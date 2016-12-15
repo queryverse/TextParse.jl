@@ -16,8 +16,8 @@ end
 
 @inline function tryparsenext{T<:Signed}(::Prim{T}, str, i, len)
     R = Nullable{T}
-    sign, i = @chk1 tryparsenext_sign(str, i, len)
-    x, i = @chk1 tryparsenext_base10(T, str, i, len, 20)
+    @chk2 sign, i = tryparsenext_sign(str, i, len)
+    @chk2 x, i = tryparsenext_base10(T, str, i, len, 20)
 
     @label done
     return R(sign*x), i
@@ -29,13 +29,13 @@ end
 @inline function tryparsenext(::Prim{Float64}, str, i, len)
     R = Nullable{Float64}
     f = 0.0
-    sign, i = @chk1 tryparsenext_sign(str, i, len)
-    x, i = @chk1 tryparsenext_base10(Int, str, i, len, 20)
+    @chk2 sign, i = tryparsenext_sign(str, i, len)
+    @chk2 x, i = tryparsenext_base10(Int, str, i, len, 20)
     i > len && @goto done
     @inbounds point, ii = next(str, i)
 
     point != '.' && @goto done
-    y, i = @chk1 tryparsenext_base10_frac(str, ii, len, 16)
+    @chk2 y, i = tryparsenext_base10_frac(str, ii, len, 16)
     f = y / 10^16
 
     @label done
@@ -60,7 +60,7 @@ end
 
 @inline function tryparsenext{T<:AbstractString}(::Prim{T}, str, i, len, opts)
     R = Nullable{T}
-    _, ii = @chk1 tryparsenext_string(str, i, len, opts.delim)
+    @chk2 _, ii = tryparsenext_string(str, i, len, opts.delim)
 
     @label done
     return R(_substring(T, str, i, ii-1)), ii
@@ -101,7 +101,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
             i = ii
         end
     end
-    res, i = @chk1 tryparsenext(f.inner, str, i, len)
+    @chk2 res, i = tryparsenext(f.inner, str, i, len)
 
     i0 = i
     if f.ignore_end_whitespace

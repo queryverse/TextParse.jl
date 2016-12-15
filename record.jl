@@ -14,7 +14,7 @@ end
         i > len && @goto error
 
         Base.@nexprs $N j->begin
-            (val_j, i) = @chk1 tryparsenext(r.fields[j], str, i, len)
+            @chk2 (val_j, i) = tryparsenext(r.fields[j], str, i, len)
         end
 
         @label done
@@ -31,7 +31,7 @@ end
         i > len && @goto error
 
         Base.@nexprs $N j->begin
-            val_j, i = @chk1 tryparsenext(r.fields[j], str, i, len)
+            @chk2 val_j, i = tryparsenext(r.fields[j], str, i, len)
             columns[j][col] = val_j
         end
 
@@ -47,10 +47,10 @@ using Base.Test
 let
     unwrap(xs) = (get(xs[1]), xs[2:end]...)
     failedat(xs) = (@assert isnull(xs[1]); xs[2])
-    R = Nullable{Tuple{Int, UInt, Float64}}
     r=Record((Field(Prim{Int}()), Field(Prim{UInt}()), Field(Prim{Float64}())))
     @test tryparsenext(r, "12,21,21,", 1, 9) |> unwrap == ((12, UInt(21), 21.0), 10)
     @test tryparsenext(r, "12,21.0,21,", 1, 9) |> failedat == 6
     s = "12   ,  21,  21.23,"
-    @test tryparsenext(r, s, 1, 9) |> unwrap == (R((12, 21, 21.23)), length(s)+1)
+    @test tryparsenext(r, s, 1, length(s)) |> unwrap == ((12, UInt(21), 21.23), length(s)+1)
+    nothing
 end

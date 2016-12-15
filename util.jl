@@ -11,6 +11,23 @@ macro chk1(expr,label=:error)
     end
 end
 
+macro chk2(expr,label=:error)
+    @assert expr.head == :(=)
+    lhs, rhs = expr.args
+
+    @assert lhs.head == :tuple
+    res, state = lhs.args
+    quote
+        x = $(esc(rhs))
+        $(esc(state)) = x[2] # bubble error location
+        if isnull(x[1])
+            @goto $label
+        else
+            $(esc(res)) = get(x[1])
+        end
+    end
+end
+
 @inline function tryparsenext_base10_digit(T,str,i, len)
     R = Nullable{T}
     i > len && @goto error
@@ -24,10 +41,10 @@ end
 
 @inline function tryparsenext_base10(T, str,i,len, maxdig)
     R = Nullable{T}
-    r,i = @chk1 tryparsenext_base10_digit(T,str,i, len)
+    @chk2 r, i = tryparsenext_base10_digit(T,str,i, len)
     ten = T(10)
     for j = 2:maxdig
-        d,i = @chk1 tryparsenext_base10_digit(T,str,i,len) done
+        @chk2 d, i = tryparsenext_base10_digit(T,str,i,len) done
         r = r*ten + d
     end
     @label done
@@ -52,7 +69,7 @@ end
 
 @inline function tryparsenext_base10_frac(str,i,len,maxdig)
     R = Nullable{Int}
-    r,i = @chk1 tryparsenext_base10_digit(Int, str,i,len)
+    @chk2 r, i = tryparsenext_base10_digit(Int, str,i,len)
     for j = 2:maxdig
         nd,i = tryparsenext_base10_digit(Int, str,i,len)
         if isnull(nd)
