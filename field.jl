@@ -133,13 +133,3 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     @label error
     return R(), i
 end
-
-using Base.Test
-let
-    R = Nullable{Tuple{Int, UInt, Float64}}
-    r=Record((Prim{Int}(), Prim{UInt}(), Prim{Float64}()))
-    @test tryparsenext(r, "12,21,21,", 1, 9) == (R((12, 21, 21.0)), 10)
-    @test tryparsenext(r, "12,21.0,21,", 1, 9) == (R(), 6)
-    s = "12   ,  21,  21.23,"
-    @test tryparsenext(r, s, 1, 9) == (R((12, 21, 21.23)), length(s)+1)
-end
