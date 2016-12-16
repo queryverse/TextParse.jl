@@ -92,6 +92,8 @@ end
 
 Repeated{F}(f::F, n) = Repeated{F, fieldtype(f), n}(f)
 
+fieldtype{F,T,N}(::Repeated{F,T,N}) = NTuple{N,T}
+
 @generated function tryparsenext{F,T,N}(f::Repeated{F,T,N}, str, i, len)
     quote
         R = Nullable{NTuple{N,T}}
