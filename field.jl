@@ -79,10 +79,10 @@ end
 
 @qtype Field{T}(
     inner::Prim{T}
-  , ignore_init_whitespace::Bool=true
+  ; ignore_init_whitespace::Bool=true
   , ignore_end_whitespace::Bool=true
   , quoted::Bool=false
-  , quotechar::Char='"'
+  , quotechar::Char='\"'
   , escapechar::Char='\\'
   , eofdelim::Bool=false
   , spacedelim::Bool=false
