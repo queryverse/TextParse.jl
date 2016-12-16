@@ -7,6 +7,8 @@ abstract AbstractToken{T}
 ### parses just the thing of type T
 immutable Prim{T} <: AbstractToken{T} end
 
+fieldtype{T}(::AbstractToken{T}) = T
+
 
 ### Unsigned integers
 
@@ -133,3 +135,4 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     @label error
     return R(), i
 end
+

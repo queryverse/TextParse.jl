@@ -82,5 +82,43 @@ end
 using Base.Test
 let
     f = UseOne((Field(Prim{Int}(), delim=';'), Field(Prim{Float64}()), Field(Prim{Int}(), eofdelim=true)), 3)
-    @test tryparsenext(f, "1; 33.21, 42", 1, 12) |> unwrap == (42, 13)
+    @test tryparsenext(f, "1; 33.21, 45", 1, 12) |> unwrap == (45, 13)
+end
+
+
+immutable Repeated{F, T, N}
+    field::F
+end
+
+Repeated{F}(f::F, n) = Repeated{F, fieldtype(f), n}(f)
+
+@generated function tryparsenext{F,T,N}(f::Repeated{F,T,N}, str, i, len)
+    quote
+        R = Nullable{NTuple{N,T}}
+        i > len && @goto error
+
+        # pefect candidate for #11902
+        Base.@nexprs $N j->begin
+            @chk2 (val_j, i) = tryparsenext(f.field, str, i, len)
+        end
+
+        @label done
+        return R(Base.@ntuple $N val), i
+
+        @label error
+        R(), i
+    end
+end
+
+using BenchmarkTools
+
+let
+    f = Repeated(Field(Prim{Int}(), delim=';'), 3)
+    @test tryparsenext(f, "1; 33; 45;", 1, 12) |> unwrap == ((1,33,45), 11)
+
+    inp = join(map(string, [1:45;]), "; ") * "; "
+    out = ntuple(identity, 45)
+    f2 = Repeated(Field(Prim{Int}(), delim=';'), 45)
+    @test tryparsenext(f2, inp, 1, length(inp)) |> unwrap == (out, length(inp))
+    #@benchmark tryparsenext($f2, $inp, 1, length($inp))
 end
