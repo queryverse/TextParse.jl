@@ -103,10 +103,11 @@ end
         i > len && break
         c, ii = next(str, i)
         for endchar in endchars
-            endchar == c && break
+            endchar == c && @goto done
         end
         i = ii
     end
+    @label done
     return Nullable{Int}(0), i
 end
 
