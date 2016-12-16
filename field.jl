@@ -5,7 +5,10 @@ abstract AbstractToken{T}
 
 ### Simple primitive parsing
 ### parses just the thing of type T
-immutable Prim{T} <: AbstractToken{T} end
+immutable Prim{T} <: AbstractToken{T}
+    delim::Char
+end
+Prim(T) = Prim{T}(',')
 
 fieldtype{T}(::AbstractToken{T}) = T
 
@@ -51,18 +54,18 @@ end
     str[i:j]
 end
 
-@inline function _substring(::Type{SubString}, str, i, j)
+@inline function _substring{T}(::Type{SubString{T}}, str, i, j)
     SubString(str, i, j)
 end
 
 using WeakRefStrings
-@inline function _substring(::Type{WeakRefString}, str, i, j)
+@inline function _substring{T}(::Type{WeakRefString{T}}, str, i, j)
     WeakRefString(pointer(str.data)+(i-1), (j-i+1))
 end
 
-@inline function tryparsenext{T<:AbstractString}(::Prim{T}, str, i, len, opts)
+function tryparsenext{T<:AbstractString}(p::Prim{T}, str, i, len)
     R = Nullable{T}
-    @chk2 _, ii = tryparsenext_string(str, i, len, opts.delim)
+    @chk2 _, ii = tryparsenext_string(str, i, len, (p.delim,))
 
     @label done
     return R(_substring(T, str, i, ii-1)), ii

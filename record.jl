@@ -45,7 +45,7 @@ end
 
 using Base.Test
 let
-    r=Record((Field(Prim{Int}()), Field(Prim{UInt}()), Field(Prim{Float64}())))
+    r=Record((Field(Prim(Int)), Field(Prim(UInt)), Field(Prim(Float64))))
     @test tryparsenext(r, "12,21,21,", 1, 9) |> unwrap == ((12, UInt(21), 21.0), 10)
     @test tryparsenext(r, "12,21.0,21,", 1, 9) |> failedat == 6
     s = "12   ,  21,  21.23,"
@@ -81,7 +81,7 @@ end
 
 using Base.Test
 let
-    f = UseOne((Field(Prim{Int}(), delim=';'), Field(Prim{Float64}()), Field(Prim{Int}(), eofdelim=true)), 3)
+    f = UseOne((Field(Prim(Int), delim=';'), Field(Prim(Float64)), Field(Prim(Int), eofdelim=true)), 3)
     @test tryparsenext(f, "1; 33.21, 45", 1, 12) |> unwrap == (45, 13)
 end
 
@@ -113,12 +113,12 @@ end
 using BenchmarkTools
 
 let
-    f = Repeated(Field(Prim{Int}(), delim=';'), 3)
+    f = Repeated(Field(Prim(Int), delim=';'), 3)
     @test tryparsenext(f, "1; 33; 45;", 1, 12) |> unwrap == ((1,33,45), 11)
 
     inp = join(map(string, [1:45;]), "; ") * "; "
     out = ntuple(identity, 45)
-    f2 = Repeated(Field(Prim{Int}(), delim=';'), 45)
+    f2 = Repeated(Field(Prim(Int), delim=';'), 45)
     @test tryparsenext(f2, inp, 1, length(inp)) |> unwrap == (out, length(inp))
     #@benchmark tryparsenext($f2, $inp, 1, length($inp))
 end
