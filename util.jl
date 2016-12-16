@@ -114,3 +114,8 @@ end
     c == ' ' || c == '\t'
 end
 
+
+### Testing helpers
+
+unwrap(xs) = (get(xs[1]), xs[2:end]...)
+failedat(xs) = (@assert isnull(xs[1]); xs[2])

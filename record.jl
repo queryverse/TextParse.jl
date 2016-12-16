@@ -45,12 +45,42 @@ end
 
 using Base.Test
 let
-    unwrap(xs) = (get(xs[1]), xs[2:end]...)
-    failedat(xs) = (@assert isnull(xs[1]); xs[2])
     r=Record((Field(Prim{Int}()), Field(Prim{UInt}()), Field(Prim{Float64}())))
     @test tryparsenext(r, "12,21,21,", 1, 9) |> unwrap == ((12, UInt(21), 21.0), 10)
     @test tryparsenext(r, "12,21.0,21,", 1, 9) |> failedat == 6
     s = "12   ,  21,  21.23,"
     @test tryparsenext(r, s, 1, length(s)) |> unwrap == ((12, UInt(21), 21.23), length(s)+1)
     nothing
+end
+
+
+# Weird hybrid of records and fields
+
+immutable UseOne{T,R<:Record,use} <: AbstractToken{T}
+    record::R
+end
+
+fieldtype{T}(::UseOne{T}) = T
+
+function UseOne(fields::Tuple, use)
+    r = Record(fields)
+    UseOne{fieldtype(fields[use]), typeof(r), use}(r)
+end
+getthing{n}(x, ::Type{Val{n}}) = x[n]
+function tryparsenext{T,S,use}(f::UseOne{T,S,use}, str, i, len)
+    R = Nullable{T}
+    @chk2 xs, i = tryparsenext(f.record, str, i, len)
+
+    @label done
+    return R(getthing(xs, Val{use})), i
+
+    @label error
+    return R(), i
+end
+
+
+using Base.Test
+let
+    f = UseOne((Field(Prim{Int}(), delim=';'), Field(Prim{Float64}()), Field(Prim{Int}(), eofdelim=true)), 3)
+    @test tryparsenext(f, "1; 33.21, 42", 1, 12) |> unwrap == (42, 13)
 end
