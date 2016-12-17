@@ -98,7 +98,7 @@ end
   , quoted::Bool=false
   , quotechar::Char='\"'
   , escapechar::Char='\\'
-  , eofdelim::Bool=false
+  , eoldelim::Bool=false
   , spacedelim::Bool=false
   , delim::Char=','
 )
@@ -130,7 +130,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     f.delim == '\t' && c == '\t' && @goto done
 
     if i > len
-        if f.eofdelim
+        if f.eoldelim
             @goto done
         else
             @goto error
@@ -138,6 +138,26 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     end
 
     @inbounds c, ii = next(str, i)
+
+    if f.eoldelim
+        if c == '\r'
+            i=ii
+            c, ii = next(str, i)
+            if c == '\n'
+                i=ii
+            end
+            @goto done
+        elseif c == '\n'
+            i=ii
+            c, ii = next(str, i)
+            if c == '\r'
+                i=ii
+            end
+            @goto done
+        end
+        @goto error
+    end
+
     c != f.delim && @goto error # this better be the delim!!
     i = ii
 

@@ -81,7 +81,7 @@ end
 
 using Base.Test
 let
-    f = UseOne((Field(Prim(Int), delim=';'), Field(Prim(Float64)), Field(Prim(Int), eofdelim=true)), 3)
+    f = UseOne((Field(Prim(Int), delim=';'), Field(Prim(Float64)), Field(Prim(Int), eoldelim=true)), 3)
     @test tryparsenext(f, "1; 33.21, 45", 1, 12) |> unwrap == (45, 13)
 end
 
