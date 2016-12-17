@@ -39,11 +39,11 @@ end
     return R(), i
 end
 
-@inline function tryparsenext_base10(T, str,i,len, maxdig)
+@inline function tryparsenext_base10(T, str,i,len)
     R = Nullable{T}
     @chk2 r, i = tryparsenext_base10_digit(T,str,i, len)
     ten = T(10)
-    for j = 2:maxdig
+    while true
         @chk2 d, i = tryparsenext_base10_digit(T,str,i,len) done
         r = r*ten + d
     end

@@ -16,13 +16,13 @@ fieldtype{T}(::AbstractToken{T}) = T
 ### Unsigned integers
 
 @inline function tryparsenext{T<:Unsigned}(::Prim{T}, str, i, len)
-    tryparsenext_base10(T,str, i, len, 20)
+    tryparsenext_base10(T,str, i, len)
 end
 
 @inline function tryparsenext{T<:Signed}(::Prim{T}, str, i, len)
     R = Nullable{T}
     @chk2 sign, i = tryparsenext_sign(str, i, len)
-    @chk2 x, i = tryparsenext_base10(T, str, i, len, 20)
+    @chk2 x, i = tryparsenext_base10(T, str, i, len)
 
     @label done
     return R(sign*x), i
@@ -43,20 +43,37 @@ end
         i=ii
         @goto dec
     end
-    @chk2 x, i = tryparsenext_base10(Int, str, i, len, 20)
+    @chk2 x, i = tryparsenext_base10(Int, str, i, len)
     i > len && @goto done
     @inbounds c, ii = next(str, i)
 
     c != '.' && @goto done
     @label dec
-    @chk2 y, i = tryparsenext_base10_frac(str, ii, len, 16)
-    f = y / 10^16
+    @chk2 y, i = tryparsenext_base10(Int, str, ii, len)
+    f = y / 10.0^(i-ii)
+
+    i > len && @goto done
+    c, ii = next(str, i)
+    if c == 'e' || c == 'E'
+        @chk2 exp, i = tryparsenext(Prim(Int), str, ii, len)
+        return R(sign*(x+f) * 10.0^exp), i
+    end
 
     @label done
     return R(sign*(x+f)), i
 
     @label error
     return R(), i
+end
+
+using Base.Test
+let
+    @test tryparsenext(Prim(Float64), "21", 1, 2) |> unwrap== (21.0,3)
+    @test tryparsenext(Prim(Float64), ".21", 1, 3) |> unwrap== (.21,4)
+    @test tryparsenext(Prim(Float64), "1.21", 1, 4) |> unwrap== (1.21,5)
+    @test tryparsenext(Prim(Float64), "-1.21", 1, 5) |> unwrap== (-1.21,6)
+    @test tryparsenext(Prim(Float64), "-1.5e-12", 1, 8) |> unwrap == (-1.5e-12,9)
+    @test tryparsenext(Prim(Float64), "-1.5E-12", 1, 8) |> unwrap == (-1.5e-12,9)
 end
 
 @inline function _substring(::Type{String}, str, i, j)
@@ -83,6 +100,16 @@ function tryparsenext{T<:AbstractString}(p::Prim{T}, str, i, len)
     return R(), ii
 end
 
+function tryparsenext(p::Prim{Tuple{Int, Int}}, str, i, len)
+    R = Nullable{Tuple{Int,Int}}
+    @chk2 _, ii = tryparsenext_string(str, i, len, (p.delim,))
+
+    @label done
+    return R((i, ii-1)), ii
+
+    @label error
+    return R(), ii
+end
 # fallback to method which doesn't need options
 @inline function tryparsenext(f, str, i, len, opts)
     tryparsenext(f, str, i, len)
