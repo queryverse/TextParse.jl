@@ -63,7 +63,7 @@ end
     elseif c == '+'
         return R(1), ii
     else
-        return '0' <= c <= '9' ? (R(1), i) : (R(), i)
+        return (R(1), i)
     end
 end
 

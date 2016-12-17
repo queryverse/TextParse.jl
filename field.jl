@@ -35,11 +35,20 @@ end
     R = Nullable{Float64}
     f = 0.0
     @chk2 sign, i = tryparsenext_sign(str, i, len)
+    x=0
+
+    i > len && @goto error
+    c, ii = next(str, i)
+    if c == '.'
+        i=ii
+        @goto dec
+    end
     @chk2 x, i = tryparsenext_base10(Int, str, i, len, 20)
     i > len && @goto done
-    @inbounds point, ii = next(str, i)
+    @inbounds c, ii = next(str, i)
 
-    point != '.' && @goto done
+    c != '.' && @goto done
+    @label dec
     @chk2 y, i = tryparsenext_base10_frac(str, ii, len, 16)
     f = y / 10^16
 
