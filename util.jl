@@ -87,32 +87,12 @@ end
     return R(), i
 end
 
-@inline function tryparsenext_char(str,i,len,cc::Char)::Tuple{Nullable{Char},Int}
-    R = Nullable{Char}
-    i > len && @goto error
-    c,ii = next(str,i)
-    c == cc || @goto error
-    return R(c), ii
-
-    @label error
-    return R(), i
-end
-
-@inline function tryparsenext_string{N}(str, i, len, endchars::NTuple{N, Char}, maxchars=typemax(Int))
-    for j=1:maxchars
-        i > len && break
-        c, ii = next(str, i)
-        for endchar in endchars
-            endchar == c && @goto done
-        end
-        i = ii
-    end
-    @label done
-    return Nullable{Int}(0), i
-end
-
 @inline function iswhitespace(c::Char)
     c == ' ' || c == '\t'
+end
+
+@inline function isnewline(c::Char)
+    c == '\n' || c == '\r'
 end
 
 

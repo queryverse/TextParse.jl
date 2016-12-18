@@ -80,22 +80,30 @@ end
 
 
 @qtype Str{T}(
-    delim::Char=','
-  , quotechar::Char='\"'
+    output_type::Type{T}
+  ; delim::Char=','
+  , includenewline=false
   , escapechar::Char='\\'
 ) <: AbstractToken{T}
 
-fromtype{S<:AbstractString}(::Type{S}) = Str{S}()
+fromtype{S<:AbstractString}(::Type{S}) = Str(S)
 
-function tryparsenext{T}(p::Str{T}, str, i, len)
+function tryparsenext{T}(s::Str{T}, str, i, len)
     R = Nullable{T}
-    @chk2 _, ii = tryparsenext_string(str, i, len, (p.delim,))
+    p = ' '
+    i0 = i
+    while true
+        i > len && break
+        c, ii = next(str, i)
+        if (c == s.delim && p != s.escapechar) ||
+            (!s.includenewline && isnewline(c))
+            break
+        end
+        i = ii
+        p = c
+    end
 
-    @label done
-    return R(_substring(T, str, i, ii-1)), ii
-
-    @label error
-    return R(), ii
+    return R(_substring(T, str, i0, i-1)), i
 end
 
 @inline function _substring(::Type{String}, str, i, j)
@@ -109,6 +117,15 @@ end
 using WeakRefStrings
 @inline function _substring{T}(::Type{WeakRefString{T}}, str, i, j)
     WeakRefString(pointer(str.data)+(i-1), (j-i+1))
+end
+
+let
+    for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 11)]
+        @test tryparsenext(Str(String), s) |> unwrap == (s[1:till-1], till)
+    end
+    for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
+        @test tryparsenext(Str(String, includenewline=true), s) |> unwrap == (s[1:till-1], till)
+    end
 end
 
 
