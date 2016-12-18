@@ -1,25 +1,23 @@
 using QuickTypes
 
 abstract AbstractToken{T}
-
-
-### Simple primitive parsing
-### parses just the thing of type T
-immutable Prim{T} <: AbstractToken{T}
-    delim::Char
-end
-Prim(T) = Prim{T}(',')
-
 fieldtype{T}(::AbstractToken{T}) = T
+fieldtype{T}(::Type{AbstractToken{T}}) = T
+fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 
+
+# Numberic parsing
+@qtype Numeric{T}(
+    decimal::Char='.'
+  , thousands::Char=','
+) <: AbstractToken{T}
+
+Numeric{N<:Number}(::Type{N}; kws...) = Numeric{N}(;kws...)
+fromtype{N<:Number}(::Type{N}) = Numeric(N)
 
 ### Unsigned integers
 
-@inline function tryparsenext{T<:Unsigned}(::Prim{T}, str, i, len)
-    tryparsenext_base10(T,str, i, len)
-end
-
-@inline function tryparsenext{T<:Signed}(::Prim{T}, str, i, len)
+@inline function tryparsenext{T<:Signed}(::Numeric{T}, str, i, len)
     R = Nullable{T}
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
@@ -31,8 +29,12 @@ end
     return R(), i
 end
 
-@inline function tryparsenext(::Prim{Float64}, str, i, len)
-    R = Nullable{Float64}
+@inline function tryparsenext{T<:Unsigned}(::Numeric{T}, str, i, len)
+    tryparsenext_base10(T,str, i, len)
+end
+
+@inline function tryparsenext{F<:AbstractFloat}(::Numeric{F}, str, i, len)
+    R = Nullable{F}
     f = 0.0
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     x=0
@@ -55,7 +57,7 @@ end
     i > len && @goto done
     c, ii = next(str, i)
     if c == 'e' || c == 'E'
-        @chk2 exp, i = tryparsenext(Prim(Int), str, ii, len)
+        @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
         return R(sign*(x+f) * 10.0^exp), i
     end
 
@@ -68,12 +70,32 @@ end
 
 using Base.Test
 let
-    @test tryparsenext(Prim(Float64), "21", 1, 2) |> unwrap== (21.0,3)
-    @test tryparsenext(Prim(Float64), ".21", 1, 3) |> unwrap== (.21,4)
-    @test tryparsenext(Prim(Float64), "1.21", 1, 4) |> unwrap== (1.21,5)
-    @test tryparsenext(Prim(Float64), "-1.21", 1, 5) |> unwrap== (-1.21,6)
-    @test tryparsenext(Prim(Float64), "-1.5e-12", 1, 8) |> unwrap == (-1.5e-12,9)
-    @test tryparsenext(Prim(Float64), "-1.5E-12", 1, 8) |> unwrap == (-1.5e-12,9)
+    @test tryparsenext(fromtype(Float64), "21", 1, 2) |> unwrap== (21.0,3)
+    @test tryparsenext(fromtype(Float64), ".21", 1, 3) |> unwrap== (.21,4)
+    @test tryparsenext(fromtype(Float64), "1.21", 1, 4) |> unwrap== (1.21,5)
+    @test tryparsenext(fromtype(Float64), "-1.21", 1, 5) |> unwrap== (-1.21,6)
+    @test tryparsenext(fromtype(Float64), "-1.5e-12", 1, 8) |> unwrap == (-1.5e-12,9)
+    @test tryparsenext(fromtype(Float64), "-1.5E-12", 1, 8) |> unwrap == (-1.5e-12,9)
+end
+
+
+@qtype Str{T}(
+    delim::Char=','
+  , quotechar::Char='\"'
+  , escapechar::Char='\\'
+) <: AbstractToken{T}
+
+fromtype{S<:AbstractString}(::Type{S}) = Str{S}()
+
+function tryparsenext{T}(p::Str{T}, str, i, len)
+    R = Nullable{T}
+    @chk2 _, ii = tryparsenext_string(str, i, len, (p.delim,))
+
+    @label done
+    return R(_substring(T, str, i, ii-1)), ii
+
+    @label error
+    return R(), ii
 end
 
 @inline function _substring(::Type{String}, str, i, j)
@@ -89,37 +111,21 @@ using WeakRefStrings
     WeakRefString(pointer(str.data)+(i-1), (j-i+1))
 end
 
-function tryparsenext{T<:AbstractString}(p::Prim{T}, str, i, len)
-    R = Nullable{T}
-    @chk2 _, ii = tryparsenext_string(str, i, len, (p.delim,))
 
-    @label done
-    return R(_substring(T, str, i, ii-1)), ii
-
-    @label error
-    return R(), ii
+immutable LiteStr
+    range::UnitRange{Int}
 end
+fromtype(::Type{LiteStr}) = Str{LiteStr}()
 
-function tryparsenext(p::Prim{Tuple{Int, Int}}, str, i, len)
-    R = Nullable{Tuple{Int,Int}}
-    @chk2 _, ii = tryparsenext_string(str, i, len, (p.delim,))
-
-    @label done
-    return R((i, ii-1)), ii
-
-    @label error
-    return R(), ii
-end
-# fallback to method which doesn't need options
-@inline function tryparsenext(f, str, i, len, opts)
-    tryparsenext(f, str, i, len)
+@inline function _substring(::Type{LiteStr}, str, i, j)
+    LiteStr(i:j)
 end
 
 
 ### Field parsing
 
-@qtype Field{T}(
-    inner::Prim{T}
+@qtype Field{T,S<:AbstractToken}(
+    inner::S
   ; ignore_init_whitespace::Bool=true
   , ignore_end_whitespace::Bool=true
   , quoted::Bool=false
@@ -128,9 +134,8 @@ end
   , eoldelim::Bool=false
   , spacedelim::Bool=false
   , delim::Char=','
-)
-
-fieldtype{T}(::Field{T}) = T
+  , output_type::Type{T}=fieldtype(inner)
+) <: AbstractToken{T}
 
 function tryparsenext{T}(f::Field{T}, str, i, len)
     R = Nullable{T}
