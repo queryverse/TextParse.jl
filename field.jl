@@ -79,9 +79,9 @@ let
 end
 
 
-@qtype Str{T}(
+@qimmutable Str{T}(
     output_type::Type{T}
-  ; delim::Char=','
+    ; endchar::Char=','
   , includenewline=false
   , escapechar::Char='\\'
 ) <: AbstractToken{T}
@@ -90,12 +90,13 @@ fromtype{S<:AbstractString}(::Type{S}) = Str(S)
 
 function tryparsenext{T}(s::Str{T}, str, i, len)
     R = Nullable{T}
+    i > len && return R(), i
     p = ' '
     i0 = i
     while true
         i > len && break
         c, ii = next(str, i)
-        if (c == s.delim && p != s.escapechar) ||
+        if (c == s.endchar && p != s.escapechar) ||
             (!s.includenewline && isnewline(c))
             break
         end
@@ -126,6 +127,7 @@ let
     for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
         @test tryparsenext(Str(String, includenewline=true), s) |> unwrap == (s[1:till-1], till)
     end
+    @test tryparsenext(Str(String, includenewline=true), "") |> failedat == 1
 end
 
 
