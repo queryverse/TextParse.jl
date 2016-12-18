@@ -79,13 +79,13 @@ let
 end
 
 
-@qimmutable Str{T}(
-    output_type::Type{T}
-    ; endchar::Char=','
-  , includenewline=false
-  , escapechar::Char='\\'
-) <: AbstractToken{T}
+immutable Str{T} <: AbstractToken{T}
+    endchar::Char
+    escapechar::Char
+    includenewline::Bool
+end
 
+Str{T}(t::Type{T}, endchar=',', escapechar='\\', includenewline=false) = Str{T}(endchar, escapechar, includenewline)
 fromtype{S<:AbstractString}(::Type{S}) = Str(S)
 
 function tryparsenext{T}(s::Str{T}, str, i, len)
@@ -125,9 +125,9 @@ let
         @test tryparsenext(Str(String), s) |> unwrap == (s[1:till-1], till)
     end
     for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(Str(String, includenewline=true), s) |> unwrap == (s[1:till-1], till)
+        @test tryparsenext(Str(String, ',', '"', true), s) |> unwrap == (s[1:till-1], till)
     end
-    @test tryparsenext(Str(String, includenewline=true), "") |> failedat == 1
+    @test tryparsenext(Str(String, ',', '"', true), "") |> failedat == 1
 end
 
 
@@ -182,7 +182,7 @@ end
 # XXX: feels like a hack - might be slow
 @inline function tryparsenext_inner{T,S<:Str}(q::Quoted{T,S}, str, i, len, quotestarted)
     if quotestarted
-        return tryparsenext(Str(T, endchar=q.quotechar, escapechar=q.escapechar, includenewline=true), str, i, len)
+        return tryparsenext(Str(T, q.quotechar, q.escapechar, true), str, i, len)
     else
         return tryparsenext(q.inner, str, i, len)
     end
@@ -229,7 +229,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len)
     return R(T(x)), ii
 
     @label maybe_null
-    @chk2 nastr, ii = tryparsenext(Str(String, endchar=na.endchar, includenewline=false), str, i,len)
+    @chk2 nastr, ii = tryparsenext(Str(String, na.endchar, '\\', false), str, i,len)
     if nastr in na.nastrings
         i=ii
         @goto null
