@@ -134,7 +134,7 @@ end
 immutable LiteStr
     range::UnitRange{Int}
 end
-fromtype(::Type{LiteStr}) = Str{LiteStr}()
+fromtype(::Type{LiteStr}) = Str(LiteStr)
 
 @inline function _substring(::Type{LiteStr}, str, i, j)
     LiteStr(i:j)
@@ -200,6 +200,57 @@ let
     @test tryparsenext(Quoted(Str(String), required=true), "x\"abc\"") |> failedat == 1
 end
 
+### Nullable
+
+const NA_Strings = ("NA", "N/A","#N/A", "#N/A N/A", "#NA",
+                    "-1.#IND", "-1.#QNAN", "-NaN", "-nan",
+                    "1.#IND", "1.#QNAN", "N/A", "NA",
+                    "NULL", "NaN", "nan")
+
+@qtype NAToken{T, S<:AbstractToken}(
+    inner::S
+  ; emptyisna=true
+  , endchar=','
+  , nastrings=NA_Strings
+  , output_type::Type{T}=Nullable{fieldtype(inner)}
+) <: AbstractToken{T}
+
+function tryparsenext{T}(na::NAToken{T}, str, i, len)
+    R = Nullable{T}
+    i > len && @goto error
+    c, ii=next(str,i)
+    if (c == na.endchar || isnewline(c)) && na.emptyisna
+       @goto null
+    end
+
+    @chk2 x,ii = tryparsenext(na.inner, str, i, len) maybe_null
+
+    @label done
+    return R(T(x)), ii
+
+    @label maybe_null
+    @chk2 nastr, ii = tryparsenext(Str(String, endchar=na.endchar, includenewline=false), str, i,len)
+    if nastr in na.nastrings
+        i=ii
+        @goto null
+    end
+    return R(), i
+
+    @label null
+    return R(T()), i
+
+    @label error
+    return R(), i
+end
+
+fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
+
+let
+    @test tryparsenext(NAToken(fromtype(Float64)), ",") |> unwrap |> failedat == 1 # is nullable
+    @test tryparsenext(NAToken(fromtype(Float64)), "X,") |> failedat == 1
+    @test tryparsenext(NAToken(fromtype(Float64)), "NA,") |> unwrap |> failedat == 3
+    @test tryparsenext(NAToken(fromtype(Float64)), "1.212,") |> unwrap |> unwrap == (1.212, 6)
+end
 
 ### Field parsing
 
