@@ -140,6 +140,66 @@ fromtype(::Type{LiteStr}) = Str{LiteStr}()
     LiteStr(i:j)
 end
 
+@qtype Quoted{T, S<:AbstractToken}(
+    inner::S
+  ; output_type::Type{T}=fieldtype(inner)
+  , required::Bool=false
+  , quotechar::Char='"'
+  , escapechar::Char='\\'
+) <: AbstractToken{T}
+
+function tryparsenext{T}(q::Quoted{T}, str, i, len)
+    R = Nullable{T}
+    i > len && @goto error
+    c, ii = next(str, i)
+    quotestarted = false
+    if q.quotechar == c
+        quotestarted = true
+        i = ii
+    else
+        q.required && @goto error
+    end
+    @chk2 x, i = tryparsenext_inner(q, str, i, len, quotestarted)
+
+    if i > len
+        quotestarted && @goto error
+        @goto done
+    end
+    c, ii = next(str, i)
+    # TODO: eat up whitespaces?
+    if quotestarted && c != q.quotechar
+        @goto error
+    end
+    i = ii
+
+    @label done
+    return R(x), i
+
+    @label error
+    return R(), i
+end
+
+# XXX: feels like a hack - might be slow
+@inline function tryparsenext_inner{T,S<:Str}(q::Quoted{T,S}, str, i, len, quotestarted)
+    if quotestarted
+        return tryparsenext(Str(T, endchar=q.quotechar, escapechar=q.escapechar, includenewline=true), str, i, len)
+    else
+        return tryparsenext(q.inner, str, i, len)
+    end
+end
+
+@inline function tryparsenext_inner(q::Quoted, str, i, len, quotestarted)
+    tryparsenext(q.inner, str, i, len)
+end
+
+let
+    @test tryparsenext(Quoted(Str(String)), "\"abc\"") |> unwrap == ("abc", 6)
+    @test tryparsenext(Quoted(Str(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
+    @test tryparsenext(Quoted(Str(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
+    @test tryparsenext(Quoted(Str(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
+    @test tryparsenext(Quoted(Str(String), required=true), "x\"abc\"") |> failedat == 1
+end
+
 
 ### Field parsing
 
