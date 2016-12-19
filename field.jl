@@ -79,16 +79,16 @@ let
 end
 
 
-immutable Str{T} <: AbstractToken{T}
+immutable StringToken{T} <: AbstractToken{T}
     endchar::Char
     escapechar::Char
     includenewline::Bool
 end
 
-Str{T}(t::Type{T}, endchar=',', escapechar='\\', includenewline=false) = Str{T}(endchar, escapechar, includenewline)
-fromtype{S<:AbstractString}(::Type{S}) = Str(S)
+StringToken{T}(t::Type{T}, endchar=',', escapechar='\\', includenewline=false) = StringToken{T}(endchar, escapechar, includenewline)
+fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
 
-function tryparsenext{T}(s::Str{T}, str, i, len)
+function tryparsenext{T}(s::StringToken{T}, str, i, len)
     R = Nullable{T}
     i > len && return R(), i
     p = ' '
@@ -122,19 +122,19 @@ end
 
 let
     for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 11)]
-        @test tryparsenext(Str(String), s) |> unwrap == (s[1:till-1], till)
+        @test tryparsenext(StringToken(String), s) |> unwrap == (s[1:till-1], till)
     end
     for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(Str(String, ',', '"', true), s) |> unwrap == (s[1:till-1], till)
+        @test tryparsenext(StringToken(String, ',', '"', true), s) |> unwrap == (s[1:till-1], till)
     end
-    @test tryparsenext(Str(String, ',', '"', true), "") |> failedat == 1
+    @test tryparsenext(StringToken(String, ',', '"', true), "") |> failedat == 1
 end
 
 
 immutable LiteStr
     range::UnitRange{Int}
 end
-fromtype(::Type{LiteStr}) = Str(LiteStr)
+fromtype(::Type{LiteStr}) = StringToken(LiteStr)
 
 @inline function _substring(::Type{LiteStr}, str, i, j)
     LiteStr(i:j)
@@ -180,9 +180,9 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
 end
 
 # XXX: feels like a hack - might be slow
-@inline function tryparsenext_inner{T,S<:Str}(q::Quoted{T,S}, str, i, len, quotestarted)
+@inline function tryparsenext_inner{T,S<:StringToken}(q::Quoted{T,S}, str, i, len, quotestarted)
     if quotestarted
-        return tryparsenext(Str(T, q.quotechar, q.escapechar, true), str, i, len)
+        return tryparsenext(StringToken(T, q.quotechar, q.escapechar, true), str, i, len)
     else
         return tryparsenext(q.inner, str, i, len)
     end
@@ -193,11 +193,11 @@ end
 end
 
 let
-    @test tryparsenext(Quoted(Str(String)), "\"abc\"") |> unwrap == ("abc", 6)
-    @test tryparsenext(Quoted(Str(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
-    @test tryparsenext(Quoted(Str(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
-    @test tryparsenext(Quoted(Str(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
-    @test tryparsenext(Quoted(Str(String), required=true), "x\"abc\"") |> failedat == 1
+    @test tryparsenext(Quoted(StringToken(String)), "\"abc\"") |> unwrap == ("abc", 6)
+    @test tryparsenext(Quoted(StringToken(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
+    @test tryparsenext(Quoted(StringToken(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
+    @test tryparsenext(Quoted(StringToken(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
+    @test tryparsenext(Quoted(StringToken(String), required=true), "x\"abc\"") |> failedat == 1
 end
 
 ### Nullable
@@ -229,7 +229,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len)
     return R(T(x)), ii
 
     @label maybe_null
-    @chk2 nastr, ii = tryparsenext(Str(String, na.endchar, '\\', false), str, i,len)
+    @chk2 nastr, ii = tryparsenext(StringToken(String, na.endchar, '\\', false), str, i,len)
     if nastr in na.nastrings
         i=ii
         @goto null
