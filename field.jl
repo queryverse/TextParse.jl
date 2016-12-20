@@ -137,13 +137,11 @@ let
 end
 
 
-immutable LiteStr
-    range::UnitRange{Int}
-end
-fromtype(::Type{LiteStr}) = StringToken(LiteStr)
+include("lib/substringarray.jl")
+fromtype(::Type{StrRange}) = StringToken(StrRange)
 
-@inline function _substring(::Type{LiteStr}, str, i, j)
-    LiteStr(i:j)
+@inline function _substring(::Type{StrRange}, str, i, j)
+    StrRange(i:j)
 end
 
 @qtype Quoted{T, S<:AbstractToken}(
