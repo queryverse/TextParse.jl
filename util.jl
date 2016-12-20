@@ -6,7 +6,7 @@ macro chk1(expr,label=:error)
         if isnull(x[1])
             @goto $label
         else
-            get(x[1]),x[2]
+           x[1].value, x[2]
         end
     end
 end
@@ -23,7 +23,7 @@ macro chk2(expr,label=:error)
         if isnull(x[1])
             @goto $label
         else
-            $(esc(res)) = get(x[1])
+            $(esc(res)) = x[1].value
         end
     end
 end
