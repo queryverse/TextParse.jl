@@ -18,7 +18,8 @@ type Str <: AbstractString
 end
 
 Str(d::Union{Vector{Int8},Vector{UInt8}}) = Str(pointer(d), length(d))
-Str(s::String) = Str(s.data)
+Str(s::String, offset=0, endof=length(s.data)) = Str(pointer(s.data)+offset, endof)
+Str(s::SubString) = Str(s.string, s.offset, s.endof) # TODO: handle substring of substrings
 
 endof(s::Str) = s.len
 sizeof(s::Str) = s.len
