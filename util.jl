@@ -67,26 +67,6 @@ end
     end
 end
 
-@inline function tryparsenext_base10_frac(str,i,len,maxdig)
-    R = Nullable{Int}
-    @chk2 r, i = tryparsenext_base10_digit(Int, str,i,len)
-    for j = 2:maxdig
-        nd,i = tryparsenext_base10_digit(Int, str,i,len)
-        if isnull(nd)
-            for k = j:maxdig
-                r *= 10
-            end
-            break
-        end
-        d = get(nd)
-        r = 10*r + d
-    end
-    return R(r), i
-
-    @label error
-    return R(), i
-end
-
 @inline function iswhitespace(c::Char)
     c == ' ' || c == '\t'
 end
