@@ -308,16 +308,20 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     if f.eoldelim
         if c == '\r'
             i=ii
-            c, ii = next(str, i)
-            if c == '\n'
-                i=ii
+            if i <= len
+                @inbounds c, ii = next(str, i)
+                if c == '\n'
+                    i=ii
+                end
             end
             @goto done
         elseif c == '\n'
             i=ii
-            c, ii = next(str, i)
-            if c == '\r'
-                i=ii
+            if i <= len
+                @inbounds c, ii = next(str, i)
+                if c == '\r'
+                    i=ii
+                end
             end
             @goto done
         end
