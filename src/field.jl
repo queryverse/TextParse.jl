@@ -111,8 +111,6 @@ end
     str[i:j]
 end
 
-include("lib/Str.jl")
-
 @inline function _substring(::Type{Str}, str, i, j)
     Str(pointer(str.data)+(i-1), j-i+1)
 end
