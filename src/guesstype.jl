@@ -4,18 +4,20 @@ typealias StringLike Union{AbstractString, StrRange}
 
 isna(x) = x == "" || x in NA_Strings
 
-function guess_eltype(x, prev_guess=Union{}, str_type=StrRange, isna=isna)
+function guess_eltype(x, prev_guess=Union{}, str_type=StrRange, datefmt=ISODateTimeFormat)
    guess = isna(x) ? Nullable{prev_guess} :
            !isnull(tryparse(Int64, x)) ? Int64 :
            !isnull(tryparse(Float64, x)) ? Float64 :
            !isnull(tryparse(Float64, x)) ? Float64 :
-           #!isnull(tryparse(DateTime, x)) ? DateTime
+           try DateTime(x, datefmt); true catch er false end ? datefmt :
            str_type
    t = promote_guess(prev_guess, guess)
    t == Any ? str_type : t
 end
 
 promote_guess(T,S) = promote_type(T,S)
+Base.promote_type(d1::DateFormat, d2::DateFormat) = d2
+promote_guess(T::Type{Union{}},S::DateFormat) = S
 promote_guess{S}(T,::Nullable{S}) = Nullable{promote_guess(S,T)}
 promote_guess{S<:StringLike}(T, ::S) = S
 

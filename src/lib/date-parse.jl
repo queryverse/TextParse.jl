@@ -1,6 +1,12 @@
 ### Parsing utilities
 
-@generated function tryparse_internal{T<:TimeType, S, F}(::Type{T}, str::AbstractString, df::DateFormat{S, F}, raise::Bool=false)
+import Base: unsafe_get
+
+if (!isdefined(Base, :unsafe_get))
+    unsafe_get(x::Nullable) = x.value
+end
+
+@generated function tryparse_internal{T<:TimeType, S, F}(::Type{T}, str::AbstractString, df::DateFormat{S, F}, pos, len, raise::Bool=false)
     token_types = Type[dp <: DatePart ? SLOT_RULE[first(dp.parameters)] : Void for dp in F.parameters]
     N = length(F.parameters)
 
@@ -22,7 +28,6 @@
         R = Nullable{$tuple_type}
         t = df.tokens
         l = df.locale
-        pos, len = start(str), endof(str)
 
         err_idx = 1
         Base.@nexprs $N i->val_i = 0
@@ -33,16 +38,15 @@
             val_i, pos = unsafe_get(nv), next_pos
             err_idx += 1
         end)
-        pos <= len && @goto error
 
         @label done
         parts = Base.@ntuple $N val
-        return R(reorder_args(parts, $field_order, $field_defaults, err_idx)::$tuple_type)
+        return R(reorder_args(parts, $field_order, $field_defaults, err_idx)::$tuple_type), pos
 
         @label error
         # Note: Keeping exception generation in separate function helps with performance
         raise && throw(gen_exception(t, err_idx, pos))
-        return R()
+        return R(), pos
     end
 end
 
@@ -76,7 +80,7 @@ function reorder_args{N}(val::Tuple, idx::NTuple{N}, default::Tuple, default_fro
 end
 
 function Base.tryparse{T<:TimeType}(::Type{T}, str::AbstractString, df::DateFormat)
-    nt = tryparse_internal(T, str, df, false)
+    nt,_ = tryparse_internal(T, str, df, start(str), endof(str), false)
     if isnull(nt)
         return Nullable{T}()
     else
@@ -90,7 +94,7 @@ default_format(::Type{DateTime}) = ISODateTimeFormat
 function Base.parse{T<:TimeType}(::Type{T},
                                  str::AbstractString,
                                  df::DateFormat)
-    nt = tryparse_internal(T, str, df, true)
+    nt, _ = tryparse_internal(T, str, df, start(str), endof(str), true)
     T(unsafe_get(nt)...)
 end
 

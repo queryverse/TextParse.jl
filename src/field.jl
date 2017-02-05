@@ -202,6 +202,33 @@ let
     @test tryparsenext(Quoted(StringToken(String), required=true), "x\"abc\"") |> failedat == 1
 end
 
+## Date and Time
+@qtype DateTimeToken{T,S<:DateFormat}(
+    output_type::Type{T},
+    format::S
+) <: AbstractToken{T}
+fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
+fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
+fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
+
+function fromtype(nd::Nullable{DateFormat})
+    if !isnull(nd)
+        NAToken(DateTimeToken(DateTime, get(nd)))
+    else
+        fromtype(Nullable{DateTime})
+    end
+end
+
+function tryparsenext{T}(dt::DateTimeToken{T}, str, i, len)
+    R = Nullable{T}
+    nt, i = tryparse_internal(T, str, dt.format, i, len)
+    if isnull(nt)
+        return R(), i
+    else
+        return R(T(unsafe_get(nt)...)), i
+    end
+end
+
 ### Nullable
 
 const NA_Strings = ("NA", "N/A","#N/A", "#N/A N/A", "#NA",
