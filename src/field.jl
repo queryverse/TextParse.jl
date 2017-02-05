@@ -57,7 +57,7 @@ end
     i > len && @goto done
     c, ii = next(str, i)
     if c == 'e' || c == 'E'
-        @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
+        @chk2 exp, i = tryparsenext(Numeric{Int}(), str, ii, len)
         return R(sign*(x+f) * 10.0^exp), i
     end
 
