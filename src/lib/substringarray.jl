@@ -24,3 +24,7 @@ function setindex!(x::SubStringArray, y::StrRange, idx...)
     x.ranges[idx...] = y
     x
 end
+
+function Base.resize!(x::SubStringArray, n)
+    resize!(x.ranges, n)
+end

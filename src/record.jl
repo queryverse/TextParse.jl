@@ -25,14 +25,14 @@ end
     end
 end
 
-@generated function tryparsesetindex{N,To}(r::Record{NTuple{N},To}, str, i, len, columns::Tuple, col)
+@generated function tryparsesetindex{N,To}(r::Record{NTuple{N},To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int)
     quote
         R = Nullable{Void}
         i > len && @goto error
 
         Base.@nexprs $N j->begin
             @chk2 val_j, i = tryparsenext(r.fields[j], str, i, len)
-            columns[j][col] = val_j
+            columns[j][row] = val_j
         end
 
         @label done
