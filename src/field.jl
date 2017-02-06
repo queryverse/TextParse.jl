@@ -120,8 +120,9 @@ end
 end
 
 using WeakRefStrings
-@inline function _substring{T}(::Type{WeakRefString{T}}, str, i, j)
-    WeakRefString(pointer(str.data)+(i-1), (j-i+1))
+@inline function _substring{T<:WeakRefString}(::Type{T}, str, i, j)
+    vec = Vector{UInt8}(str)
+    WeakRefString(pointer(vec)+(i-1), (j-i+1))
 end
 
 let
@@ -132,14 +133,6 @@ let
         @test tryparsenext(StringToken(String, ',', '"', true), s) |> unwrap == (s[1:till-1], till)
     end
     @test tryparsenext(StringToken(String, ',', '"', true), "") |> failedat == 1
-end
-
-
-include("lib/substringarray.jl")
-fromtype(::Type{StrRange}) = StringToken(StrRange)
-
-@inline function _substring(::Type{StrRange}, str, i, j)
-    StrRange(i:j)
 end
 
 @qtype Quoted{T, S<:AbstractToken}(

@@ -15,7 +15,7 @@ function csvread(filename::String, delim=',';
                  header_exists=true,
                  colnames=String[],
                  coltypes=Type[],
-                 strtype=StrRange,
+                 strtype=WeakRefString{UInt8},
                  type_detect_rows=20)
     f=open(filename, "r")
 
@@ -101,9 +101,12 @@ function parsefill!{N}(str::String, rec::Record{NTuple{N}}, nrecs, cols)
     end
 end
 
+const weakrefstringrefs = WeakKeyDict()
 function makeoutputvecs(str, rec, N)
-    ([if fieldtype(f) == StrRange
-        SubStringArray(str, N)
+    ([if fieldtype(f) == WeakRefString{UInt8}
+        x = Array(fieldtype(f), N)
+        weakrefstringrefs[x] = str
+        x
     elseif fieldtype(f) <: Nullable
         NullableArray(fieldtype(f), N)
     else
