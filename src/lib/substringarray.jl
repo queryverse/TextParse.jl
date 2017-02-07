@@ -19,13 +19,19 @@ end
 
 size(x::SubStringArray) = size(x.ranges)
 
-function getindex(x::SubStringArray, idx...)
+Base.linearindexing(x::SubStringArray) = Base.linearindexing(x.ranges)
+
+function getindex(x::SubStringArray, idx::Int...)
     r = getindex(x.ranges, idx...)
     WeakRefString{UInt8}(pointer(Vector{UInt8}(x.str))+r.offset, r.length, r.offset)
 end
 
-function Base.setindex!(x::SubStringArray, y::WeakRefString, idx...)
-    if y.ptr-y.offset !== pointer(Vector{UInt8}(x.str))
+function getindex(x::SubStringArray, idx::AbstractArray...)
+    SubStringArray(x.str, x.ranges[idx...])
+end
+
+function Base.setindex!(x::SubStringArray, y::WeakRefString, idx::Int...)
+    if y.ptr-y.ind !== pointer(Vector{UInt8}(x.str))
         throw(ArgumentError("The substring array has a different parent"))
     end
 
@@ -36,8 +42,8 @@ function Base.setindex!(x::SubStringArray, y::StrRange, idx...)
     x.ranges[idx...] = y
 end
 
-function Base.similar(x::SubStringArray, dims::Tuple)
-    SubStringArray(x.str, similar(x.ranges, dims))
+function Base.similar(x::SubStringArray, dims::Int...)
+    SubStringArray(x.str, fill(StrRange(0,0), dims))
 end
 
 function Base.resize!(x::SubStringArray, n)
