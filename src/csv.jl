@@ -15,7 +15,7 @@ function csvread(filename::String, delim=',';
                  header_exists=true,
                  colnames=String[],
                  coltypes=Type[],
-                 strtype=WeakRefString{UInt8},
+                 strtype=StrRange,
                  type_detect_rows=20)
     f=open(filename, "r")
 
@@ -107,6 +107,8 @@ function makeoutputvecs(str, rec, N)
         x = Array(fieldtype(f), N)
         weakrefstringrefs[x] = str
         x
+    elseif fieldtype(f) == StrRange
+        SubStringArray(str, N)
     elseif fieldtype(f) <: Nullable
         NullableArray(fieldtype(f), N)
     else

@@ -135,6 +135,14 @@ let
     @test tryparsenext(StringToken(String, ',', '"', true), "") |> failedat == 1
 end
 
+
+include("lib/substringarray.jl")
+fromtype(::Type{StrRange}) = StringToken(StrRange)
+
+@inline function _substring(::Type{StrRange}, str, i, j)
+    StrRange(i-1, j-i+1)
+end
+
 @qtype Quoted{T, S<:AbstractToken}(
     inner::S
   ; output_type::Type{T}=fieldtype(inner)
