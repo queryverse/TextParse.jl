@@ -8,7 +8,14 @@ function Record{T<:Tuple}(t::T)
     Record{T, To}(t)
 end
 
-@generated function tryparsenext{N,To}(r::Record{NTuple{N},To}, str, i, len)
+# for dispatch on N
+if VERSION >= v"0.6.0-dev"
+    typealias RecN{N,U} Record{T,U} where T<:NTuple{N, Any}
+else
+    typealias RecN{N,U} Record{NTuple{N, U}}
+end
+
+@generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len)
     quote
         R = Nullable{To}
         i > len && @goto error
@@ -25,7 +32,7 @@ end
     end
 end
 
-@generated function tryparsesetindex{N,To}(r::Record{NTuple{N},To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int)
+@generated function tryparsesetindex{N,To}(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int)
     quote
         R = Nullable{Void}
         i > len && @goto error

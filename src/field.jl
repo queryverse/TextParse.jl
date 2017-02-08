@@ -111,12 +111,14 @@ end
     str[i:j]
 end
 
-@inline function _substring(::Type{Str}, str, i, j)
-    Str(pointer(str.data)+(i-1), j-i+1)
+if VERSION <= v"0.6.0-dev"
+    @inline function _substring(::Type{Str}, str, i, j)
+        Str(pointer(Vector{UInt8}(str))+(i-1), j-i+1)
+    end
 end
 
-@inline function _substring{T}(::Type{SubString{T}}, str, i, j)
-    SubString(str, i, j)
+@inline function _substring{T<:SubString}(::Type{T}, str, i, j)
+    T(str, i, j)
 end
 
 using WeakRefStrings

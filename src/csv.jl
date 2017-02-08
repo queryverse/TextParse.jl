@@ -75,7 +75,7 @@ function csvread(filename::String, delim=',';
     parsefill!(str, rec, N, cols)
 end
 
-function parsefill!{N}(str::String, rec::Record{NTuple{N}}, nrecs, cols)
+function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
     i = 1
     j = start(str)
     l = endof(str)
@@ -112,6 +112,6 @@ function makeoutputvecs(str, rec, N)
     elseif fieldtype(f) <: Nullable
         NullableArray(fieldtype(f), N)
     else
-        Array(fieldtype(f), N)
+        Array{fieldtype(f)}(N)
     end for f in rec.fields]...)
 end
