@@ -89,8 +89,7 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
         res = tryparsesetindex(rec, str, j,l, cols, i)
         if !issuccess(res)
             j, tok = geterror(res)
-            @show string(rec.fields[tok])
-            throw(CSVParseError(str, i, j-prev_j, rec.fields[tok]))
+            throw(CSVParseError(str, rec, i, j, j-prev_j, tok))
         else
             j = value(res)
         end
@@ -150,9 +149,11 @@ end
 
 immutable CSVParseError <: Exception
     str
+    rec
     lineno
     char
-    token
+    charinline
+    err_field
 end
 
 function Base.showerror(io::IO, err::CSVParseError)
@@ -161,16 +162,16 @@ function Base.showerror(io::IO, err::CSVParseError)
     maxchar = 100
     rng = getlineat(str, char)
     substr = strip(str[rng])
-    pointer = String(['_' for i=1:(char-first(rng))]) * "^"
+    pointer = String(['_' for i=1:(char-first(rng)-1)]) * "^"
     if length(substr) > maxchar
         # center the error char
         lst = min(char+ceil(Int, maxchar), last(rng))
         fst = max(start(rng), lst-maxchar)
         substr = "..." * strip(str[fst:lst]) * "..."
-        pointer = String(['_' for i=1:(char-fst+3)]) * "^"
+        pointer = String(['_' for i=1:(char-fst+2)]) * "^"
     end
-    err = "Parse error at line $(err.lineno) (excl header) at char $char:\n" *
-        substr * "\n" * pointer * "\nExpected token: " * string(err.token)
+    err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
+           substr * "\n" * pointer * "\nCSV column $(err.err_field) is expected to be: " * string(err.rec[err.err_field])
     print(io, err)
 end
 
