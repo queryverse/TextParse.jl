@@ -85,8 +85,9 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
     l = endof(str)
     sizemargin = sqrt(2)
     while true
+        prev_j = j
         succ, j = tryparsesetindex(rec, str, j,l, cols, i)
-        isnull(succ) && throw(ParseError("parse failed at $j"))
+        isnull(succ) && throw(CSVParseError(str, i, j-prev_j))
         if j > l
             #shrink
             for c in cols
@@ -119,4 +120,56 @@ function makeoutputvecs(str, rec, N)
     else
         Array{fieldtype(f)}(N)
     end for f in rec.fields]...)
+end
+
+function getlineat(str, i)
+    ii = prevind(str, i)
+    line_start = i
+    l = endof(str)
+    while ii > 0 && !isnewline(str[ii])
+        line_start = ii
+        ii = prevind(str, line_start)
+    end
+
+    c, ii = next(str, i)
+    line_end = i
+    while !isnewline(c) && ii <= l
+        line_end = ii
+        c, ii = next(str, ii)
+    end
+
+    line_start:line_end
+end
+
+immutable CSVParseError <: Exception
+    str
+    lineno
+    char
+end
+
+function Base.showerror(io::IO, err::CSVParseError)
+    str = err.str
+    char = err.char
+    maxchar = 100
+    rng = getlineat(str, char)
+    substr = strip(str[rng])
+    pointer = String(['_' for i=1:(char-first(rng))]) * "^"
+    if length(substr) > maxchar
+        # center the error char
+        lst = min(char+ceil(Int, maxchar), last(rng))
+        fst = max(start(rng), lst-maxchar)
+        substr = "..." * strip(str[fst:lst]) * "..."
+        pointer = String(['_' for i=1:(char-fst+3)]) * "^"
+    end
+    err = "Parse error at line $(err.lineno) (excl header) at char $char:\n" *
+          substr * "\n" * pointer
+    print(io, err)
+end
+
+let
+    str = "abc\ndefg"
+    @test str[getlineat(str,1)] == "abc\n"
+    @test str[getlineat(str,4)] == "abc\n"
+    @test str[getlineat(str,5)] == "defg"
+    @test str[getlineat(str,endof(str))] == "defg"
 end
