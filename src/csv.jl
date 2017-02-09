@@ -26,8 +26,8 @@ function csvread(filename::String, delim=',';
     start_offset = 0
     rowlength_sum = 0
     if header_exists
-        h = readline(f) # header
-        start_offset = endof(h) + (VERSION < v"0.6.0-dev" ? 0 : 1) # on 0.6 readline omits the \n
+        h = readline(f, chomp=true) # header
+        start_offset = position(f)-1
 
         if isempty(colnames)
             colnames_inferred = split(h, delim)
@@ -47,7 +47,7 @@ function csvread(filename::String, delim=',';
     end
 
     for i=1:type_detect_rows
-        str = readline(f) # header
+        str = readline(f, chomp=true) # header
         rowlength_sum += endof(str)
         if i == 1
             line = split(str, delim)

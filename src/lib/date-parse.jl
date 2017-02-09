@@ -1,10 +1,11 @@
 ### Parsing utilities
 
-import Base: unsafe_get
-
 if (!isdefined(Base, :unsafe_get))
     unsafe_get(x::Nullable) = x.value
+else
+    import Base: unsafe_get
 end
+
 
 include("date-tryparse-internal.jl")
 
