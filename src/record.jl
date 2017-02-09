@@ -39,7 +39,7 @@ end
 
         Base.@nexprs $N j->begin
             @chk2 val_j, i = tryparsenext(r.fields[j], str, i, len)
-            columns[j][row] = val_j
+            setcell!(columns[j], row, val_j, str)
         end
 
         @label done
@@ -48,6 +48,14 @@ end
         @label error
         R(), i
     end
+end
+
+@inline function setcell!(col, i, val, str)
+    col[i] = val
+end
+
+@inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
+    col[i] = unsafe_string(pointer(Vector{UInt8}(str))+val.offset, val.length)
 end
 
 using Base.Test

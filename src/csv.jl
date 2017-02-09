@@ -6,6 +6,10 @@ optionsiter(colnames::AbstractVector) = enumerate(colnames)
 tofield(f::Field, x,y,z) = f
 tofield(t::Union{Type, DateFormat}, delim, quotechar,escapechar) =
     Field(fromtype(t), delim=delim, quotechar=quotechar, escapechar=escapechar)
+tofield(t::Type{String}, delim, quotechar,escapechar) =
+    Field(fromtype(StrRange), delim=delim, quotechar=quotechar, escapechar=escapechar)
+tofield(t::Type{Nullable{String}}, delim, quotechar,escapechar) =
+    Field(fromtype(Nullable{StrRange}), delim=delim, quotechar=quotechar, escapechar=escapechar)
 
 
 function csvread(filename::String, delim=',';
@@ -108,7 +112,7 @@ function makeoutputvecs(str, rec, N)
         weakrefstringrefs[x] = str
         x
     elseif fieldtype(f) == StrRange
-        SubStringArray(str, N)
+        Array{String}(N)
     elseif fieldtype(f) <: Nullable
         NullableArray(fieldtype(f), N)
     else
