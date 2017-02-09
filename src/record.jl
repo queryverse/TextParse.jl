@@ -55,7 +55,7 @@ end
 end
 
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
-    col[i] = unsafe_string(pointer(Vector{UInt8}(str))+val.offset, val.length)
+    col[i] = unsafe_string(pointer(str, 1+val.offset), val.length)
 end
 
 using Base.Test
