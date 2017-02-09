@@ -86,8 +86,15 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
     sizemargin = sqrt(2)
     while true
         prev_j = j
-        succ, j = tryparsesetindex(rec, str, j,l, cols, i)
-        isnull(succ) && throw(CSVParseError(str, i, j-prev_j))
+        res = tryparsesetindex(rec, str, j,l, cols, i)
+        if !issuccess(res)
+            j, tok = geterror(res)
+            @show string(rec.fields[tok])
+            throw(CSVParseError(str, i, j-prev_j, rec.fields[tok]))
+        else
+            j = value(res)
+        end
+
         if j > l
             #shrink
             for c in cols
@@ -145,6 +152,7 @@ immutable CSVParseError <: Exception
     str
     lineno
     char
+    token
 end
 
 function Base.showerror(io::IO, err::CSVParseError)
@@ -162,7 +170,7 @@ function Base.showerror(io::IO, err::CSVParseError)
         pointer = String(['_' for i=1:(char-fst+3)]) * "^"
     end
     err = "Parse error at line $(err.lineno) (excl header) at char $char:\n" *
-          substr * "\n" * pointer
+        substr * "\n" * pointer * "\nExpected token: " * string(err.token)
     print(io, err)
 end
 

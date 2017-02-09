@@ -1,6 +1,6 @@
 ### Parsing utilities
 
-include("lib/either.jl")
+include("lib/result.jl")
 
 macro chk1(expr,label=:error)
     quote
