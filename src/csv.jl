@@ -27,7 +27,7 @@ function csvread(filename::String, delim=',';
     rowlength_sum = 0
     if header_exists
         h = readline(f) # header
-        start_offset = endof(h)+1
+        start_offset = endof(h)
 
         if isempty(colnames)
             colnames_inferred = split(h, delim)
