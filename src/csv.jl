@@ -122,7 +122,7 @@ function makeoutputvecs(str, rec, N)
     elseif fieldtype(f) == StrRange
         Array{String}(N)
     elseif fieldtype(f) <: Nullable
-        NullableArray(fieldtype(f), N)
+        NullableArray{fieldtype(f)|>eltype}(N)
     else
         Array{fieldtype(f)}(N)
     end for f in rec.fields]...)
