@@ -10,9 +10,9 @@ end
 
 # for dispatch on N
 if VERSION >= v"0.6.0-dev"
-    typealias RecN{N,U} Record{T,U} where T<:NTuple{N, Any}
+    eval(parse("typealias RecN{N,U} Record{T,U} where T<:NTuple{N, Any}"))
 else
-    typealias RecN{N,U} Record{NTuple{N, U}}
+    typealias RecN{N,U} Record{NTuple{N}, U}
 end
 
 @generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len)
