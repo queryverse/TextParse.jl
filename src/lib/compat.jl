@@ -4,6 +4,7 @@ if VERSION < v"0.6.0-dev"
     include("Str.jl")
 else
     const Str = String
+    import Base.Dates: SLOT_RULE, TimeType, DatePart, tryparsenext, slot_order, slot_defaults, slot_types
 
     include("date-tryparse-internal.jl")
     const ISODateFormat = Base.Dates.ISODateFormat

@@ -1,4 +1,3 @@
-import Base.Dates: SLOT_RULE, TimeType, DatePart, tryparsenext, slot_order, slot_defaults, slot_types
 @generated function tryparse_internal{T<:TimeType, S, F}(::Type{T}, str::AbstractString, df::DateFormat{S, F}, pos::Int, len, raise::Bool=false)
     token_types = Type[dp <: DatePart ? SLOT_RULE[first(dp.parameters)] : Void for dp in F.parameters]
     N = length(F.parameters)
