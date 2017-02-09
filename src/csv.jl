@@ -83,6 +83,7 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
     i = 1
     j = start(str)
     l = endof(str)
+    sizemargin = sqrt(2)
     while true
         succ, j = tryparsesetindex(rec, str, j,l, cols, i)
         isnull(succ) && throw(ParseError("parse failed at $j"))
@@ -95,9 +96,9 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
         end
         i += 1
         if i > nrecs
-            nrecs = round(Int, nrecs * sqrt(2))
             # grow
-            nrecs = ceil(Int, j/i * sqrt(2)) # updated estimate
+            sizemargin = (sizemargin-1.0)/2 + 1.0
+            nrecs = ceil(Int, j/i * sizemargin) # updated estimate
             for c in cols
                 resize!(c, nrecs)
             end
@@ -108,7 +109,7 @@ end
 const weakrefstringrefs = WeakKeyDict()
 function makeoutputvecs(str, rec, N)
     ([if fieldtype(f) == WeakRefString{UInt8}
-        x = Array(fieldtype(f), N)
+        x = Array{fieldtype(f)}(N)
         weakrefstringrefs[x] = str
         x
     elseif fieldtype(f) == StrRange
