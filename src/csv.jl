@@ -27,7 +27,7 @@ function csvread(filename::String, delim=',';
     rowlength_sum = 0
     if header_exists
         h = readline(f) # header
-        start_offset = endof(h)
+        start_offset = endof(h) + (VERSION < v"0.6.0-dev" ? 0 : 1) # on 0.6 readline omits the \n
 
         if isempty(colnames)
             colnames_inferred = split(h, delim)
@@ -171,7 +171,7 @@ function Base.showerror(io::IO, err::CSVParseError)
         pointer = String(['_' for i=1:(char-fst+2)]) * "^"
     end
     err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
-           substr * "\n" * pointer * "\nCSV column $(err.err_field) is expected to be: " * string(err.rec[err.err_field])
+           substr * "\n" * pointer * "\nCSV column $(err.err_field) is expected to be: " * string(err.rec.fields[err.err_field])
     print(io, err)
 end
 
