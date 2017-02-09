@@ -1,5 +1,7 @@
 ### Parsing utilities
 
+include("lib/either.jl")
+
 macro chk1(expr,label=:error)
     quote
         x = $(esc(expr))
