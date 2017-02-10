@@ -78,6 +78,38 @@ end
 end
 
 
+function eatnewlines(str, i=1, l=endof(str))
+    while i<=l
+        c, ii = next(str, i)
+        !isnewline(c) && break
+        i = ii
+    end
+
+    return i
+end
+
+let
+    @test eatnewlines("\n\r\nx") == 4
+    @test eatnewlines("x\n\r\nx") == 1
+end
+
+function getlineend(str, i=1, l=endof(str))
+    while i<=l
+        c, ii = next(str, i)
+        isnewline(c) && break
+        i = ii
+    end
+
+    return i-1
+end
+
+let
+    @test getlineend("\n\r\nx") == 0
+    @test getlineend("x\n\r\nx") == 1
+    @test getlineend("x y\n\r\nxyz", 6) == 5
+    @test getlineend("x y\n\r\nxyz", 7) == 9
+end
+
 ### Testing helpers
 
 unwrap(xs) = (get(xs[1]), xs[2:end]...)

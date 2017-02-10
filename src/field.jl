@@ -51,7 +51,7 @@ end
 
     c != '.' && @goto done
     @label dec
-    @chk2 y, i = tryparsenext_base10(Int, str, ii, len)
+    @chk2 y, i = tryparsenext_base10(Int, str, ii, len) done
     f = y / 10.0^(i-ii)
 
     i > len && @goto done
@@ -73,11 +73,11 @@ let
     @test tryparsenext(fromtype(Float64), "21", 1, 2) |> unwrap== (21.0,3)
     @test tryparsenext(fromtype(Float64), ".21", 1, 3) |> unwrap== (.21,4)
     @test tryparsenext(fromtype(Float64), "1.21", 1, 4) |> unwrap== (1.21,5)
+    @test tryparsenext(fromtype(Float64), "1.", 1, 2) |> unwrap== (1.,3)
     @test tryparsenext(fromtype(Float64), "-1.21", 1, 5) |> unwrap== (-1.21,6)
     @test tryparsenext(fromtype(Float64), "-1.5e-12", 1, 8) |> unwrap == (-1.5e-12,9)
     @test tryparsenext(fromtype(Float64), "-1.5E-12", 1, 8) |> unwrap == (-1.5e-12,9)
 end
-
 
 immutable StringToken{T} <: AbstractToken{T}
     endchar::Char
