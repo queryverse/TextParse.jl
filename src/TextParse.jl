@@ -1,4 +1,6 @@
 module TextParse
+
+using NullableArrays
 using Base.Test
 
 include("lib/compat.jl")

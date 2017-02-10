@@ -60,6 +60,17 @@ end
     col[i] = unsafe_string(pointer(str, 1+val.offset), val.length)
 end
 
+@inline function setcell!(col::NullableArray{String,1}, i, val::Nullable{StrRange}, str)
+
+    if isnull(val)
+        col[i] = Nullable{String}()
+    else
+        sr = get(val)
+        str = Nullable{String}(unsafe_string(pointer(str, 1+sr.offset), sr.length))
+        col[i] = str
+    end
+end
+
 using Base.Test
 let
     r=Record((Field(fromtype(Int)), Field(fromtype(UInt)), Field(fromtype(Float64))))

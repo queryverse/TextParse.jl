@@ -1,5 +1,3 @@
-using NullableArrays
-
 typealias StringLike Union{AbstractString, StrRange}
 
 const common_date_formats = Any[dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
@@ -34,6 +32,8 @@ function guess_eltype(x, prev_guess=Union{},
        dateguess = guessdateformat(x, dateformats, datetimeformats)
        if dateguess !== nothing
            guess = dateguess
+       else
+           guess = strtype
        end
    end
 

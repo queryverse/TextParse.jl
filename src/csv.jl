@@ -1,91 +1,196 @@
 export csvread
+const debugrec = Ref{Any}()
 
 optionsiter(colnames::Associative) = colnames
 optionsiter(colnames::AbstractVector) = enumerate(colnames)
 
-tofield(f::Field, x,y,z) = f
-tofield(t::Union{Type, DateFormat}, delim, quotechar,escapechar) =
-    Field(fromtype(t), delim=delim, quotechar=quotechar, escapechar=escapechar)
-tofield(t::Type{String}, delim, quotechar,escapechar) =
-    Field(fromtype(StrRange), delim=delim, quotechar=quotechar, escapechar=escapechar)
-tofield(t::Type{Nullable{String}}, delim, quotechar,escapechar) =
-    Field(fromtype(Nullable{StrRange}), delim=delim, quotechar=quotechar, escapechar=escapechar)
+tofield(f::Field, opts) = f
+tofield(t::Union{Type, DateFormat}, opts) =
+    Field(fromtype(t), delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
+tofield(t::Type{String}, opts) = 
+    Field(fromtype(StrRange), delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
+tofield(t::Type{Nullable{String}}, opts) =
+    Field(fromtype(Nullable{StrRange}), delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
 
+"""
+    csvread(file::IO, delim=',';
+            quotechar='"',
+            escapechar='\\',
+            dateformat=ISODateTimeFormat,
+            header_exists=true,
+            colnames=Dict(),
+            coltypes=Dict(),
+            type_detect_rows=20)
 
-function csvread(filename::String, delim=',';
+Read CSV from `file`. Returns a tuple of 2 elements:
+1. A tuple of columns each as a Vector or NullableArray
+2. column names if header_exists=true
+
+Notes:
+- `type_detect_rows` is the number of rows used to detect the type
+  of the column. If the column changes type later, you must specify
+  the right type in `coltypes`
+- Empty lines will be ignored
+"""
+function csvread(file::String, delim=','; kwargs...)
+    open(file, "r") do io
+        csvread(io, delim; kwargs...)
+    end
+end
+
+function csvread(file::IO, delim=','; kwargs...)
+    mmap_data = Mmap.mmap(seek(file, start_offset))
+    String(mmap_data)
+    _csvread(str, delim; kwargs...)
+end
+
+immutable ParsingOptions
+    delim::Char
+    quotechar::Char
+    escapechar::Char
+    #ignore_empty_rows::Bool
+end
+
+# read CSV in a string
+function _csvread(str::AbstractString, delim=',';
                  quotechar='"',
                  escapechar='\\',
-                 dateformat=ISODateTimeFormat,
+                 dateformats=common_date_formats,
+                 datetimeformats=common_datetime_formats,
+                 nrows=0,
                  header_exists=true,
                  colnames=String[],
+                 #ignore_empty_rows=true,
                  coltypes=Type[],
-                 strtype=StrRange,
                  type_detect_rows=20)
-    f=open(filename, "r")
 
-    start_offset = 0
-    rowlength_sum = 0
+    opts = ParsingOptions(delim, quotechar, escapechar) #ignore_empty_rows,
+    len = endof(str)
+    pos = start(str)
+    rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
+
     if header_exists
-        h = readline(f, chomp=true) # header
-        start_offset = position(f)-1
-
-        if isempty(colnames)
-            colnames_inferred = split(h, delim)
-        else
-            for (i, v) in optionsiter(colnames)
-                colnames_inferred[i] = v
-            end
-        end
+        merged_colnames, pos = readcolnames(str, opts, pos, colnames)
+    else
+        merged_colnames = colnames
     end
 
-    colnames_inferred = String[]
-    guess = []
-    if length(coltypes) != 0 && length(coltypes) == length(colnames)
-        # we already know the types
-        guess = coltypes
-        @goto parse
-    end
-
-    for i=1:type_detect_rows
-        str = readline(f, chomp=true) # header
-        rowlength_sum += endof(str)
-        if i == 1
-            line = split(str, delim)
-            guess = Any[Union{} for i=1:length(line)]
-        end
-        guess = Any[guess_eltype(x, y, strtype, dateformat) for (x,y) in
-                    zip(split(str, delim), guess)]
-    end
-    rowlength_estimate = rowlength_sum / type_detect_rows
-    rowestimate = ceil(Int, filesize(f) / rowlength_estimate)
-
-    for (i, v) in optionsiter(coltypes)
-        guess[i] = coltypes[i]
-    end
+    guess, pos1 = guesscoltypes(str, opts, pos, type_detect_rows, coltypes,
+                          dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
-        guess[i] = tofield(v, delim, quotechar, escapechar)
+        guess[i] = tofield(v, opts)
     end
 
     guess[end].eoldelim = true
-
-    @label parse
     rec = Record((guess...,))
-    mmap_data = Mmap.mmap(seek(f, start_offset))
-    close(f)
-    str = String(mmap_data)
-    N = round(Int, rowestimate * sqrt(2))
-    cols = makeoutputvecs(str, rec, N)
-    parsefill!(str, rec, N, cols)
+    debugrec[] = rec
+
+    if nrows == 0
+        meanrowsize = (pos1-pos) / type_detect_rows
+        # just an estimate, with some margin
+        nrows = ceil(Int, (endof(str)-pos) / meanrowsize * sqrt(2))
+    end
+
+    cols = makeoutputvecs(str, rec, nrows)
+    parsefill!(str, rec, nrows, cols, pos, endof(str))
+
+    cols, merged_colnames
 end
 
-function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols)
+function readcolnames(str, opts, pos, colnames)
+    colnames_inferred = String[]
+
+    len = endof(str)
+    pos = eatnewlines(str, pos, len)
+    lineend = getlineend(str, pos, len)
+    head = str[pos:lineend]
+
+    colnames_inferred = map(strip, split(head, opts.delim))
+
+    # set a subset of column names
+    for (i, v) in optionsiter(colnames)
+        colnames_inferred[i] = v
+    end
+    colnames_inferred, lineend+1
+end
+
+
+let
+    str1 = """
+     a, b,c d, e
+    x,1,1,1
+    ,1,1,1
+    x,1,1.,1
+    x y,1.0,1,
+    x,1.0,,1
+    """
+    opts = ParsingOptions(',', '"', '\\')
+    @test readcolnames(str1, opts, 1, String[]) == (["a", "b", "c d", "e"], 13)
+    @test readcolnames("\n\r$str1", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "e"], 15)
+end
+
+function guesscoltypes(str::AbstractString, opts::ParsingOptions, pos::Int,
+                       nrows::Int, coltypes,
+                       dateformats=common_date_formats,
+                       datetimeformats=common_datetime_formats)
+    # Field type guesses
+    guess = []
+
+    for i=1:nrows
+        pos = eatnewlines(str, pos)
+        if pos > endof(str)
+            break
+        end
+
+        lineend = getlineend(str, pos)
+        row = str[pos:lineend]
+
+        fields = map(strip, split(row, opts.delim))
+        if i == 1
+            guess = Any[Union{} for i=1:length(fields)] # idk
+        end
+
+        # update guess
+        guess = Any[guess_eltype(f, g, StrRange, dateformats, datetimeformats)
+                    for (f,g) in zip(fields, guess)]
+        pos = lineend+1
+    end
+
+    # override guesses with user request
+    for (i, v) in optionsiter(coltypes)
+        guess[i] = coltypes[i]
+    end
+    guess, pos
+end
+
+let
+    str1 = """
+     a, b,c d, e
+    x,1,1,1
+    x,1,1,1
+    x,1,1.,1
+    x y,1.0,1,
+    ,1.0,,1
+    """
+    opts = ParsingOptions(',', '"', '\\')
+    _, pos = readcolnames(str1, opts, 1, String[])
+    testtill(i, coltypes=[]) = guesscoltypes(str1, opts, pos, i, coltypes)
+    @test testtill(0) |> first == Any[]
+    @test testtill(1) |> first == Any[StrRange, Int, Int, Int]
+    @test testtill(2) |> first == Any[StrRange, Int, Int, Int]
+    @test testtill(3) |> first == Any[StrRange, Int, Float64, Int]
+    @test testtill(4) |> first == Any[StrRange, Float64, Float64, Nullable{Int}]
+    @test testtill(5) |> first == Any[Nullable{StrRange}, Float64, Nullable{Float64}, Nullable{Int}]
+end
+
+function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
+                       j=start(str), l=endof(str))
     i = 1
-    j = start(str)
-    l = endof(str)
     sizemargin = sqrt(2)
     while true
         prev_j = j
+        j = eatnewlines(str, j)
         res = tryparsesetindex(rec, str, j,l, cols, i)
         if !issuccess(res)
             j, tok = geterror(res)
@@ -120,7 +225,9 @@ function makeoutputvecs(str, rec, N)
         weakrefstringrefs[x] = str
         x
     elseif fieldtype(f) == StrRange
-        Array{String}(N)
+        Array{String,1}(N)
+    elseif fieldtype(f) == Nullable{StrRange}
+        NullableArray{String}(N)
     elseif fieldtype(f) <: Nullable
         NullableArray{fieldtype(f)|>eltype}(N)
     else
@@ -145,6 +252,14 @@ function getlineat(str, i)
     end
 
     line_start:line_end
+end
+
+let
+    str = "abc\ndefg"
+    @test str[getlineat(str,1)] == "abc\n"
+    @test str[getlineat(str,4)] == "abc\n"
+    @test str[getlineat(str,5)] == "defg"
+    @test str[getlineat(str,endof(str))] == "defg"
 end
 
 immutable CSVParseError <: Exception
@@ -176,9 +291,21 @@ function Base.showerror(io::IO, err::CSVParseError)
 end
 
 let
-    str = "abc\ndefg"
-    @test str[getlineat(str,1)] == "abc\n"
-    @test str[getlineat(str,4)] == "abc\n"
-    @test str[getlineat(str,5)] == "defg"
-    @test str[getlineat(str,endof(str))] == "defg"
+
+    str1 = """
+     a, b,c d, e
+    x,1,1,1
+    ,1,1,1
+    x,1,1.,1
+    x y,1.0,1,
+    x,1.0,,1
+    """
+    data = (
+            (NullableArray(["x", "","x","x y","x"], Bool[0,1,0,0,0]),
+              ones(5),
+              NullableArray(ones(5), Bool[0,0,0,0,1]),
+              NullableArray(ones(Int,5), Bool[0,0,0,1,0]))
+              , ["a", "b", "c d", "e"])
+    _csvread(str1, ',')
+    @test isequal(_csvread(str1, ','), data)
 end
