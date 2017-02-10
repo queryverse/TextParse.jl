@@ -5,12 +5,14 @@ optionsiter(colnames::Associative) = colnames
 optionsiter(colnames::AbstractVector) = enumerate(colnames)
 
 tofield(f::Field, opts) = f
+tofield(f::AbstractToken, opts) =
+    Field(f, delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
 tofield(t::Union{Type, DateFormat}, opts) =
-    Field(fromtype(t), delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
+    tofield(fromtype(t), opts)
 tofield(t::Type{String}, opts) = 
-    Field(fromtype(StrRange), delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
+    tofield(fromtype(StrRange), opts)
 tofield(t::Type{Nullable{String}}, opts) =
-    Field(fromtype(Nullable{StrRange}), delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
+    tofield(fromtype(Nullable{StrRange}), opts)
 
 """
     csvread(file::IO, delim=',';
@@ -39,9 +41,8 @@ function csvread(file::String, delim=','; kwargs...)
 end
 
 function csvread(file::IO, delim=','; kwargs...)
-    mmap_data = Mmap.mmap(seek(file, start_offset))
-    String(mmap_data)
-    _csvread(str, delim; kwargs...)
+    mmap_data = Mmap.mmap(file)
+    _csvread(String(mmap_data), delim; kwargs...)
 end
 
 immutable ParsingOptions
