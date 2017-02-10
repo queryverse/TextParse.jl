@@ -6,7 +6,10 @@ const common_date_formats = Any[dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
                                 dateformat"dd u yyyy",  dateformat"e, dd u yyyy"
                                 ]
 
-const common_datetime_formats = Any[ISODateTimeFormat,
+const common_datetime_formats = Any[
+                                    dateformat"yyyy-mm-ddTHH:MM:SS",
+                                    dateformat"yyyy-mm-dd HH:MM:SS",
+                                    ISODateTimeFormat,
                                     dateformat"yyyy-mm-dd HH:MM:SS.s",
                                     RFC1123Format,
                                     dateformat"yyyy/mm/dd HH:MM:SS.s",
@@ -41,27 +44,24 @@ function guess_eltype(x, prev_guess=Union{},
    t == Any ? strtype : t
 end
 
-function guessdateformat(x, dateformats=common_date_formats,
+function guessdateformat(str, dateformats=common_date_formats,
                          datetimeformats=common_datetime_formats)
 
-    for f in dateformats
-        try
-            Date(x, f)
-            return DateTimeToken(Date, f)
-        catch err
-            continue
-        end
-    end
+    dts = Any[Date => d for d in dateformats]
+    dts = vcat(dts, Any[DateTime => d for d in datetimeformats])
 
-    for f in datetimeformats
-        try
-            Date(x, f)
-            return DateTimeToken(DateTime, f)
-        catch err
-            continue
+    for (typ, df) in dts
+        x, len = tryparse_internal(typ, str, df, 1, endof(str))
+        if !isnull(x)
+            try
+                typ(get(x)...)
+                if len > endof(str)
+                    return DateTimeToken(typ, df)
+                end
+            catch err; end
         end
     end
-    nothing
+    return nothing
 end
 
 let
