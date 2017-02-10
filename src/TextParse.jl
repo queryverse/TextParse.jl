@@ -1,4 +1,5 @@
 module TextParse
+using Base.Test
 
 include("lib/compat.jl")
 include("util.jl")

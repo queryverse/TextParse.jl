@@ -10,5 +10,6 @@ else
     include("date-tryparse-internal.jl")
     const ISODateFormat = Base.Dates.ISODateFormat
     const ISODateTimeFormat = Base.Dates.ISODateTimeFormat
+    const RFC1123Format = Base.Dates.RFC1123Format
 end
 
