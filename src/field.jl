@@ -7,12 +7,12 @@ fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 
 
 # Numberic parsing
-@qtype Numeric{T}(
-    decimal::Char='.'
-  , thousands::Char=','
-) <: AbstractToken{T}
+immutable Numeric{T} <: AbstractToken{T}
+    decimal::Char
+    thousands::Char
+end
 
-Numeric{N<:Number}(::Type{N}; kws...) = Numeric{N}(;kws...)
+Numeric{T}(::Type{T}, decimal='.', thousands=',') = Numeric{T}(decimal, thousands)
 fromtype{N<:Number}(::Type{N}) = Numeric(N)
 
 ### Unsigned integers
@@ -57,7 +57,7 @@ end
     i > len && @goto done
     c, ii = next(str, i)
     if c == 'e' || c == 'E'
-        @chk2 exp, i = tryparsenext(Numeric{Int}(), str, ii, len)
+        @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
         return R(sign*(x+f) * 10.0^exp), i
     end
 
