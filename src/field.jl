@@ -311,17 +311,17 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     end
     @chk2 res, i = tryparsenext(f.inner, str, i, len)
 
-    i0 = i
     if f.ignore_end_whitespace
+        i0 = i
         while i <= len
             @inbounds c, ii = next(str, i)
             !iswhitespace(c) && break
             i = ii
+            f.delim == '\t' && c == '\t' && @goto done
         end
-    end
 
-    f.spacedelim && i > i0 && @goto done
-    f.delim == '\t' && c == '\t' && @goto done
+        f.spacedelim && i > i0 && @goto done
+    end
 
     if i > len
         if f.eoldelim
@@ -332,6 +332,8 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     end
 
     @inbounds c, ii = next(str, i)
+    f.delim == c && (i=ii; @goto done)
+    f.spacedelim && iswhitespace(c) && (i=ii; @goto done)
 
     if f.eoldelim
         if c == '\r'
@@ -353,16 +355,30 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
             end
             @goto done
         end
-        @goto error
     end
-
-    c != f.delim && @goto error # this better be the delim!!
-    i = ii
-
-    @label done
-    return R(res), i
 
     @label error
     return R(), i
+
+    @label done
+    return R(res), i
 end
 
+let
+    f = fromtype(Int)
+    @test tryparsenext(Field(f,delim=','), "12,3", 1,4) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f,delim=','), "12 ,3", 1,5) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,delim=','), " 12 ,3", 1,6) |> unwrap == (12, 6)
+    @test tryparsenext(Field(f,delim='\t'), "12\t3", 1,4) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f,delim='\t'), "12 \t3", 1,5) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,delim='\t'), " 12 \t 3", 1,7) |> unwrap == (12, 6)
+    @test tryparsenext(Field(f,spacedelim=true), " 12 3", 1,5) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,spacedelim=true), " 12 3", 1,5) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,spacedelim=true, ignore_end_whitespace=false), " 12 \t 3", 1,7) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim=' '), "12 3", 1,4) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), "12 \t3", 1,5) |> failedat == 3
+    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), " 12\t 3", 1,5) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n", 1,4) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), " 12", 1,3) |> unwrap == (12,4)
+    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n\r\n", 1,6) |> unwrap == (12,6)
+end
