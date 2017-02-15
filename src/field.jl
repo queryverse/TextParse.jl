@@ -68,17 +68,6 @@ end
     return R(), i
 end
 
-using Base.Test
-let
-    @test tryparsenext(fromtype(Float64), "21", 1, 2) |> unwrap== (21.0,3)
-    @test tryparsenext(fromtype(Float64), ".21", 1, 3) |> unwrap== (.21,4)
-    @test tryparsenext(fromtype(Float64), "1.21", 1, 4) |> unwrap== (1.21,5)
-    @test tryparsenext(fromtype(Float64), "1.", 1, 2) |> unwrap== (1.,3)
-    @test tryparsenext(fromtype(Float64), "-1.21", 1, 5) |> unwrap== (-1.21,6)
-    @test tryparsenext(fromtype(Float64), "-1.5e-12", 1, 8) |> unwrap == (-1.5e-12,9)
-    @test tryparsenext(fromtype(Float64), "-1.5E-12", 1, 8) |> unwrap == (-1.5e-12,9)
-end
-
 immutable StringToken{T} <: AbstractToken{T}
     endchar::Char
     escapechar::Char
@@ -125,16 +114,6 @@ using WeakRefStrings
 @inline function _substring{T<:WeakRefString}(::Type{T}, str, i, j)
     vec = Vector{UInt8}(str)
     WeakRefString(pointer(vec)+(i-1), (j-i+1))
-end
-
-let
-    for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 11)]
-        @test tryparsenext(StringToken(String), s) |> unwrap == (s[1:till-1], till)
-    end
-    for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(StringToken(String, ',', '"', true), s) |> unwrap == (s[1:till-1], till)
-    end
-    @test tryparsenext(StringToken(String, ',', '"', true), "") |> failedat == 1
 end
 
 
@@ -195,14 +174,6 @@ end
 
 @inline function tryparsenext_inner(q::Quoted, str, i, len, quotestarted)
     tryparsenext(q.inner, str, i, len)
-end
-
-let
-    @test tryparsenext(Quoted(StringToken(String)), "\"abc\"") |> unwrap == ("abc", 6)
-    @test tryparsenext(Quoted(StringToken(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
-    @test tryparsenext(Quoted(StringToken(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
-    @test tryparsenext(Quoted(StringToken(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
-    @test tryparsenext(Quoted(StringToken(String), required=true), "x\"abc\"") |> failedat == 1
 end
 
 ## Date and Time
@@ -276,13 +247,6 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len)
 end
 
 fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
-
-let
-    @test tryparsenext(NAToken(fromtype(Float64)), ",") |> unwrap |> failedat == 1 # is nullable
-    @test tryparsenext(NAToken(fromtype(Float64)), "X,") |> failedat == 1
-    @test tryparsenext(NAToken(fromtype(Float64)), "NA,") |> unwrap |> failedat == 3
-    @test tryparsenext(NAToken(fromtype(Float64)), "1.212,") |> unwrap |> unwrap == (1.212, 6)
-end
 
 ### Field parsing
 
@@ -366,21 +330,3 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     return R(res), i
 end
 
-let
-    f = fromtype(Int)
-    @test tryparsenext(Field(f,delim=','), "12,3", 1,4) |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,delim=','), "12 ,3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,delim=','), " 12 ,3", 1,6) |> unwrap == (12, 6)
-    @test tryparsenext(Field(f,delim='\t'), "12\t3", 1,4) |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,delim='\t'), "12 \t3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,delim='\t'), " 12 \t 3", 1,7) |> unwrap == (12, 6)
-    @test tryparsenext(Field(f,spacedelim=true), " 12 3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,spacedelim=true), " 12 3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,spacedelim=true, ignore_end_whitespace=false), " 12 \t 3", 1,7) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim=' '), "12 3", 1,4) |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), "12 \t3", 1,5) |> failedat == 3
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), " 12\t 3", 1,5) |> unwrap == (12,5)
-    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n", 1,4) |> unwrap == (12,5)
-    @test tryparsenext(Field(f,eoldelim=true), " 12", 1,3) |> unwrap == (12,4)
-    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n\r\n", 1,6) |> unwrap == (12,6)
-end

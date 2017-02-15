@@ -117,20 +117,6 @@ function readcolnames(str, opts, pos, colnames)
 end
 
 
-let
-    str1 = """
-     a, b,c d, e
-    x,1,1,1
-    ,1,1,1
-    x,1,1.,1
-    x y,1.0,1,
-    x,1.0,,1
-    """
-    opts = ParsingOptions(',', '"', '\\')
-    @test readcolnames(str1, opts, 1, String[]) == (["a", "b", "c d", "e"], 13)
-    @test readcolnames("\n\r$str1", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "e"], 15)
-end
-
 function guesscoltypes(str::AbstractString, opts::ParsingOptions, pos::Int,
                        nrows::Int, coltypes,
                        dateformats=common_date_formats,
@@ -163,26 +149,6 @@ function guesscoltypes(str::AbstractString, opts::ParsingOptions, pos::Int,
         guess[i] = coltypes[i]
     end
     guess, pos
-end
-
-let
-    str1 = """
-     a, b,c d, e
-    x,1,1,1
-    x,1,1,1
-    x,1,1.,1
-    x y,1.0,1,
-    ,1.0,,1
-    """
-    opts = ParsingOptions(',', '"', '\\')
-    _, pos = readcolnames(str1, opts, 1, String[])
-    testtill(i, coltypes=[]) = guesscoltypes(str1, opts, pos, i, coltypes)
-    @test testtill(0) |> first == Any[]
-    @test testtill(1) |> first == Any[StrRange, Int, Int, Int]
-    @test testtill(2) |> first == Any[StrRange, Int, Int, Int]
-    @test testtill(3) |> first == Any[StrRange, Int, Float64, Int]
-    @test testtill(4) |> first == Any[StrRange, Float64, Float64, Nullable{Int}]
-    @test testtill(5) |> first == Any[Nullable{StrRange}, Float64, Nullable{Float64}, Nullable{Int}]
 end
 
 function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
@@ -255,14 +221,6 @@ function getlineat(str, i)
     line_start:line_end
 end
 
-let
-    str = "abc\ndefg"
-    @test str[getlineat(str,1)] == "abc\n"
-    @test str[getlineat(str,4)] == "abc\n"
-    @test str[getlineat(str,5)] == "defg"
-    @test str[getlineat(str,endof(str))] == "defg"
-end
-
 immutable CSVParseError <: Exception
     str
     rec
@@ -289,24 +247,4 @@ function Base.showerror(io::IO, err::CSVParseError)
     err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
            substr * "\n" * pointer * "\nCSV column $(err.err_field) is expected to be: " * string(err.rec.fields[err.err_field])
     print(io, err)
-end
-
-let
-
-    str1 = """
-     a, b,c d, e
-    x,1,1,1
-    ,1,1,1
-    x,1,1.,1
-    x y,1.0,1,
-    x,1.0,,1
-    """
-    data = (
-            (NullableArray(["x", "","x","x y","x"], Bool[0,1,0,0,0]),
-              ones(5),
-              NullableArray(ones(5), Bool[0,0,0,0,1]),
-              NullableArray(ones(Int,5), Bool[0,0,0,1,0]))
-              , ["a", "b", "c d", "e"])
-    _csvread(str1, ',')
-    @test isequal(_csvread(str1, ','), data)
 end

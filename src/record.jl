@@ -71,17 +71,6 @@ end
     end
 end
 
-using Base.Test
-let
-    r=Record((Field(fromtype(Int)), Field(fromtype(UInt)), Field(fromtype(Float64))))
-    @test tryparsenext(r, "12,21,21,", 1, 9) |> unwrap == ((12, UInt(21), 21.0), 10)
-    @test tryparsenext(r, "12,21.0,21,", 1, 9) |> failedat == 6
-    s = "12   ,  21,  21.23,"
-    @test tryparsenext(r, s, 1, length(s)) |> unwrap == ((12, UInt(21), 21.23), length(s)+1)
-    nothing
-end
-
-
 # Weird hybrid of records and fields
 
 immutable UseOne{T,R<:Record,use} <: AbstractToken{T}
@@ -104,13 +93,6 @@ function tryparsenext{T,S,use}(f::UseOne{T,S,use}, str, i, len)
 
     @label error
     return R(), i
-end
-
-
-using Base.Test
-let
-    f = UseOne((Field(fromtype(Int), delim=';'), Field(fromtype(Float64)), Field(fromtype(Int), eoldelim=true)), 3)
-    @test tryparsenext(f, "1; 33.21, 45", 1, 12) |> unwrap == (45, 13)
 end
 
 
@@ -138,17 +120,4 @@ fieldtype{F,T,N}(::Repeated{F,T,N}) = NTuple{N,T}
         @label error
         R(), i
     end
-end
-
-using BenchmarkTools
-
-let
-    f = Repeated(Field(fromtype(Int), delim=';'), 3)
-    @test tryparsenext(f, "1; 33; 45;", 1, 12) |> unwrap == ((1,33,45), 11)
-
-    inp = join(map(string, [1:45;]), "; ") * "; "
-    out = ntuple(identity, 45)
-    f2 = Repeated(Field(fromtype(Int), delim=';'), 45)
-    @test tryparsenext(f2, inp, 1, length(inp)) |> unwrap == (out, length(inp))
-    #@benchmark tryparsenext($f2, $inp, 1, length($inp))
 end
