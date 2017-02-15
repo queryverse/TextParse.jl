@@ -4,7 +4,7 @@ const debugrec = Ref{Any}()
 optionsiter(colnames::Associative) = colnames
 optionsiter(colnames::AbstractVector) = enumerate(colnames)
 
-tofield(f::Field, opts) = f
+tofield(f::AbstractField, opts) = f
 tofield(f::AbstractToken, opts) =
     Field(f, delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
 tofield(t::Union{Type, DateFormat}, opts) =

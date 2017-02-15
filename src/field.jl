@@ -286,6 +286,8 @@ end
 
 ### Field parsing
 
+abstract AbstractField{T} <: AbstractToken{T} # A rocord is a collection of abstract fields
+
 @qtype Field{T,S<:AbstractToken}(
     inner::S
   ; ignore_init_whitespace::Bool=true
@@ -297,7 +299,7 @@ end
   , spacedelim::Bool=false
   , delim::Char=','
   , output_type::Type{T}=fieldtype(inner)
-) <: AbstractToken{T}
+) <: AbstractField{T}
 
 function tryparsenext{T}(f::Field{T}, str, i, len)
     R = Nullable{T}
