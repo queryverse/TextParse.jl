@@ -185,13 +185,8 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
     end
 end
 
-const weakrefstringrefs = WeakKeyDict()
 function makeoutputvecs(str, rec, N)
-    ([if fieldtype(f) == WeakRefString{UInt8}
-        x = Array{fieldtype(f)}(N)
-        weakrefstringrefs[x] = str
-        x
-    elseif fieldtype(f) == StrRange
+    ([if fieldtype(f) == StrRange
         Array{String,1}(N)
     elseif fieldtype(f) == Nullable{StrRange}
         NullableArray{String}(N)

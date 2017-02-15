@@ -101,6 +101,7 @@ end
 end
 
 if VERSION <= v"0.6.0-dev"
+    # from lib/Str.jl
     @inline function _substring(::Type{Str}, str, i, j)
         Str(pointer(Vector{UInt8}(str))+(i-1), j-i+1)
     end
@@ -110,14 +111,24 @@ end
     T(str, i, j)
 end
 
-using WeakRefStrings
-@inline function _substring{T<:WeakRefString}(::Type{T}, str, i, j)
-    vec = Vector{UInt8}(str)
-    WeakRefString(pointer(vec)+(i-1), (j-i+1))
+# using WeakRefStrings
+# @inline function _substring{T<:WeakRefString}(::Type{T}, str, i, j)
+#     vec = Vector{UInt8}(str)
+#     WeakRefString(pointer(vec)+(i-1), (j-i+1))
+# end
+
+# StrRange
+# This type is the beginning of a hack to avoid allocating 3 objects
+# instead of just 1 when using the `tryparsenext` framework.
+# The expression (Nullable{String}("xyz"), 4) asks the GC to track
+# the string, the nullable and the tuple. Instead we return
+# (Nullable{StrRange}(StrRange(0,3)), 4) which makes 0 allocations.
+# later when assigning the column inside `tryparsesetindex` we
+# create the string. See `setcell!`
+immutable StrRange
+    offset::Int
+    length::Int
 end
-
-
-include("lib/substringarray.jl")
 fromtype(::Type{StrRange}) = StringToken(StrRange)
 
 @inline function _substring(::Type{StrRange}, str, i, j)
