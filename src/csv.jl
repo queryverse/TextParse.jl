@@ -187,7 +187,8 @@ end
 
 function makeoutputvecs(str, rec, N)
     ([if fieldtype(f) == StrRange
-        Array{String,1}(N)
+      # By default we put strings in a PooledArray
+      resize!(PooledArray(Int32[], String[]), N)
     elseif fieldtype(f) == Nullable{StrRange}
         NullableArray{String}(N)
     elseif fieldtype(f) <: Nullable

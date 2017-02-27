@@ -56,8 +56,12 @@ end
     col[i] = val
 end
 
+@inline function setcell!{R}(col::PooledArray{String,R}, i, val::StrRange, str)
+    nonallocating_setindex!(col, i, val, str)
+end
+
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
-    col[i] = unsafe_string(pointer(str, 1+val.offset), val.length)
+    col[i] = alloc_string(str, val)
 end
 
 @inline function setcell!(col::NullableArray{String,1}, i, val::Nullable{StrRange}, str)

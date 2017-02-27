@@ -103,3 +103,60 @@ end
 unwrap(xs) = (get(xs[1]), xs[2:end]...)
 failedat(xs) = (@assert isnull(xs[1]); xs[2])
 tryparsenext(tok, str) = tryparsenext(tok, str, 1, endof(str))
+
+# String speedup hacks
+
+# StrRange
+# This type is the beginning of a hack to avoid allocating 3 objects
+# instead of just 1 when using the `tryparsenext` framework.
+# The expression (Nullable{String}("xyz"), 4) asks the GC to track
+# the string, the nullable and the tuple. Instead we return
+# (Nullable{StrRange}(StrRange(0,3)), 4) which makes 0 allocations.
+# later when assigning the column inside `tryparsesetindex` we
+# create the string. See `setcell!`
+immutable StrRange
+    offset::Int
+    length::Int
+end
+
+
+# PooledArrays for string data
+using WeakRefStrings
+using PooledArrays
+
+@inline function nonallocating_setindex!{T}(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString)
+    wstr = WeakRefString(pointer(str, 1+rng.offset), rng.length)
+    pool_idx = findfirst(pa.pool, wstr)
+    if pool_idx <= 0
+        # allocate only here.
+        val = convert(T,alloc_string(str, rng))
+        pool_idx = push_pool!(pa, val)
+    end
+
+    pa.refs[i] = pool_idx
+end
+
+function push_pool!{T,R}(pa::PooledArray{T,R}, val)
+    # TODO: move this refactoring to PooledArrays
+    push!(pa.pool, val)
+    pool_idx = length(pa.pool)
+    if pool_idx > typemax(R)
+        throw(ErrorException(
+            "You're using a PooledArray with ref type $R, which can only hold $(int(typemax(R))) values,\n",
+            "and you just tried to add the $(typemax(R)+1)th reference.  Please change the ref type\n",
+            "to a larger int type, or use the default ref type ($DEFAULT_POOLED_REF_TYPE)."
+        ))
+    end
+    if pool_idx > 1 && isless(val, pa.pool[pool_idx-1])
+        # maintain sorted order
+        sp = sortperm(pa.pool)
+        isp = invperm(sp)
+        refs = pa.refs
+        for i = 1:length(refs)
+            @inbounds refs[i] = isp[refs[i]]
+        end
+        pool_idx = isp[pool_idx]
+        copy!(pa.pool, pa.pool[sp])
+    end
+    pool_idx
+end
