@@ -1,6 +1,9 @@
 using TextParse
-import TextParse: tryparsenext, unwrap, failedat
+import TextParse: tryparsenext, unwrap, failedat, AbstractToken
 using Base.Test
+
+# dumb way to compare two AbstractTokens
+Base.:(==){T<:AbstractToken}(a::T, b::T) = string(a) == string(b)
 
 import TextParse: eatnewlines
 @testset "eatnewlines" begin
@@ -163,6 +166,35 @@ import TextParse: getlineat
     @test str[getlineat(str,5)] == "defg"
     @test str[getlineat(str,endof(str))] == "defg"
 end
+
+import TextParse: guesstoken, Unknown, Numeric, DateTimeToken
+@testset "guesstoken" begin
+    opts = LocalOpts(',', '"', '\\', false)
+    @test guesstoken("21", opts) == fromtype(Int)
+    @test guesstoken("", opts) == NAToken(Unknown())
+    @test guesstoken("NA", opts) == NAToken(Unknown())
+    @test guesstoken("21", opts, NAToken(Unknown())) == NAToken(fromtype(Int))
+    @test guesstoken("", opts, fromtype(Int)) == NAToken(fromtype(Int))
+    @test guesstoken("", opts, NAToken(fromtype(Int))) == NAToken(fromtype(Int))
+    @test guesstoken("21", opts, fromtype(Float64)) == fromtype(Float64)
+    @test guesstoken("\"21\"", opts, fromtype(Float64)) == Quoted(Numeric(Float64), required=false)
+    @test guesstoken("abc", opts, fromtype(Float64), String) == fromtype(String)
+    @test guesstoken("\"abc\"", opts, fromtype(Float64), String) == Quoted(fromtype(String))
+    @test guesstoken("abc", opts, Quoted(fromtype(Float64)), String) == Quoted(fromtype(String))
+    @test guesstoken("abc", opts, NAToken(Unknown()), String) == StringToken(String)
+    @test guesstoken("abc", opts, NAToken(fromtype(Int)), String) == StringToken(String)
+    @test guesstoken("20160909 12:12:12", opts, Unknown()) |> typeof == DateTimeToken(DateTime, dateformat"yyyymmdd HH:MM:SS.s") |> typeof
+    @test guesstoken("\"12\"", opts, NAToken(Unknown()), String) == Quoted(NAToken(fromtype(Int)))
+    @test guesstoken("\"\"", opts, Quoted(fromtype(Int)), String) == Quoted(NAToken(fromtype(Int)))
+end
+
+import TextParse: guessdateformat
+@testset "date detection" begin
+    @test guessdateformat("2016") |> typeof == DateTimeToken(Date, dateformat"yyyy-mm-dd") |> typeof
+    @test guessdateformat("09/09/2016") |> typeof == DateTimeToken(Date, dateformat"mm/dd/yyyy") |> typeof
+    @test guessdateformat("24/09/2016") |> typeof == DateTimeToken(Date, dateformat"dd/mm/yyyy") |> typeof
+end
+
 
 using NullableArrays
 import TextParse: _csvread
