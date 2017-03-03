@@ -173,7 +173,9 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
 end
 
 function makeoutputvecs(str, rec, N)
-    ([if fieldtype(f) == StrRange
+    ([if fieldtype(f) == Nullable{Union{}} # we weren't able to detect the type, all columns were blank
+        NullableArray{Void}(N)
+    elseif fieldtype(f) == StrRange
       # By default we put strings in a PooledArray
       resize!(PooledArray(Int32[], String[]), N)
     elseif fieldtype(f) == Nullable{StrRange}

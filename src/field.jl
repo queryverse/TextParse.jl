@@ -9,6 +9,7 @@ fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 # needed for promoting guessses
 immutable Unknown <: AbstractToken{Union{}} end
 fromtype(::Type{Union{}}) = Unknown()
+tryparsenext(::Unknown, str, i, j) = Nullable{Void}(nothing), i
 
 # Numberic parsing
 immutable Numeric{T} <: AbstractToken{T}
