@@ -16,7 +16,7 @@ tofield(f::AbstractToken, delim) =
             header_exists=true,
             colnames=Dict(),
             coltypes=Dict(),
-            type_detect_rows=20)
+            type_detect_rows=100)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
 1. A tuple of columns each as a Vector or NullableArray
