@@ -6,6 +6,19 @@ fieldtype{T}(::Type{AbstractToken{T}}) = T
 fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 
 
+## options passed down for tokens (specifically NAToken, StringToken)
+## inside a Quoted token
+immutable LocalOpts
+    endchar::Char         # End parsing at this char
+    quotechar::Char       # Quote char
+    escapechar::Char      # Escape char
+    includenewlines::Bool # Whether to include newlines in string parsing
+end
+
+function tryparsenext(tok::AbstractToken, str, i, len, locopts)
+    tryparsenext(tok, str, i, len)
+end
+
 # needed for promoting guessses
 immutable Unknown <: AbstractToken{Union{}} end
 fromtype(::Type{Union{}}) = Unknown()
@@ -76,13 +89,14 @@ end
 immutable StringToken{T} <: AbstractToken{T}
     endchar::Char
     escapechar::Char
-    includenewline::Bool
+    includenewlines::Bool
 end
 
-StringToken{T}(t::Type{T}, endchar=',', escapechar='\\', includenewline=false) = StringToken{T}(endchar, escapechar, includenewline)
+StringToken{T}(t::Type{T}, endchar=',', escapechar='\\', includenewlines=false) = StringToken{T}(endchar, escapechar, includenewlines)
 fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
 
-function tryparsenext{T}(s::StringToken{T}, str, i, len)
+function tryparsenext{T}(s::StringToken{T}, str, i, len,
+                         opts=LocalOpts(s.endchar, '"', s.escapechar, s.includenewlines))
     R = Nullable{T}
     i > len && return R(), i
     p = ' '
@@ -90,8 +104,8 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len)
     while true
         i > len && break
         c, ii = next(str, i)
-        if (c == s.endchar && p != s.escapechar) ||
-            (!s.includenewline && isnewline(c))
+        if (c == opts.endchar && p != opts.escapechar) ||
+            (!opts.includenewlines && isnewline(c))
             break
         end
         i = ii
@@ -131,10 +145,15 @@ end
     StrRange(i-1, j-i+1)
 end
 
+@inline function _substring(::Type{WeakRefString}, str, i, j)
+    WeakRefString(pointer(str, i), j-i+1)
+end
+
 @qtype Quoted{T, S<:AbstractToken}(
     inner::S
   ; output_type::Type{T}=fieldtype(inner)
   , required::Bool=false
+  , includenewlines::Bool=true
   , quotechar::Char='"'
   , escapechar::Char='\\'
 ) <: AbstractToken{T}
@@ -150,7 +169,13 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
     else
         q.required && @goto error
     end
-    @chk2 x, i = tryparsenext_inner(q, str, i, len, quotestarted)
+
+    @chk2 x, i = if quotestarted
+        opts = LocalOpts(q.quotechar, q.quotechar, q.escapechar, q.includenewlines)
+        tryparsenext(q.inner, str, i, len, opts)
+    else
+        tryparsenext(q.inner, str, i, len)
+    end
 
     if i > len
         quotestarted && @goto error
@@ -168,19 +193,6 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
 
     @label error
     return R(), i
-end
-
-# XXX: feels like a hack - might be slow
-@inline function tryparsenext_inner{T,S<:StringToken}(q::Quoted{T,S}, str, i, len, quotestarted)
-    if quotestarted
-        return tryparsenext(StringToken(T, q.quotechar, q.escapechar, true), str, i, len)
-    else
-        return tryparsenext(q.inner, str, i, len)
-    end
-end
-
-@inline function tryparsenext_inner(q::Quoted, str, i, len, quotestarted)
-    tryparsenext(q.inner, str, i, len)
 end
 
 ## Date and Time
@@ -225,11 +237,13 @@ const NA_Strings = ("NA", "N/A","#N/A", "#N/A N/A", "#NA",
   , output_type::Type{T}=Nullable{fieldtype(inner)}
 ) <: AbstractToken{T}
 
-function tryparsenext{T}(na::NAToken{T}, str, i, len)
+function tryparsenext{T}(na::NAToken{T}, str, i, len,
+                         opts=LocalOpts(na.endchar,'"','\\',false))
     R = Nullable{T}
-    i > len && @goto error
+    i > len && @goto error # XXX: should probably succeed though
     c, ii=next(str,i)
-    if (c == na.endchar || isnewline(c)) && na.emptyisna
+    #@show na.endchar
+    if (c == opts.endchar || isnewline(c)) && na.emptyisna
        @goto null
     end
 
@@ -239,7 +253,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len)
     return R(T(x)), ii
 
     @label maybe_null
-    @chk2 nastr, ii = tryparsenext(StringToken(String, na.endchar, '\\', false), str, i,len)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.escapechar, opts.includenewlines), str, i,len)
     if nastr in na.nastrings
         i=ii
         @goto null

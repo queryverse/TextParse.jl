@@ -20,15 +20,6 @@ isna(x) = x == "" || x in NA_Strings
 
 const DEFAULT_QUOTES = ('"', ''')
 
-## options passed down for tokens (specifically NAToken, StringToken)
-## inside a Quoted token
-immutable LocalOpts
-    endchar::Char         # End parsing at this char
-    quotechar::Char       # Quote char
-    escapechar::Char      # Escape char
-    includenewlines::Bool # Whether to include newlines in string parsing
-end
-
 function StringToken(T::Type, opts::LocalOpts)
     StringToken(T, opts.endchar, opts.escapechar, opts.includenewlines)
 end
