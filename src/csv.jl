@@ -219,13 +219,14 @@ function Base.showerror(io::IO, err::CSVParseError)
     str = err.str
     char = err.char
     maxchar = 100
+    hmaxchar = round(Int, maxchar/2)
     rng = getlineat(str, char)
     substr = strip(str[rng])
     pointer = String(['_' for i=1:(char-first(rng)-1)]) * "^"
     if length(substr) > maxchar
         # center the error char
-        lst = min(char+ceil(Int, maxchar), last(rng))
-        fst = max(start(rng), lst-maxchar)
+        lst = min(char+ceil(Int, hmaxchar), last(rng))
+        fst = max(first(rng), char-hmaxchar)
         substr = "..." * strip(str[fst:lst]) * "..."
         pointer = String(['_' for i=1:(char-fst+2)]) * "^"
     end
