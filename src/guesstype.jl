@@ -18,17 +18,55 @@ const common_datetime_formats = Any[
 
 isna(x) = x == "" || x in NA_Strings
 
-function guess_eltype(x, prev_guess=Union{},
+const DEFAULT_QUOTES = ('"', ''')
+
+## options passed down for tokens (specifically NAToken, StringToken)
+## inside a Quoted token
+immutable LocalOpts
+    endchar::Char         # End parsing at this char
+    quotechar::Char       # Quote char
+    escapechar::Char      # Escape char
+    includenewlines::Bool # Whether to include newlines in string parsing
+end
+
+function StringToken(T::Type, opts::LocalOpts)
+    StringToken(T, opts.endchar, opts.escapechar, opts.includenewlines)
+end
+
+function guesstoken(x, opts, prev_guess::ANY=Unknown(),
                       strtype=StrRange,
                       dateformats=common_date_formats,
                       datetimeformats=common_datetime_formats)
+    # detect quoting
+    if length(x) > 0 && x[1] in DEFAULT_QUOTES && last(x) == x[1]
+        # this is a reliable quoted situation
+        inner_x = strip(strip(x, x[1]))
+        prev = prev_guess
+        if isa(prev_guess, Quoted)
+            prev = prev_guess.inner
+        end
 
-   guess = isna(x) ?
-           (issubtype(prev_guess, Nullable) &&
-                prev_guess!=Union{} ? prev_guess : Nullable{prev_guess}) :
-           !isnull(tryparse(Int64, x)) ? Int64 :
-           !isnull(tryparse(Float64, x)) ? Float64 :
-           !isnull(tryparse(Float64, x)) ? Float64 :
+        opts1 = LocalOpts(opts.endchar, x[1], opts.escapechar,
+                          opts.includenewlines)
+        inner = guesstoken(inner_x, opts, prev, strtype,
+                             dateformats, datetimeformats)
+        return Quoted(inner; quotechar=opts.quotechar, escapechar=opts.escapechar)
+    end
+
+    if isa(prev_guess, Quoted)
+        # It seems this field is not quoted.
+        # promote the inner thing
+        inner = guesstoken(x, opts, prev_guess.inner, strtype,
+                             dateformats, datetimeformats)
+        return Quoted(inner; required=false, quotechar=prev_guess.quotechar,
+                             escapechar=prev_guess.escapechar)
+    end
+    guess = isna(x) ?
+           (isa(prev_guess, NAToken) &&
+            prev_guess!=Unknown() ? prev_guess : NAToken(prev_guess, endchar=opts.endchar)) :
+           !isnull(tryparse(Int64, x)) ? fromtype(Int64) :
+           !isnull(tryparse(Float64, x)) ? fromtype(Float64) :
+           !isnull(tryparse(Float64, x)) ? fromtype(Float64) :
            Any
 
    if guess == Any
@@ -36,12 +74,12 @@ function guess_eltype(x, prev_guess=Union{},
        if dateguess !== nothing
            guess = dateguess
        else
-           guess = strtype
+           guess = StringToken(strtype, opts)
        end
    end
 
-   t = promote_guess(prev_guess, guess)
-   t == Any ? strtype : t
+   t = promote_guess(opts, prev_guess, guess)
+   t == Any ? StringToken(strtype, opts) : t
 end
 
 function guessdateformat(str, dateformats=common_date_formats,
@@ -70,22 +108,32 @@ let
     @test guessdateformat("24/09/2016") |> typeof == DateTimeToken(Date, dateformat"dd/mm/yyyy") |> typeof
 end
 
-promote_guess(T,S) = promote_type(T,S)
-promote_guess(d1::DateTimeToken, d2::DateTimeToken) = d2 # TODO: check compatibility
-promote_guess(T::Type{Union{}},S::DateTimeToken) = S
-promote_guess{S}(T,::Nullable{S}) = Nullable{promote_guess(S,T)}
-promote_guess{S<:StringLike}(T, ::S) = S
+promote_guess(opts, d1::DateTimeToken, d2::DateTimeToken) = d2 # TODO: check compatibility
+promote_guess(opts, ::Unknown,S::DateTimeToken) = S
+promote_guess(opts, T,S) = fromtype(promote_type(fieldtype(T),fieldtype(S)))
+promote_guess(opts, T, na::NAToken) = NAToken(promote_guess(opts, T,na.inner), endchar=na.endchar)
+promote_guess(opts, na1::NAToken, na2::NAToken) = NAToken(promote_guess(opts, na2.inner,na1.inner), endchar=na2.endchar) # XXX: na1.endchar == na2.endchar ?
+promote_guess(opts, T, q::Quoted) = Quoted(promote_guess(opts, T,q.inner), endchar=q.quotechar, escapechar=q.escapechar, required=false)
+promote_guess(opts, q1::Quoted, q2::Quoted) = Quoted(promote_guess(opts, q1.inner,q2.inner), required=q2.required, quotechar=q2.quotechar, escapechar=q2.escapechar) # XXX: are the options same?
+promote_guess(opts, T, s::StringToken) = s
 
 let
-    @test guess_eltype("21") == Int
-    @test guess_eltype("") == Nullable{Union{}}
-    @test guess_eltype("NA") == Nullable{Union{}}
-    @test guess_eltype("21", Nullable{Union{}}) == Nullable{Int}
-    @test guess_eltype("", Int) == Nullable{Int}
-    @test guess_eltype("", Nullable{Int}) == Nullable{Int}
-    @test guess_eltype("21", Float64) == Float64
-    @test guess_eltype("\"21\"", Float64, String) == String # Should this be Quoted(Numeric(Float64), required=false) instead?
-    @test guess_eltype("abc", Float64, String) == String
-    @test guess_eltype("20160909 12:12:12", Union{}) |> typeof == DateTimeToken(DateTime, dateformat"yyyymmdd HH:MM:SS.s") |> typeof
+    # dumb way to get the comparison working
+    Base.:(==){T<:AbstractToken}(a::T, b::T) = string(a) == string(b)
+    opts = LocalOpts(',', '"', '\\', false)
+    @test guesstoken("21", opts) == fromtype(Int)
+    @test guesstoken("", opts) == NAToken(Unknown())
+    @test guesstoken("NA", opts) == NAToken(Unknown())
+    @test guesstoken("21", opts, NAToken(Unknown())) == NAToken(fromtype(Int))
+    @test guesstoken("", opts, fromtype(Int)) == NAToken(fromtype(Int))
+    @test guesstoken("", opts, NAToken(fromtype(Int))) == NAToken(fromtype(Int))
+    @test guesstoken("21", opts, fromtype(Float64)) == fromtype(Float64)
+    @test guesstoken("\"21\"", opts, fromtype(Float64), fromtype(String)) == Quoted(Numeric(Float64), required=false)
+    @test guesstoken("abc", opts, fromtype(Float64), String) == fromtype(String)
+    @test guesstoken("\"abc\"", opts, fromtype(Float64), String) == Quoted(fromtype(String))
+    @test guesstoken("abc", opts, Quoted(fromtype(Float64)), String) == Quoted(fromtype(String))
+    @test guesstoken("abc", opts, NAToken(Unknown()), String) == StringToken(String)
+    @test guesstoken("abc", opts, NAToken(fromtype(Int)), String) == StringToken(String)
+    @test guesstoken("20160909 12:12:12", opts, Unknown()) |> typeof == DateTimeToken(DateTime, dateformat"yyyymmdd HH:MM:SS.s") |> typeof
 end
 

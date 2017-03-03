@@ -153,7 +153,10 @@ function push_pool!{T,R}(pa::PooledArray{T,R}, val)
         isp = invperm(sp)
         refs = pa.refs
         for i = 1:length(refs)
-            @inbounds refs[i] = isp[refs[i]]
+            # after resize we might have some 0s
+            if refs[i] != 0
+                @inbounds refs[i] = isp[refs[i]]
+            end
         end
         pool_idx = isp[pool_idx]
         copy!(pa.pool, pa.pool[sp])

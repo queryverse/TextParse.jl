@@ -6,6 +6,10 @@ fieldtype{T}(::Type{AbstractToken{T}}) = T
 fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 
 
+# needed for promoting guessses
+immutable Unknown <: AbstractToken{Union{}} end
+fromtype(::Type{Union{}}) = Unknown()
+
 # Numberic parsing
 immutable Numeric{T} <: AbstractToken{T}
     decimal::Char
@@ -258,9 +262,6 @@ abstract AbstractField{T} <: AbstractToken{T} # A rocord is a collection of abst
     inner::S
   ; ignore_init_whitespace::Bool=true
   , ignore_end_whitespace::Bool=true
-  , quoted::Bool=false
-  , quotechar::Char='\"'
-  , escapechar::Char='\\'
   , eoldelim::Bool=false
   , spacedelim::Bool=false
   , delim::Char=','

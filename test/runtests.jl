@@ -111,7 +111,7 @@ import TextParse: Repeated
 end
 
 
-import TextParse: ParsingOptions, readcolnames
+import TextParse: LocalOpts, readcolnames
 @testset "CSV column names" begin
     str1 = """
      a, b,c d, e
@@ -121,9 +121,14 @@ import TextParse: ParsingOptions, readcolnames
     x y,1.0,1,
     x,1.0,,1
     """
-    opts = ParsingOptions(',', '"', '\\')
+
+    str2 = """
+     a, " b", "c", "d\\" e "
+    """
+    opts = LocalOpts(',', '"', '\\', false)
     @test readcolnames(str1, opts, 1, String[]) == (["a", "b", "c d", "e"], 13)
     @test readcolnames("\n\r$str1", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "e"], 15)
+    #@test readcolnames("$str2", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "d\" e"], 24)
 end
 
 import TextParse: guesscoltypes, StrRange
@@ -136,15 +141,15 @@ import TextParse: guesscoltypes, StrRange
     x y,1.0,1,
     ,1.0,,1
     """
-    opts = ParsingOptions(',', '"', '\\')
+    opts = LocalOpts(',', '"', '\\', false)
     _, pos = readcolnames(str1, opts, 1, String[])
     testtill(i, coltypes=[]) = guesscoltypes(str1, opts, pos, i, coltypes)
     @test testtill(0) |> first == Any[]
-    @test testtill(1) |> first == Any[StrRange, Int, Int, Int]
-    @test testtill(2) |> first == Any[StrRange, Int, Int, Int]
-    @test testtill(3) |> first == Any[StrRange, Int, Float64, Int]
-    @test testtill(4) |> first == Any[StrRange, Float64, Float64, Nullable{Int}]
-    @test testtill(5) |> first == Any[Nullable{StrRange}, Float64, Nullable{Float64}, Nullable{Int}]
+    @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
+    @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
+    @test testtill(3) |> first == map(fromtype, [StrRange, Int, Float64, Int])
+    @test testtill(4) |> first == map(fromtype, [StrRange, Float64, Float64, Nullable{Int}])
+    @test testtill(5) |> first == map(fromtype, [Nullable{StrRange}, Float64, Nullable{Float64}, Nullable{Int}])
 end
 
 
@@ -170,11 +175,10 @@ import TextParse: _csvread
     x,1.0,,1
     """
     data = (
-            (NullableArray(["x", "","x","x y","x"], Bool[0,1,0,0,0]),
+            (["x", "","x","x y","x"],
               ones(5),
               NullableArray(ones(5), Bool[0,0,0,0,1]),
-              NullableArray(ones(Int,5), Bool[0,0,0,1,0]))
-              , ["a", "b", "c d", "e"])
-    _csvread(str1, ',')
+              NullableArray(ones(Int,5), Bool[0,0,0,1,0])),
+              ["a", "b", "c d", "e"])
     @test isequal(_csvread(str1, ','), data)
 end

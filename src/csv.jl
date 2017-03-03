@@ -4,15 +4,9 @@ const debugrec = Ref{Any}()
 optionsiter(colnames::Associative) = colnames
 optionsiter(colnames::AbstractVector) = enumerate(colnames)
 
-tofield(f::AbstractField, opts) = f
-tofield(f::AbstractToken, opts) =
-    Field(f, delim=opts.delim, quotechar=opts.quotechar, escapechar=opts.escapechar)
-tofield(t::Union{Type, DateFormat}, opts) =
-    tofield(fromtype(t), opts)
-tofield(t::Type{String}, opts) = 
-    tofield(fromtype(StrRange), opts)
-tofield(t::Type{Nullable{String}}, opts) =
-    tofield(fromtype(Nullable{StrRange}), opts)
+tofield(f::AbstractField, delim) = f
+tofield(f::AbstractToken, delim) =
+    Field(f, delim=delim)
 
 """
     csvread(file::IO, delim=',';
@@ -45,13 +39,6 @@ function csvread(file::IO, delim=','; kwargs...)
     _csvread(String(mmap_data), delim; kwargs...)
 end
 
-immutable ParsingOptions
-    delim::Char
-    quotechar::Char
-    escapechar::Char
-    #ignore_empty_rows::Bool
-end
-
 # read CSV in a string
 function _csvread(str::AbstractString, delim=',';
                  quotechar='"',
@@ -65,7 +52,7 @@ function _csvread(str::AbstractString, delim=',';
                  coltypes=Type[],
                  type_detect_rows=20)
 
-    opts = ParsingOptions(delim, quotechar, escapechar) #ignore_empty_rows,
+    opts = LocalOpts(delim, quotechar, escapechar, false)
     len = endof(str)
     pos = start(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
@@ -80,7 +67,7 @@ function _csvread(str::AbstractString, delim=',';
                           dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
-        guess[i] = tofield(v, opts)
+        guess[i] = tofield(v, delim)
     end
 
     guess[end].eoldelim = true
@@ -107,7 +94,7 @@ function readcolnames(str, opts, pos, colnames)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
-    colnames_inferred = map(strip, split(head, opts.delim))
+    colnames_inferred = map(strip, split(head, opts.endchar))
 
     # set a subset of column names
     for (i, v) in optionsiter(colnames)
@@ -117,7 +104,7 @@ function readcolnames(str, opts, pos, colnames)
 end
 
 
-function guesscoltypes(str::AbstractString, opts::ParsingOptions, pos::Int,
+function guesscoltypes(str::AbstractString, opts::LocalOpts, pos::Int,
                        nrows::Int, coltypes,
                        dateformats=common_date_formats,
                        datetimeformats=common_datetime_formats)
@@ -133,13 +120,13 @@ function guesscoltypes(str::AbstractString, opts::ParsingOptions, pos::Int,
         lineend = getlineend(str, pos)
         row = str[pos:lineend]
 
-        fields = map(strip, split(row, opts.delim))
+        fields = map(strip, split(row, opts.endchar))
         if i == 1
-            guess = Any[Union{} for i=1:length(fields)] # idk
+            guess = Any[Unknown() for i=1:length(fields)] # idk
         end
 
         # update guess
-        guess = Any[guess_eltype(f, g, StrRange, dateformats, datetimeformats)
+        guess = Any[guesstoken(f, opts, g, StrRange, dateformats, datetimeformats)
                     for (f,g) in zip(fields, guess)]
         pos = lineend+1
     end
