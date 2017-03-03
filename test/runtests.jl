@@ -151,7 +151,7 @@ import TextParse: guesscoltypes, StrRange
     @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(3) |> first == map(fromtype, [StrRange, Int, Float64, Int])
     @test testtill(4) |> first == map(fromtype, [StrRange, Float64, Float64, Nullable{Int}])
-    @test testtill(5) |> first == map(fromtype, [Nullable{StrRange}, Float64, Nullable{Float64}, Nullable{Int}])
+    @test testtill(5) |> first == map(fromtype, [StrRange, Float64, Nullable{Float64}, Nullable{Int}])
 end
 
 

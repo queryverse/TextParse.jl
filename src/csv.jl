@@ -50,7 +50,7 @@ function _csvread(str::AbstractString, delim=',';
                  colnames=String[],
                  #ignore_empty_rows=true,
                  coltypes=Type[],
-                 type_detect_rows=20)
+                 type_detect_rows=100)
 
     opts = LocalOpts(delim, quotechar, escapechar, false)
     len = endof(str)
@@ -126,8 +126,11 @@ function guesscoltypes(str::AbstractString, opts::LocalOpts, pos::Int,
         end
 
         # update guess
-        guess = Any[guesstoken(f, opts, g, StrRange, dateformats, datetimeformats)
-                    for (f,g) in zip(fields, guess)]
+        for j in 1:length(guess)
+            guess[j] = guesstoken(fields[j], opts,
+                                  guess[j], StrRange,
+                                  dateformats, datetimeformats)
+        end
         pos = lineend+1
     end
 

@@ -70,6 +70,9 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
    end
 
    t = promote_guess(opts, prev_guess, guess)
+   if isa(t, Quoted) && isa(t.inner, NAToken) && isa(t.inner.inner, StringToken)
+       @show x, prev_guess, guess, t
+   end
    t == Any ? StringToken(strtype, opts) : t
 end
 
@@ -100,9 +103,10 @@ let
 end
 
 promote_guess(opts, d1::DateTimeToken, d2::DateTimeToken) = d2 # TODO: check compatibility
-promote_guess(opts, ::Unknown,S::DateTimeToken) = S
+promote_guess(opts, ::Unknown, S::DateTimeToken) = S
 promote_guess(opts, T,S) = fromtype(promote_type(fieldtype(T),fieldtype(S)))
 promote_guess(opts, T, na::NAToken) = NAToken(promote_guess(opts, T,na.inner), endchar=na.endchar)
+promote_guess(opts, str::StringToken, na::NAToken) = str
 promote_guess(opts, na1::NAToken, na2::NAToken) = NAToken(promote_guess(opts, na2.inner,na1.inner), endchar=na2.endchar) # XXX: na1.endchar == na2.endchar ?
 promote_guess(opts, T, q::Quoted) = Quoted(promote_guess(opts, T,q.inner), endchar=q.quotechar, escapechar=q.escapechar, required=false)
 promote_guess(opts, q1::Quoted, q2::Quoted) = Quoted(promote_guess(opts, q1.inner,q2.inner), required=q2.required, quotechar=q2.quotechar, escapechar=q2.escapechar) # XXX: are the options same?
@@ -119,12 +123,14 @@ let
     @test guesstoken("", opts, fromtype(Int)) == NAToken(fromtype(Int))
     @test guesstoken("", opts, NAToken(fromtype(Int))) == NAToken(fromtype(Int))
     @test guesstoken("21", opts, fromtype(Float64)) == fromtype(Float64)
-    @test guesstoken("\"21\"", opts, fromtype(Float64), fromtype(String)) == Quoted(Numeric(Float64), required=false)
+    @test guesstoken("\"21\"", opts, fromtype(Float64)) == Quoted(Numeric(Float64), required=false)
     @test guesstoken("abc", opts, fromtype(Float64), String) == fromtype(String)
     @test guesstoken("\"abc\"", opts, fromtype(Float64), String) == Quoted(fromtype(String))
     @test guesstoken("abc", opts, Quoted(fromtype(Float64)), String) == Quoted(fromtype(String))
     @test guesstoken("abc", opts, NAToken(Unknown()), String) == StringToken(String)
     @test guesstoken("abc", opts, NAToken(fromtype(Int)), String) == StringToken(String)
     @test guesstoken("20160909 12:12:12", opts, Unknown()) |> typeof == DateTimeToken(DateTime, dateformat"yyyymmdd HH:MM:SS.s") |> typeof
+    @test guesstoken("\"12\"", opts, NAToken(Unknown()), String) == Quoted(NAToken(fromtype(Int)))
+    @test guesstoken("\"\"", opts, Quoted(fromtype(Int)), String) == Quoted(NAToken(fromtype(Int)))
 end
 
