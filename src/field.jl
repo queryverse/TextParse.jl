@@ -88,24 +88,50 @@ end
 
 immutable StringToken{T} <: AbstractToken{T}
     endchar::Char
+    quotechar::Char
     escapechar::Char
     includenewlines::Bool
 end
 
-StringToken{T}(t::Type{T}, endchar=',', escapechar='\\', includenewlines=false) = StringToken{T}(endchar, escapechar, includenewlines)
+StringToken{T}(t::Type{T}, endchar=',', quotechar='"', escapechar='\\', includenewlines=false) = StringToken{T}(endchar, quotechar, escapechar, includenewlines)
 fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
 
 function tryparsenext{T}(s::StringToken{T}, str, i, len,
-                         opts=LocalOpts(s.endchar, '"', s.escapechar, s.includenewlines))
+                         opts=LocalOpts(s.endchar, s.quotechar, s.escapechar, s.includenewlines))
     R = Nullable{T}
-    i > len && return R(), i
+    i > len && return R(), i # XXX: maybe wrong?
     p = ' '
     i0 = i
     while true
         i > len && break
         c, ii = next(str, i)
-        if (c == opts.endchar && p != opts.escapechar) ||
-            (!opts.includenewlines && isnewline(c))
+        if c == opts.endchar
+            # this means we're inside a quoted string
+            # and want to read it without the quote
+            if opts.endchar == opts.quotechar
+                if opts.quotechar == opts.escapechar
+                    # sometimes the quotechar is the escapechar
+                    # in that case we need to see the next char
+                    if ii > len
+                        break
+                    end
+                    nxt, j = next(str, ii)
+                    if nxt == opts.quotechar
+                        # the current character is escaping the
+                        # next one
+                        i = j # skip next char as well
+                        p = nxt
+                        continue
+                    end
+                elseif p == opts.escapechar
+                    # previous char escaped this one
+                    i = ii
+                    p = c
+                    continue
+                end
+            end
+            break
+        elseif (!opts.includenewlines && isnewline(c))
             break
         end
         i = ii
@@ -149,6 +175,8 @@ end
     WeakRefString(pointer(str, i), j-i+1)
 end
 
+export Quoted
+
 @qtype Quoted{T, S<:AbstractToken}(
     inner::S
   ; output_type::Type{T}=fieldtype(inner)
@@ -157,6 +185,8 @@ end
   , quotechar::Char='"'
   , escapechar::Char='\\'
 ) <: AbstractToken{T}
+
+Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
 
 function tryparsenext{T}(q::Quoted{T}, str, i, len)
     R = Nullable{T}
@@ -266,7 +296,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
     return R(T(x)), ii
 
     @label maybe_null
-    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.escapechar, opts.includenewlines), str, i,len)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.quotechar, opts.escapechar, opts.includenewlines), str, i,len)
     if nastr in na.nastrings
         i=ii
         @goto null

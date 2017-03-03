@@ -35,13 +35,23 @@ end
 
 import TextParse: StringToken
 @testset "String parsing" begin
-    for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 11)]
+    for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 6)]
         @test tryparsenext(StringToken(String), s) |> unwrap == (s[1:till-1], till)
     end
     for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(StringToken(String, ',', '"', true), s) |> unwrap == (s[1:till-1], till)
+        @test tryparsenext(StringToken(String, ',', '"', '"', true), s) |> unwrap == (s[1:till-1], till)
     end
-    @test tryparsenext(StringToken(String, ',', '"', true), "") |> failedat == 1
+    @test tryparsenext(StringToken(String, ',', '"', '"', true), "") |> failedat == 1
+    tok = StringToken(String, '"', '"', '"', true)
+
+    str =  "Owner 2 ”Vicepresident\"\""
+    @test tryparsenext(tok, str) |> unwrap == (str, endof(str)+1)
+    str1 =  "\"Owner 2 ”Vicepresident\"\"\""
+    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == (str, endof(str1)+1)
+    str2 =  "\"\"\"\""
+    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"", endof(str2)+1)
+    str2 =  "\"\"\"\"\"\""
+    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"\"\"", endof(str2)+1)
 end
 
 
