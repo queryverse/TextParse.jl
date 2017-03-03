@@ -42,24 +42,26 @@ import TextParse: StringToken
 end
 
 
-import TextParse: Quoted
+import TextParse: Quoted, NAToken
 @testset "Quoted string parsing" begin
     @test tryparsenext(Quoted(StringToken(String)), "\"abc\"") |> unwrap == ("abc", 6)
     @test tryparsenext(Quoted(StringToken(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
     @test tryparsenext(Quoted(StringToken(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
     @test tryparsenext(Quoted(StringToken(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
     @test tryparsenext(Quoted(StringToken(String), required=true), "x\"abc\"") |> failedat == 1
+    @test tryparsenext(Quoted(fromtype(Int)), "21") |> unwrap == (21,3)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "21") |> unwrap |> unwrap == (21,3)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap |> failedat == 1
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap |> unwrap == (21, 5)
 end
 
-
-import TextParse: NAToken
 @testset "NA parsing" begin
     @test tryparsenext(NAToken(fromtype(Float64)), ",") |> unwrap |> failedat == 1 # is nullable
     @test tryparsenext(NAToken(fromtype(Float64)), "X,") |> failedat == 1
     @test tryparsenext(NAToken(fromtype(Float64)), "NA,") |> unwrap |> failedat == 3
     @test tryparsenext(NAToken(fromtype(Float64)), "1.212,") |> unwrap |> unwrap == (1.212, 6)
 end
-
 
 import TextParse: Field
 @testset "Field parsing" begin

@@ -160,7 +160,13 @@ end
 
 function tryparsenext{T}(q::Quoted{T}, str, i, len)
     R = Nullable{T}
-    i > len && @goto error
+    x = R()
+    if i > len
+        q.required && @goto error
+        # check to see if inner thing is ok with an empty field
+        @chk2 x, i = tryparsenext(q.inner, str, i, len) error
+        @goto done
+    end
     c, ii = next(str, i)
     quotestarted = false
     if q.quotechar == c
@@ -240,7 +246,14 @@ const NA_Strings = ("NA", "N/A","#N/A", "#N/A N/A", "#NA",
 function tryparsenext{T}(na::NAToken{T}, str, i, len,
                          opts=LocalOpts(na.endchar,'"','\\',false))
     R = Nullable{T}
-    i > len && @goto error # XXX: should probably succeed though
+    if i > len
+        if na.emptyisna
+            @goto null
+        else
+            @goto error
+        end
+    end
+
     c, ii=next(str,i)
     #@show na.endchar
     if (c == opts.endchar || isnewline(c)) && na.emptyisna

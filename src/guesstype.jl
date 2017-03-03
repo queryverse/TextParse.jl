@@ -52,7 +52,7 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
         return Quoted(inner; required=false, quotechar=prev_guess.quotechar,
                              escapechar=prev_guess.escapechar)
     end
-    guess = isna(x) ?
+    guess::Any = isna(x) ?
            (isa(prev_guess, NAToken) &&
             prev_guess!=Unknown() ? prev_guess : NAToken(prev_guess, endchar=opts.endchar)) :
            !isnull(tryparse(Int64, x)) ? fromtype(Int64) :
