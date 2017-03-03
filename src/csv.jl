@@ -4,9 +4,11 @@ const debugrec = Ref{Any}()
 optionsiter(colnames::Associative) = colnames
 optionsiter(colnames::AbstractVector) = enumerate(colnames)
 
-tofield(f::AbstractField, delim) = f
-tofield(f::AbstractToken, delim) =
-    Field(f, delim=delim)
+tofield(f::AbstractField, opts) = f
+tofield(f::AbstractToken, opts) =
+    Field(f, delim=opts.endchar)
+tofield(f::Type, opts) = tofield(fromtype(f), opts)
+tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
 
 """
     csvread(file::IO, delim=',';
@@ -67,10 +69,10 @@ function _csvread(str::AbstractString, delim=',';
                           dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
-        guess[i] = tofield(v, delim)
+        guess[i] = tofield(v, opts)
     end
 
-    guess[end].eoldelim = true
+    guess[end].eoldelim = true # the last one is delimited by line end
     rec = Record((guess...,))
     debugrec[] = rec
 
@@ -136,7 +138,7 @@ function guesscoltypes(str::AbstractString, opts::LocalOpts, pos::Int,
 
     # override guesses with user request
     for (i, v) in optionsiter(coltypes)
-        guess[i] = coltypes[i]
+        guess[i] = tofield(coltypes[i], opts)
     end
     guess, pos
 end
