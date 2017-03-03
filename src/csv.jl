@@ -47,6 +47,7 @@ function _csvread(str::AbstractString, delim=',';
                  escapechar='\\',
                  dateformats=common_date_formats,
                  datetimeformats=common_datetime_formats,
+                 pooledstrings=false,
                  nrows=0,
                  header_exists=true,
                  colnames=String[],
@@ -82,7 +83,7 @@ function _csvread(str::AbstractString, delim=',';
         nrows = ceil(Int, (endof(str)-pos) / meanrowsize * sqrt(2))
     end
 
-    cols = makeoutputvecs(str, rec, nrows)
+    cols = makeoutputvecs(str, rec, nrows, pooledstrings)
     parsefill!(str, rec, nrows, cols, pos, endof(str))
 
     cols, merged_colnames
@@ -177,12 +178,16 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
     end
 end
 
-function makeoutputvecs(str, rec, N)
+function makeoutputvecs(str, rec, N, pooledstrings)
     ([if fieldtype(f) == Nullable{Union{}} # we weren't able to detect the type, all columns were blank
         NullableArray{Void}(N)
     elseif fieldtype(f) == StrRange
       # By default we put strings in a PooledArray
-      resize!(PooledArray(Int32[], String[]), N)
+      if pooledstrings
+          resize!(PooledArray(Int32[], String[]), N)
+      else
+          Array{String}(N)
+      end
     elseif fieldtype(f) == Nullable{StrRange}
         NullableArray{String}(N)
     elseif fieldtype(f) <: Nullable
