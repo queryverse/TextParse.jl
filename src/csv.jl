@@ -97,7 +97,8 @@ function readcolnames(str, opts, pos, colnames)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
-    colnames_inferred = map(strip, split(head, opts.endchar))
+    colnames_inferred = strip.(stripquotes.(strip.(split(head, opts.endchar))))
+    # TODO: unescape
 
     # set a subset of column names
     for (i, v) in optionsiter(colnames)

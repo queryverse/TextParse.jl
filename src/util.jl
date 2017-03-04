@@ -88,6 +88,11 @@ function eatnewlines(str, i=1, l=endof(str))
     return i
 end
 
+function stripquotes(x)
+    x[1] in ('\'', '"') && x[1] == x[end] ?
+        strip(x, x[1]) : x
+end
+
 function getlineend(str, i=1, l=endof(str))
     while i<=l
         c, ii = next(str, i)
