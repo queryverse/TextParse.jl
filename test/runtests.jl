@@ -158,7 +158,7 @@ import TextParse: guesscoltypes, StrRange
     """
     opts = LocalOpts(',', '"', '\\', false)
     _, pos = readcolnames(str1, opts, 1, String[])
-    testtill(i, coltypes=[]) = guesscoltypes(str1, opts, pos, i, coltypes)
+    testtill(i, coltypes=[]) = guesscoltypes(str1, String[], opts, pos, i, coltypes)
     @test testtill(0) |> first == Any[]
     @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
@@ -225,4 +225,14 @@ import TextParse: _csvread
               NullableArray(ones(Int,5), Bool[0,0,0,1,0])),
               ["a", "b", "c d", "e"])
     @test isequal(_csvread(str1, ','), data)
+    coltype_test1 = _csvread(str1,
+                            coltypes=Dict("b"=>Nullable{Float64},
+                                          "e"=>Nullable{Float64}))
+    coltype_test2 = _csvread(str1,
+                            coltypes=Dict(2=>Nullable{Float64},
+                                          4=>Nullable{Float64}))
+    @test eltype(coltype_test1[1][2]) == Nullable{Float64}
+    @test eltype(coltype_test1[1][4]) == Nullable{Float64}
+    @test eltype(coltype_test2[1][2]) == Nullable{Float64}
+    @test eltype(coltype_test2[1][4]) == Nullable{Float64}
 end

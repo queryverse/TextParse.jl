@@ -1,8 +1,27 @@
 export csvread
 const debugrec = Ref{Any}()
 
-optionsiter(colnames::Associative) = colnames
-optionsiter(colnames::AbstractVector) = enumerate(colnames)
+optionsiter(opts::Associative) = opts
+optionsiter(opts::AbstractVector) = enumerate(opts)
+
+getbyheader(opts, header, i::Int) = opts[i]
+getbyheader(opts, header, i::Symbol) = getcol(opts, header, string(i))
+function getbyheader(opts, header, i::AbstractString)
+    if !(i in header)
+        throw(ArgumentError("Unknown column $i"))
+    end
+    getbyheader(opts, header, findfirst(header, i))
+end
+
+function optionsiter(opts::Associative, header)
+    iter = Dict{Int,Any}()
+    for (k, v) in opts
+        iter[getbyheader(1:length(header), header, k)] = v
+    end
+    iter
+end
+
+optionsiter(opts::AbstractVector, header) = optionsiter(opts)
 
 tofield(f::AbstractField, opts) = f
 tofield(f::AbstractToken, opts) =
@@ -101,14 +120,14 @@ function readcolnames(str, opts, pos, colnames)
     # TODO: unescape
 
     # set a subset of column names
-    for (i, v) in optionsiter(colnames)
+    for (i, v) in optionsiter(colnames, colnames_inferred)
         colnames_inferred[i] = v
     end
     colnames_inferred, lineend+1
 end
 
 
-function guesscoltypes(str::AbstractString, opts::LocalOpts, pos::Int,
+function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
                        nrows::Int, coltypes,
                        dateformats=common_date_formats,
                        datetimeformats=common_datetime_formats)
@@ -139,8 +158,8 @@ function guesscoltypes(str::AbstractString, opts::LocalOpts, pos::Int,
     end
 
     # override guesses with user request
-    for (i, v) in optionsiter(coltypes)
-        guess[i] = tofield(coltypes[i], opts)
+    for (i, v) in optionsiter(coltypes, header)
+        guess[i] = tofield(v, opts)
     end
     guess, pos
 end
