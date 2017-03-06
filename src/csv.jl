@@ -85,7 +85,7 @@ function _csvread(str::AbstractString, delim=',';
         merged_colnames = colnames
     end
 
-    guess, pos1 = guesscoltypes(str, opts, pos, type_detect_rows, coltypes,
+    guess, pos1 = guesscoltypes(str, merged_colnames, opts, pos, type_detect_rows, coltypes,
                           dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
