@@ -135,36 +135,9 @@ using PooledArrays
     if pool_idx <= 0
         # allocate only here.
         val = convert(T,alloc_string(str, rng))
-        pool_idx = push_pool!(pa, val)
+        pool_idx = PooledArrays.unsafe_pool_push!(pa, val)
     end
 
     pa.refs[i] = pool_idx
 end
 
-function push_pool!{T,R}(pa::PooledArray{T,R}, val)
-    # TODO: move this refactoring to PooledArrays
-    push!(pa.pool, val)
-    pool_idx = length(pa.pool)
-    if pool_idx > typemax(R)
-        throw(ErrorException(
-            "You're using a PooledArray with ref type $R, which can only hold $(int(typemax(R))) values,\n",
-            "and you just tried to add the $(typemax(R)+1)th reference.  Please change the ref type\n",
-            "to a larger int type, or use the default ref type ($DEFAULT_POOLED_REF_TYPE)."
-        ))
-    end
-    if pool_idx > 1 && isless(val, pa.pool[pool_idx-1])
-        # maintain sorted order
-        sp = sortperm(pa.pool)
-        isp = invperm(sp)
-        refs = pa.refs
-        for i = 1:length(refs)
-            # after resize we might have some 0s
-            if refs[i] != 0
-                @inbounds refs[i] = isp[refs[i]]
-            end
-        end
-        pool_idx = isp[pool_idx]
-        copy!(pa.pool, pa.pool[sp])
-    end
-    pool_idx
-end
