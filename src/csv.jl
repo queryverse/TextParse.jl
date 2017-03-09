@@ -14,6 +14,7 @@ function getbyheader(opts, header, i::AbstractString)
 end
 
 function optionsiter(opts::Associative, header)
+    isempty(header) && return opts
     iter = Dict{Int,Any}()
     for (k, v) in opts
         iter[getbyheader(1:length(header), header, k)] = v

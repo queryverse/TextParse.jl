@@ -231,8 +231,20 @@ import TextParse: _csvread
     coltype_test2 = _csvread(str1,
                             coltypes=Dict(2=>Nullable{Float64},
                                           4=>Nullable{Float64}))
+    str2 = """
+    x,1,1,1
+    ,1,1,1
+    x,1,1.,1
+    x y,1.0,1,
+    x,1.0,,1
+    """
+    coltype_test3 = _csvread(str2, header_exists=false,
+                            coltypes=Dict(2=>Nullable{Float64},
+                                          4=>Nullable{Float64}))
     @test eltype(coltype_test1[1][2]) == Nullable{Float64}
     @test eltype(coltype_test1[1][4]) == Nullable{Float64}
     @test eltype(coltype_test2[1][2]) == Nullable{Float64}
     @test eltype(coltype_test2[1][4]) == Nullable{Float64}
+    @test eltype(coltype_test3[1][2]) == Nullable{Float64}
+    @test eltype(coltype_test3[1][4]) == Nullable{Float64}
 end
