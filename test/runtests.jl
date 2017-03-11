@@ -50,8 +50,9 @@ import TextParse: StringToken
     @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == (str, endof(str1)+1)
     str2 =  "\"\"\"\""
     @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"", endof(str2)+1)
-    str2 =  "\"\"\"\"\"\""
-    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"\"\"", endof(str2)+1)
+    str2 =  "\"\"\"\"\"\","
+    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"\"\"", endof(str2))
+
 end
 
 
@@ -67,6 +68,7 @@ import TextParse: Quoted, NAToken
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap |> failedat == 1
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap |> unwrap == (21, 5)
+    @test tryparsenext(Quoted(StringToken(String, ',','"','"')), "x,") |> unwrap == ("x", 2)
 end
 
 @testset "NA parsing" begin

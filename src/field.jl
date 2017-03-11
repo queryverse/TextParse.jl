@@ -219,10 +219,11 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
     end
     c, ii = next(str, i)
     # TODO: eat up whitespaces?
-    if quotestarted && c != q.quotechar
-        @goto error
+    if quotestarted
+        c != q.quotechar && @goto error
+        i = ii
     end
-    i = ii
+
 
     @label done
     return R(x), i
