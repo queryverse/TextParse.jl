@@ -280,3 +280,16 @@ function Base.showerror(io::IO, err::CSVParseError)
            substr * "\n" * pointer * "\nCSV column $(err.err_field) is expected to be: " * string(err.rec.fields[err.err_field])
     print(io, err)
 end
+
+function quotedsplitline(str, delim, quotechar, escapechar, i, l=getlineend(str,i))
+    strtok = Quoted(StringToken(String, delim, quotechar, escapechar, false), required=false)
+    f = Field(strtok, delim=delim, eoldelim=true)
+    strs = String[]
+    while i <= l
+        @chk2 x, i = tryparsenext(f, str, i, l)
+        push!(strs, x)
+    end
+    return strs
+    @label error
+    error("Couldn't split line, error at $i")
+end

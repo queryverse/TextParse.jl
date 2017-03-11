@@ -179,6 +179,10 @@ import TextParse: getlineat
     @test str[getlineat(str,endof(str))] == "defg"
 end
 
+@testset "quotedsplitline" begin
+    @test quotedsplitline("""x\nx,"s,", "\\",x" """, ',','"','\\', 3) == ["x", "s,", "\\\",x"]
+end
+
 import TextParse: guesstoken, Unknown, Numeric, DateTimeToken
 @testset "guesstoken" begin
     opts = LocalOpts(',', '"', '\\', false)
