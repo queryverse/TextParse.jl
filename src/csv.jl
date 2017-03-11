@@ -134,6 +134,7 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
                        datetimeformats=common_datetime_formats)
     # Field type guesses
     guess = []
+    prevfields = String[]
 
     for i=1:nrows
         pos = eatnewlines(str, pos)
@@ -151,10 +152,24 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
         # update guess
         for j in 1:length(guess)
-            guess[j] = guesstoken(fields[j], opts,
-                                  guess[j], StrRange,
-                                  dateformats, datetimeformats)
+            if length(fields) != length(guess)
+                error("previous rows had $(length(guess)) fields but row $i has $(length(fields))")
+            end
+            try
+                guess[j] = guesstoken(fields[j], opts,
+                                      guess[j], StrRange,
+                                      dateformats, datetimeformats)
+            catch err
+                println(STDERR, "Error while guessing a common type for column $j")
+                println(STDERR, "new value: $(fields[j]), prev guess was: $(guess[j])")
+                if j > 1
+                    println(STDERR, "prev value: $(fields[j-1])")
+                end
+
+                rethrow(err)
+            end
         end
+        prevfields = fields
         pos = lineend+1
     end
 
