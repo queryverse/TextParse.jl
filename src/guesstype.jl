@@ -16,7 +16,7 @@ const common_datetime_formats = Any[
                                     dateformat"yyyymmdd HH:MM:SS.s"
                                    ]
 
-isna(x) = x == "" || x in NA_Strings
+isna(x) = x == "" || x in NA_STRINGS
 
 const DEFAULT_QUOTES = ('"', ''')
 

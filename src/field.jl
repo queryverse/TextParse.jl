@@ -261,16 +261,17 @@ end
 
 ### Nullable
 
-const NA_Strings = ("NA", "N/A","#N/A", "#N/A N/A", "#NA",
-                    "-1.#IND", "-1.#QNAN", "-NaN", "-nan",
-                    "1.#IND", "1.#QNAN", "N/A", "NA",
-                    "NULL", "NaN", "nan")
+const nastrings_upcase = ["NA", "NULL", "N/A","#N/A", "#N/A N/A", "#NA",
+                          "-1.#IND", "-1.#QNAN", "-NaN", "-nan",
+                          "1.#IND", "1.#QNAN", "N/A", "NA", "NaN", "nan"]
+
+const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)))
 
 @qtype NAToken{T, S<:AbstractToken}(
     inner::S
   ; emptyisna=true
   , endchar=','
-  , nastrings=NA_Strings
+  , nastrings=NA_STRINGS
   , output_type::Type{T}=Nullable{fieldtype(inner)}
 ) <: AbstractToken{T}
 
@@ -298,7 +299,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
 
     @label maybe_null
     @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.quotechar, opts.escapechar, opts.includenewlines), str, i,len)
-    if nastr in na.nastrings
+    if !isempty(searchsorted(na.nastrings, nastr))
         i=ii
         @goto null
     end
