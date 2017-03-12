@@ -247,7 +247,7 @@ function Base.showerror(io::IO, err::CSVParseError)
     char = err.char
 
     err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
-            showerrorline(str, char, 100) *
+            showerrorchar(str, char, 100) *
             "\nCSV column $(err.err_field) is expected to be: " *
             string(err.rec.fields[err.err_field])
     print(io, err)
@@ -269,9 +269,9 @@ function showerrorchar(str, char, maxchar)
 end
 
 function quotedsplit(str, delim, quotechar, escapechar, includequotes, i, l)
-    strtok = Quoted(StringToken(String, delim, quotechar,
-                                escapechar, false, false),
-                    required=false, includequotes=includequotes)
+    strtok = Quoted(StringToken(String),
+                    required=false, escapechar=escapechar,
+                    quotechar=quotechar,includequotes=includequotes)
 
     f = Field(strtok, delim=delim, eoldelim=true)
     strs = String[]

@@ -142,6 +142,8 @@ import TextParse: quotedsplit
     @test quotedsplit(str, ',','"','\\', false, 3, length(str)) == ["x", "s,", "\\\",x"]
     @test quotedsplit(",", ',','"','\\', true, 1, 1) == ["", ""]
     @test quotedsplit(", ", ',','"','\\', false, 1, 2) == ["", ""]
+    str = "1, \"x \"\"y\"\" z\", 1"
+    @test quotedsplit(str, ',', '"','"',true, 1, endof(str)) == ["1", "\"x \"\"y\"\" z\"", "1"]
 end
 
 import TextParse: LocalOpts, readcolnames

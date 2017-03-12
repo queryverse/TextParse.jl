@@ -318,7 +318,6 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
     end
 
     c, ii=next(str,i)
-    #@show na.endchar
     if (c == opts.endchar || isnewline(c)) && na.emptyisna
        @goto null
     end
