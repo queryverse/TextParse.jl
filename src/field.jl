@@ -12,6 +12,7 @@ immutable LocalOpts
     endchar::Char         # End parsing at this char
     quotechar::Char       # Quote char
     escapechar::Char      # Escape char
+    includequotes::Bool   # Whether to include quotes in string parsing
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
@@ -90,25 +91,43 @@ immutable StringToken{T} <: AbstractToken{T}
     endchar::Char
     quotechar::Char
     escapechar::Char
+    includequotes::Bool
     includenewlines::Bool
 end
 
-StringToken{T}(t::Type{T}, endchar=',', quotechar='"', escapechar='\\', includenewlines=false) = StringToken{T}(endchar, quotechar, escapechar, includenewlines)
+function StringToken{T}(t::Type{T},
+               endchar=',',
+               quotechar='"',
+               escapechar='\\',
+               includequotes=false,
+               includenewlines=false)
+
+    StringToken{T}(endchar, quotechar, escapechar,
+                   includequotes, includenewlines)
+end
+
 fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
 
 function tryparsenext{T}(s::StringToken{T}, str, i, len,
-                         opts=LocalOpts(s.endchar, s.quotechar, s.escapechar, s.includenewlines))
+                         opts=LocalOpts(s.endchar, s.quotechar,
+                                        s.escapechar, s.includequotes,
+                                        s.includenewlines))
     R = Nullable{T}
-    i > len && return R(), i # XXX: maybe wrong?
     p = ' '
     i0 = i
-    while true
-        i > len && break
+    if opts.includequotes && i <= len
+        c, ii = next(str, i)
+        if c == opts.quotechar
+            i = ii # advance counter so that
+                   # the while loop doesn't react to opening quote
+        end
+    end
+
+    while i <= len
         c, ii = next(str, i)
         if c == opts.endchar
-            # this means we're inside a quoted string
-            # and want to read it without the quote
             if opts.endchar == opts.quotechar
+                # this means we're inside a quoted string
                 if opts.quotechar == opts.escapechar
                     # sometimes the quotechar is the escapechar
                     # in that case we need to see the next char
@@ -129,6 +148,9 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len,
                     p = c
                     continue
                 end
+            end
+            if opts.includequotes
+                i = ii
             end
             break
         elseif (!opts.includenewlines && isnewline(c))
@@ -181,6 +203,7 @@ export Quoted
     inner::S
   ; output_type::Type{T}=fieldtype(inner)
   , required::Bool=false
+  , includequotes::Bool=false
   , includenewlines::Bool=true
   , quotechar::Char='"'
   , escapechar::Char='\\'
@@ -201,25 +224,30 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
     quotestarted = false
     if q.quotechar == c
         quotestarted = true
-        i = ii
+        if !q.includequotes
+            i = ii
+        end
     else
         q.required && @goto error
     end
 
     @chk2 x, i = if quotestarted
-        opts = LocalOpts(q.quotechar, q.quotechar, q.escapechar, q.includenewlines)
+        opts = LocalOpts(q.quotechar, q.quotechar, q.escapechar,
+                         q.includequotes, q.includenewlines)
         tryparsenext(q.inner, str, i, len, opts)
     else
         tryparsenext(q.inner, str, i, len)
     end
 
     if i > len
-        quotestarted && @goto error
+        if quotestarted && !q.includequotes
+            @goto error
+        end
         @goto done
     end
     c, ii = next(str, i)
     # TODO: eat up whitespaces?
-    if quotestarted
+    if quotestarted && !q.includequotes
         c != q.quotechar && @goto error
         i = ii
     end
@@ -276,7 +304,7 @@ const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)
 ) <: AbstractToken{T}
 
 function tryparsenext{T}(na::NAToken{T}, str, i, len,
-                         opts=LocalOpts(na.endchar,'"','\\',false))
+                         opts=LocalOpts(na.endchar,'"','\\',false,false))
     R = Nullable{T}
     if i > len
         if na.emptyisna
@@ -298,7 +326,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
     return R(T(x)), ii
 
     @label maybe_null
-    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.quotechar, opts.escapechar, opts.includenewlines), str, i,len)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.quotechar, opts.escapechar, false, opts.includenewlines), str, i,len)
     if !isempty(searchsorted(na.nastrings, nastr))
         i=ii
         @goto null

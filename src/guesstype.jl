@@ -38,7 +38,7 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
         end
 
         opts1 = LocalOpts(opts.endchar, x[1], opts.escapechar,
-                          opts.includenewlines)
+                          opts.includequotes, opts.includenewlines)
         inner = guesstoken(inner_x, opts, prev, strtype,
                              dateformats, datetimeformats)
         return Quoted(inner; quotechar=opts.quotechar, escapechar=opts.escapechar)
@@ -96,15 +96,21 @@ function guessdateformat(str, dateformats=common_date_formats,
     return nothing
 end
 
-promote_guess(opts, d1::DateTimeToken, d2::DateTimeToken) = d2 # TODO: check compatibility
-promote_guess(opts, ::Unknown, S::DateTimeToken) = S
 promote_guess(opts, T,S) = fromtype(promote_type(fieldtype(T),fieldtype(S)))
-promote_guess(opts, T, na::NAToken) = NAToken(promote_guess(opts, T,na.inner), endchar=na.endchar)
-promote_guess(opts, str::StringToken, na::NAToken) = str
+
+promote_guess(opts, str::StringToken, ::Any) = str
+promote_guess(opts,r::Any, str::StringToken) = str
 promote_guess(opts, str::StringToken, str2::StringToken) = str2
-promote_guess(opts, str::StringToken, t) = str
+promote_guess(opts, str::StringToken, na::NAToken) = str
+
+promote_guess(opts, ::Unknown, S::DateTimeToken) = S
+promote_guess(opts, T, d::DateTimeToken) = fromtype(StrRange)
+promote_guess(opts, d::DateTimeToken, T) = fromtype(StrRange)
+promote_guess(opts, d1::DateTimeToken, d2::DateTimeToken) = d2 # TODO: check compatibility
+
+promote_guess(opts, T, na::NAToken) = NAToken(promote_guess(opts, T,na.inner), endchar=na.endchar)
 promote_guess(opts, na1::NAToken, na2::NAToken) = NAToken(promote_guess(opts, na2.inner,na1.inner), endchar=na2.endchar) # XXX: na1.endchar == na2.endchar ?
+
 promote_guess(opts, T, q::Quoted) = Quoted(promote_guess(opts, T,q.inner), endchar=q.quotechar, escapechar=q.escapechar, required=false)
 promote_guess(opts, q1::Quoted, q2::Quoted) = Quoted(promote_guess(opts, q1.inner,q2.inner), required=q2.required, quotechar=q2.quotechar, escapechar=q2.escapechar) # XXX: are the options same?
-promote_guess(opts, T, s::StringToken) = s
 

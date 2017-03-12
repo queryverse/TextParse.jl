@@ -75,7 +75,7 @@ function _csvread(str::AbstractString, delim=',';
                  coltypes=Type[],
                  type_detect_rows=100)
 
-    opts = LocalOpts(delim, quotechar, escapechar, false)
+    opts = LocalOpts(delim, quotechar, escapechar, false, false)
     len = endof(str)
     pos = start(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
@@ -117,7 +117,7 @@ function readcolnames(str, opts, pos, colnames)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
-    colnames_inferred = strip.(stripquotes.(strip.(split(head, opts.endchar))))
+    colnames_inferred = quotedsplit(str, opts.endchar, opts.quotechar, opts.escapechar, false, pos, lineend)
     # TODO: unescape
 
     # set a subset of column names
@@ -143,9 +143,8 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
         end
 
         lineend = getlineend(str, pos)
-        row = str[pos:lineend]
 
-        fields = map(strip, split(row, opts.endchar))
+        fields = quotedsplit(str, opts.endchar, opts.quotechar, opts.escapechar, true, pos, lineend)
         if i == 1
             guess = Any[Unknown() for i=1:length(fields)] # idk
         end
@@ -233,24 +232,6 @@ function makeoutputvecs(str, rec, N, pooledstrings)
     end for f in rec.fields]...)
 end
 
-function getlineat(str, i)
-    ii = prevind(str, i)
-    line_start = i
-    l = endof(str)
-    while ii > 0 && !isnewline(str[ii])
-        line_start = ii
-        ii = prevind(str, line_start)
-    end
-
-    c, ii = next(str, i)
-    line_end = i
-    while !isnewline(c) && ii <= l
-        line_end = ii
-        c, ii = next(str, ii)
-    end
-
-    line_start:line_end
-end
 
 immutable CSVParseError <: Exception
     str
@@ -281,14 +262,21 @@ function Base.showerror(io::IO, err::CSVParseError)
     print(io, err)
 end
 
-function quotedsplitline(str, delim, quotechar, escapechar, i, l=getlineend(str,i))
-    strtok = Quoted(StringToken(String, delim, quotechar, escapechar, false), required=false)
+function quotedsplit(str, delim, quotechar, escapechar, includequotes, i, l)
+    strtok = Quoted(StringToken(String, delim, quotechar,
+                                escapechar, false, false), required=false, includequotes=includequotes)
     f = Field(strtok, delim=delim, eoldelim=true)
     strs = String[]
-    while i <= l
+    while i <= l # this means that there was an empty field at the end of the line
         @chk2 x, i = tryparsenext(f, str, i, l)
         push!(strs, x)
     end
+    c, i = next(str, prevind(str, i))
+    if c == delim
+        # edge case where there's a delim at the end of the string
+        push!(strs, "")
+    end
+
     return strs
     @label error
     error("Couldn't split line, error at $i")

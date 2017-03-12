@@ -39,11 +39,13 @@ import TextParse: StringToken
         @test tryparsenext(StringToken(String), s) |> unwrap == (s[1:till-1], till)
     end
     for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(StringToken(String, ',', '"', '"', true), s) |> unwrap == (s[1:till-1], till)
+        @test tryparsenext(StringToken(String, ',', '"', '"', false, true), s) |> unwrap == (s[1:till-1], till)
     end
-    @test tryparsenext(StringToken(String, ',', '"', '"', true), "") |> failedat == 1
-    tok = StringToken(String, '"', '"', '"', true)
+    @test tryparsenext(StringToken(String, ',', '"', '"',false, true), "") |> unwrap == ("", 1)
+    tok = StringToken(String, '"', '"', '"', false, true)
 
+    @test tryparsenext(Quoted(String), "\"x\"", 1,3) |> unwrap == ("x", 4)
+    @test tryparsenext(Quoted(String, includequotes=true), "\"x\"", 1,3) |> unwrap == ("\"x\"", 4)
     str =  "Owner 2 ”Vicepresident\"\""
     @test tryparsenext(tok, str) |> unwrap == (str, endof(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
@@ -128,6 +130,18 @@ import TextParse: Repeated
 end
 
 
+import TextParse: quotedsplit
+@testset "quotedsplit" begin
+    @test quotedsplit("x", ',', '"','\\',false, 1, 1) == ["x"]
+    @test quotedsplit("x, y", ',', '"','\\',false, 1, 4) == ["x", "y"]
+    @test quotedsplit("\"x\", \"y\"", ',', '"','\\',false, 1, 8) == ["x", "y"]
+    @test quotedsplit("\"x\", \"y\"", ',', '"','\\',true, 1, 8) == ["\"x\"", "\"y\""]
+    str = """x\nx,"s,", "\\",x" """
+    @test quotedsplit(str, ',','"','\\', false, 3, length(str)) == ["x", "s,", "\\\",x"]
+    @test quotedsplit(",", ',','"','\\', true, 1, 1) == ["", ""]
+    @test quotedsplit(", ", ',','"','\\', false, 1, 2) == ["", ""]
+end
+
 import TextParse: LocalOpts, readcolnames
 @testset "CSV column names" begin
     str1 = """
@@ -142,7 +156,7 @@ import TextParse: LocalOpts, readcolnames
     str2 = """
      a, " b", "c", "d\\" e "
     """
-    opts = LocalOpts(',', '"', '\\', false)
+    opts = LocalOpts(',', '"', '\\', false, false)
     @test readcolnames(str1, opts, 1, String[]) == (["a", "b", "c d", "e"], 13)
     @test readcolnames("\n\r$str1", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "e"], 15)
     #@test readcolnames("$str2", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "d\" e"], 24)
@@ -158,7 +172,7 @@ import TextParse: guesscoltypes, StrRange
     x y,1.0,1,
     ,1.0,,1
     """
-    opts = LocalOpts(',', '"', '\\', false)
+    opts = LocalOpts(',', '"', '\\', false, false)
     _, pos = readcolnames(str1, opts, 1, String[])
     testtill(i, coltypes=[]) = guesscoltypes(str1, String[], opts, pos, i, coltypes)
     @test testtill(0) |> first == Any[]
@@ -179,13 +193,9 @@ import TextParse: getlineat
     @test str[getlineat(str,endof(str))] == "defg"
 end
 
-@testset "quotedsplitline" begin
-    @test quotedsplitline("""x\nx,"s,", "\\",x" """, ',','"','\\', 3) == ["x", "s,", "\\\",x"]
-end
-
 import TextParse: guesstoken, Unknown, Numeric, DateTimeToken
 @testset "guesstoken" begin
-    opts = LocalOpts(',', '"', '\\', false)
+    opts = LocalOpts(',', '"', '\\', false, false)
     @test guesstoken("21", opts) == fromtype(Int)
     @test guesstoken("", opts) == NAToken(Unknown())
     @test guesstoken("NA", opts) == NAToken(Unknown())

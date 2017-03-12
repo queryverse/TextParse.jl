@@ -141,3 +141,22 @@ using PooledArrays
     pa.refs[i] = pool_idx
 end
 
+function getlineat(str, i)
+    ii = prevind(str, i)
+    line_start = i
+    l = endof(str)
+    while ii > 0 && !isnewline(str[ii])
+        line_start = ii
+        ii = prevind(str, line_start)
+    end
+
+    c, ii = next(str, i)
+    line_end = i
+    while !isnewline(c) && ii <= l
+        line_end = ii
+        c, ii = next(str, ii)
+    end
+
+    line_start:line_end
+end
+
