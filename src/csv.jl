@@ -245,7 +245,15 @@ end
 function Base.showerror(io::IO, err::CSVParseError)
     str = err.str
     char = err.char
-    maxchar = 100
+
+    err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
+            showerrorline(str, char, 100) *
+            "\nCSV column $(err.err_field) is expected to be: " *
+            string(err.rec.fields[err.err_field])
+    print(io, err)
+end
+
+function showerrorchar(str, char, maxchar)
     hmaxchar = round(Int, maxchar/2)
     rng = getlineat(str, char)
     substr = strip(str[rng])
@@ -257,14 +265,14 @@ function Base.showerror(io::IO, err::CSVParseError)
         substr = "..." * strip(str[fst:lst]) * "..."
         pointer = String(['_' for i=1:(char-fst+2)]) * "^"
     end
-    err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
-           substr * "\n" * pointer * "\nCSV column $(err.err_field) is expected to be: " * string(err.rec.fields[err.err_field])
-    print(io, err)
+    substr * "\n" * pointer
 end
 
 function quotedsplit(str, delim, quotechar, escapechar, includequotes, i, l)
     strtok = Quoted(StringToken(String, delim, quotechar,
-                                escapechar, false, false), required=false, includequotes=includequotes)
+                                escapechar, false, false),
+                    required=false, includequotes=includequotes)
+
     f = Field(strtok, delim=delim, eoldelim=true)
     strs = String[]
     while i <= l # this means that there was an empty field at the end of the line
@@ -279,5 +287,5 @@ function quotedsplit(str, delim, quotechar, escapechar, includequotes, i, l)
 
     return strs
     @label error
-    error("Couldn't split line, error at $i")
+    error("Couldn't split line, error at char $i:\n$(showerrorchar(str, i, 100))")
 end

@@ -132,6 +132,9 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len,
                     # sometimes the quotechar is the escapechar
                     # in that case we need to see the next char
                     if ii > len
+                        if opts.includequotes
+                            i=ii
+                        end
                         break
                     end
                     nxt, j = next(str, ii)

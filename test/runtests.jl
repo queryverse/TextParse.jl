@@ -46,6 +46,8 @@ import TextParse: StringToken
 
     @test tryparsenext(Quoted(String), "\"x\"", 1,3) |> unwrap == ("x", 4)
     @test tryparsenext(Quoted(String, includequotes=true), "\"x\"", 1,3) |> unwrap == ("\"x\"", 4)
+    @test tryparsenext(Quoted(String, escapechar='"', includequotes=true), "\"x\"", 1,3) |> unwrap == ("\"x\"", 4)
+    @test tryparsenext(Quoted(String, includequotes=true, escapechar='"'), "\"x \"\"y\"\" z\"", 1,11) |> unwrap == ("\"x \"\"y\"\" z\"", 12)
     str =  "Owner 2 ”Vicepresident\"\""
     @test tryparsenext(tok, str) |> unwrap == (str, endof(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
