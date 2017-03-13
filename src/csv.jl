@@ -124,6 +124,12 @@ function _csvread(str::AbstractString, delim=',';
         failed_text = quotedsplit(str[err.fieldpos:l], delim, quotechar, escapechar, true)[1]
         # figure out a new token type
         newtoken = guesstoken(failed_text, opts, field.inner)
+
+        if string(field.inner) == string(newtoken)
+            println(STDERR, "Could not determine which type to promote column to.")
+            rethrow(err)
+        end
+
         newcol = try
             promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
         catch
@@ -146,7 +152,7 @@ function _csvread(str::AbstractString, delim=',';
     cols, merged_colnames
 end
 
-function promote_column(col, rowno, T)
+function promote_column(col, rowno, T, inner=false)
     if typeof(col) <: NullableArray{Void}
         if T <: StringLike
             arr = Array{String, 1}(length(col))
@@ -172,9 +178,7 @@ function promote_column(col, rowno, T)
     else
         @assert !isa(col, PooledArray) # Pooledarray of strings should never fail
         newcol = Array{T, 1}(length(col))
-        for i=1:rowno-1
-            newcol[i] = col[i]
-        end
+        copy!(newcol, 1, col, 1, rowno-1)
         newcol
     end
 end
