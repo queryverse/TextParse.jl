@@ -243,15 +243,14 @@ import TextParse: _csvread
     str1 = """
      a, b,c d, e
     x,1,1,1
-    ,1,1,1
+    ,1,,1
     x,1,1.,1
     x y,1.0,1,
     x,1.0,,1
     """
-    data = (
-            (["x", "","x","x y","x"],
+    data = ((["x", "","x","x y","x"],
               ones(5),
-              NullableArray(ones(5), Bool[0,0,0,0,1]),
+              NullableArray(ones(5), Bool[0,1,0,0,1]),
               NullableArray(ones(Int,5), Bool[0,0,0,1,0])),
               ["a", "b", "c d", "e"])
     @test isequal(_csvread(str1, ','), data)
@@ -261,9 +260,10 @@ import TextParse: _csvread
     coltype_test2 = _csvread(str1,
                             coltypes=Dict(2=>Nullable{Float64},
                                           4=>Nullable{Float64}))
+
     str2 = """
     x,1,1,1
-    ,1,1,1
+    ,1,,1
     x,1,1.,1
     x y,1.0,1,
     x,1.0,,1
@@ -277,4 +277,16 @@ import TextParse: _csvread
     @test eltype(coltype_test2[1][4]) == Nullable{Float64}
     @test eltype(coltype_test3[1][2]) == Nullable{Float64}
     @test eltype(coltype_test3[1][4]) == Nullable{Float64}
+
+    @test isequal(data, _csvread(str1, type_detect_rows=1))
+    @test isequal(data, _csvread(str1, type_detect_rows=2))
+    @test isequal(data, _csvread(str1, type_detect_rows=3))
+    @test isequal(data, _csvread(str1, type_detect_rows=4))
+    # But we can't go from a non-string column to a string column
+    str3 = """
+     a, b,c d, e
+    1,1,1,1
+    x,1,1,1
+    """
+    @test_throws TextParse.CSVParseError _csvread(str3, type_detect_rows=1)
 end

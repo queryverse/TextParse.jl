@@ -23,7 +23,9 @@ end
 # needed for promoting guessses
 immutable Unknown <: AbstractToken{Union{}} end
 fromtype(::Type{Union{}}) = Unknown()
-tryparsenext(::Unknown, str, i, j) = Nullable{Void}(nothing), i
+function tryparsenext(::Unknown, str, i, len, opts)
+    Nullable{Void}(nothing), i
+end
 
 # Numberic parsing
 immutable Numeric{T} <: AbstractToken{T}
@@ -181,11 +183,6 @@ end
     T(str, i, j)
 end
 
-# using WeakRefStrings
-# @inline function _substring{T<:WeakRefString}(::Type{T}, str, i, j)
-#     vec = Vector{UInt8}(str)
-#     WeakRefString(pointer(vec)+(i-1), (j-i+1))
-# end
 fromtype(::Type{StrRange}) = StringToken(StrRange)
 
 @inline function alloc_string(str, r::StrRange)
@@ -322,6 +319,9 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
        @goto null
     end
 
+    if isa(na.inner, Unknown)
+        @goto maybe_null
+    end
     @chk2 x,ii = tryparsenext(na.inner, str, i, len) maybe_null
 
     @label done
@@ -358,6 +358,16 @@ abstract AbstractField{T} <: AbstractToken{T} # A rocord is a collection of abst
   , output_type::Type{T}=fieldtype(inner)
 ) <: AbstractField{T}
 
+function swapinner(f::Field, inner::AbstractToken)
+    Field(inner;
+        ignore_init_whitespace= f.ignore_end_whitespace
+      , ignore_end_whitespace=f.ignore_end_whitespace
+      , eoldelim=f.eoldelim
+      , spacedelim=f.spacedelim
+      , delim=f.delim
+     )
+
+end
 function tryparsenext{T}(f::Field{T}, str, i, len)
     R = Nullable{T}
     i > len && @goto error

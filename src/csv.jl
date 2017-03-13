@@ -38,7 +38,7 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
             header_exists=true,
             colnames=Dict(),
             coltypes=Dict(),
-            type_detect_rows=100)
+            type_detect_rows=20)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
 1. A tuple of columns each as a Vector or NullableArray
@@ -73,7 +73,7 @@ function _csvread(str::AbstractString, delim=',';
                  colnames=String[],
                  #ignore_empty_rows=true,
                  coltypes=Type[],
-                 type_detect_rows=100)
+                 type_detect_rows=20)
 
     opts = LocalOpts(delim, quotechar, escapechar, false, false)
     len = endof(str)
@@ -108,9 +108,75 @@ function _csvread(str::AbstractString, delim=',';
     end
 
     cols = makeoutputvecs(str, rec, nrows, pooledstrings)
-    parsefill!(str, rec, nrows, cols, pos, lineno, 1, endof(str))
+    rowno = 1
+
+    @label retry
+    try
+        parsefill!(str, rec, nrows, cols, pos, lineno, rowno, endof(str))
+    catch err
+        if !isa(err, CSVParseError)
+            rethrow(err)
+        end
+
+        rng = getlineat(str, err.fieldpos)
+        f, l = first(rng), last(rng)
+        field = rec.fields[err.colno]
+        failed_text = quotedsplit(str[err.fieldpos:l], delim, quotechar, escapechar, true)[1]
+        # figure out a new token type
+        newtoken = guesstoken(failed_text, opts, field.inner)
+        newcol = try
+            promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
+        catch
+            rethrow(err) # rethrow original error
+        end
+
+        fieldsvec = Any[rec.fields...]
+        fieldsvec[err.colno] = swapinner(field, newtoken)
+        typeof(cols)
+        colsvec = Any[cols...]
+        colsvec[err.colno] = newcol
+
+        rec = Record((fieldsvec...))
+        cols = (colsvec...)
+        rowno = err.rowno
+        pos = f
+        @goto retry
+    end
 
     cols, merged_colnames
+end
+
+function promote_column(col, rowno, T)
+    if typeof(col) <: NullableArray{Void}
+        if T <: StringLike
+            arr = Array{String, 1}(length(col))
+            for i = 1:rowno-1
+                arr[i] = ""
+            end
+            return arr
+        elseif T <: Nullable
+            NullableArray(Array{eltype(T)}(length(col)), zeros(Bool, length(col)))
+      else
+          error("empty to non-nullable")
+      end
+    elseif T <: Nullable
+        if !isa(col, NullableArray)
+            isnullarray = Array(Bool, length(col))
+            isnullarray[1:rowno-1] = false
+            isnullarray[rowno:end] = true
+            NullableArray(promote_column(col, rowno, eltype(T)), isnullarray)
+        else
+            NullableArray(promote_column(col.values, rowno,
+                                         eltype(T)), col.isnull)
+        end
+    else
+        @assert !isa(col, PooledArray) # Pooledarray of strings should never fail
+        newcol = Array{T, 1}(length(col))
+        for i=1:rowno-1
+            newcol[i] = col[i]
+        end
+        newcol
+    end
 end
 
 function readcolnames(str, opts, pos, colnames)
@@ -191,10 +257,11 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
         prev_j = pos
         pos, lines = eatnewlines(str, pos)
         lineno += lines
-        res = tryparsesetindex(rec, str, pos,l, cols, rowno)
+        res = tryparsesetindex(rec, str, pos, l, cols, rowno)
         if !issuccess(res)
-            pos, colno = geterror(res)
-            throw(CSVParseError(str, rec, lineno, rowno, colno, pos))
+            pos, fieldpos, colno = geterror(res)
+            throw(CSVParseError(str, rec, lineno, rowno,
+                                colno, pos, fieldpos))
         else
             pos = value(res)
         end
@@ -224,22 +291,27 @@ function growcols(cols, nrecs)
 end
 
 function makeoutputvecs(str, rec, N, pooledstrings)
-    ([if fieldtype(f) == Nullable{Union{}} # we weren't able to detect the type, all columns were blank
+    map(f->makeoutputvec(str, f, N, pooledstrings), rec.fields)
+end
+
+function makeoutputvec(str, eltyp, N, pooledstrings)
+    if fieldtype(eltyp) == Nullable{Union{}} # we weren't able to detect the type,
+                                         # all columns were blank
         NullableArray{Void}(N)
-    elseif fieldtype(f) == StrRange
+    elseif fieldtype(eltyp) == StrRange
       # By default we put strings in a PooledArray
       if pooledstrings
           resize!(PooledArray(Int32[], String[]), N)
       else
           Array{String}(N)
       end
-    elseif fieldtype(f) == Nullable{StrRange}
+    elseif fieldtype(eltyp) == Nullable{StrRange}
         NullableArray{String}(N)
-    elseif fieldtype(f) <: Nullable
-        NullableArray{fieldtype(f)|>eltype}(N)
+    elseif fieldtype(eltyp) <: Nullable
+        NullableArray{fieldtype(eltyp)|>eltype}(N)
     else
-        Array{fieldtype(f)}(N)
-    end for f in rec.fields]...)
+        Array{fieldtype(eltyp)}(N)
+    end
 end
 
 
@@ -249,38 +321,39 @@ immutable CSVParseError <: Exception
     lineno
     rowno
     colno
-    char
+    pos
+    fieldpos
 end
 
 function Base.showerror(io::IO, err::CSVParseError)
     str = err.str
-    char = err.char
+    pos = err.pos
 
-    rng = getlineat(str, char)
-    charinline = err.char - first(rng)
+    rng = getlineat(str, pos)
+    charinline = err.pos - first(rng)
     err = "Parse error at line $(err.lineno) at char $charinline:\n" *
-            showerrorchar(str, char, 100) *
+            showerrorchar(str, pos, 100) *
             "\nCSV column $(err.colno) is expected to be: " *
             string(err.rec.fields[err.colno])
     print(io, err)
 end
 
-function showerrorchar(str, char, maxchar)
+function showerrorchar(str, pos, maxchar)
     hmaxchar = round(Int, maxchar/2)
-    rng = getlineat(str, char)
+    rng = getlineat(str, pos)
     substr = strip(str[rng])
-    pointer = String(['_' for i=1:(char-first(rng)-1)]) * "^"
+    pointer = String(['_' for i=1:(pos-first(rng)-1)]) * "^"
     if length(substr) > maxchar
         # center the error char
-        lst = min(char+ceil(Int, hmaxchar), last(rng))
-        fst = max(first(rng), char-hmaxchar)
+        lst = min(pos+ceil(Int, hmaxchar), last(rng))
+        fst = max(first(rng), pos-hmaxchar)
         substr = "..." * strip(str[fst:lst]) * "..."
-        pointer = String(['_' for i=1:(char-fst+2)]) * "^"
+        pointer = String(['_' for i=1:(pos-fst+2)]) * "^"
     end
     substr * "\n" * pointer
 end
 
-function quotedsplit(str, delim, quotechar, escapechar, includequotes, i, l)
+function quotedsplit(str, delim, quotechar, escapechar, includequotes, i=start(str), l=endof(str))
     strtok = Quoted(StringToken(String),
                     required=false, escapechar=escapechar,
                     quotechar=quotechar,includequotes=includequotes)

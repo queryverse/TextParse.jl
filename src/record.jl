@@ -34,13 +34,15 @@ end
 
 @generated function tryparsesetindex{N,To}(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int)
     quote
-        R = Result{Int, Tuple{Int,Int}}
+        R = Result{Int, Tuple{Int,Int,Int}}
         err_field = 1
         i > len && @goto error
+        ii = i
 
         Base.@nexprs $N j->begin
             err_field = j
-            @chk2 val_j, i = tryparsenext(r.fields[j], str, i, len)
+            @chk2 val_j, ii = tryparsenext(r.fields[j], str, i, len)
+            i = ii
             setcell!(columns[j], row, val_j, str)
         end
 
@@ -48,7 +50,7 @@ end
         return R(true, i)
 
         @label error
-        R(false, (i, err_field))
+        R(false, (ii, i, err_field)) # error char, start of error field, error field
     end
 end
 
