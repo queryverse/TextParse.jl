@@ -79,9 +79,13 @@ function _csvread(str::AbstractString, delim=',';
     len = endof(str)
     pos = start(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
+    lineno = 0
 
+    pos, lines = eatnewlines(str, pos)
+    lineno += lines
     if header_exists
         merged_colnames, pos = readcolnames(str, opts, pos, colnames)
+        lineno += 1
     else
         merged_colnames = colnames
     end
@@ -104,7 +108,7 @@ function _csvread(str::AbstractString, delim=',';
     end
 
     cols = makeoutputvecs(str, rec, nrows, pooledstrings)
-    parsefill!(str, rec, nrows, cols, pos, endof(str))
+    parsefill!(str, rec, nrows, cols, pos, lineno, 1, endof(str))
 
     cols, merged_colnames
 end
@@ -113,11 +117,12 @@ function readcolnames(str, opts, pos, colnames)
     colnames_inferred = String[]
 
     len = endof(str)
-    pos, _ = eatnewlines(str, pos, len)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
-    colnames_inferred = quotedsplit(str, opts.endchar, opts.quotechar, opts.escapechar, false, pos, lineend)
+    colnames_inferred = quotedsplit(str, opts.endchar,
+                                    opts.quotechar, opts.escapechar,
+                                    false, pos, lineend)
     # TODO: unescape
 
     # set a subset of column names
@@ -180,36 +185,41 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
 end
 
 function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
-                       j=start(str), l=endof(str))
-    i = 1
+                       pos, lineno, rowno, l=endof(str))
     sizemargin = sqrt(2)
     while true
-        prev_j = j
-        j, _ = eatnewlines(str, j)
-        res = tryparsesetindex(rec, str, j,l, cols, i)
+        prev_j = pos
+        pos, lines = eatnewlines(str, pos)
+        lineno += lines
+        res = tryparsesetindex(rec, str, pos,l, cols, rowno)
         if !issuccess(res)
-            j, tok = geterror(res)
-            throw(CSVParseError(str, rec, i, j, j-prev_j, tok))
+            pos, colno = geterror(res)
+            throw(CSVParseError(str, rec, lineno, rowno, colno, pos))
         else
-            j = value(res)
+            pos = value(res)
         end
 
-        if j > l
+        if pos > l
             #shrink
             for c in cols
-                resize!(c, i)
+                resize!(c, rowno)
             end
             return cols
         end
-        i += 1
-        if i > nrecs
+        rowno += 1
+        lineno += 1
+        if rowno > nrecs
             # grow
             sizemargin = (sizemargin-1.0)/2 + 1.0
-            nrecs = ceil(Int, j/i * sizemargin) # updated estimate
-            for c in cols
-                resize!(c, nrecs)
-            end
+            nrecs = ceil(Int, pos/rowno * sizemargin) # updated estimate
+            growcols(cols, nrecs)
         end
+    end
+end
+
+function growcols(cols, nrecs)
+    for c in cols
+        resize!(c, nrecs)
     end
 end
 
@@ -237,19 +247,21 @@ immutable CSVParseError <: Exception
     str
     rec
     lineno
+    rowno
+    colno
     char
-    charinline
-    err_field
 end
 
 function Base.showerror(io::IO, err::CSVParseError)
     str = err.str
     char = err.char
 
-    err = "Parse error at line $(err.lineno) (excl header) at char $(err.charinline):\n" *
+    rng = getlineat(str, char)
+    charinline = err.char - first(rng)
+    err = "Parse error at line $(err.lineno) at char $charinline:\n" *
             showerrorchar(str, char, 100) *
-            "\nCSV column $(err.err_field) is expected to be: " *
-            string(err.rec.fields[err.err_field])
+            "\nCSV column $(err.colno) is expected to be: " *
+            string(err.rec.fields[err.colno])
     print(io, err)
 end
 
