@@ -174,7 +174,7 @@ import TextParse: LocalOpts, readcolnames
     #@test readcolnames("$str2", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "d\" e"], 24)
 end
 
-import TextParse: guesscoltypes, StrRange
+import TextParse: guesscolparsers, StrRange
 @testset "CSV type detect" begin
     str1 = """
      a, b,c d, e
@@ -186,7 +186,7 @@ import TextParse: guesscoltypes, StrRange
     """
     opts = LocalOpts(',', '"', '\\', false, false)
     _, pos = readcolnames(str1, opts, 1, String[])
-    testtill(i, coltypes=[]) = guesscoltypes(str1, String[], opts, pos, i, coltypes)
+    testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers)
     @test testtill(0) |> first == Any[]
     @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
@@ -266,10 +266,10 @@ import TextParse: _csvread
               ["a", "b", "c d", "e"])
     @test isequal(_csvread(str1, ','), data)
     coltype_test1 = _csvread(str1,
-                            coltypes=Dict("b"=>Nullable{Float64},
+                            colparsers=Dict("b"=>Nullable{Float64},
                                           "e"=>Nullable{Float64}))
     coltype_test2 = _csvread(str1,
-                            coltypes=Dict(2=>Nullable{Float64},
+                            colparsers=Dict(2=>Nullable{Float64},
                                           4=>Nullable{Float64}))
 
     str2 = """
@@ -280,7 +280,7 @@ import TextParse: _csvread
     x,1.0,,1
     """
     coltype_test3 = _csvread(str2, header_exists=false,
-                            coltypes=Dict(2=>Nullable{Float64},
+                            colparsers=Dict(2=>Nullable{Float64},
                                           4=>Nullable{Float64}))
     @test eltype(coltype_test1[1][2]) == Nullable{Float64}
     @test eltype(coltype_test1[1][4]) == Nullable{Float64}

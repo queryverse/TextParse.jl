@@ -36,9 +36,10 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
             quotechar='"',
             escapechar='\\',
             dateformat=ISODateTimeFormat,
+            pooledstrings=false,
             header_exists=true,
             colnames=Dict(),
-            coltypes=Dict(),
+            colparsers=Dict(),
             type_detect_rows=20)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
@@ -48,7 +49,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 Notes:
 - `type_detect_rows` is the number of rows used to detect the type
   of the column. If the column changes type later, you must specify
-  the right type in `coltypes`
+  the right type in `colparsers`
 - Empty lines will be ignored
 """
 function csvread(file::String, delim=','; kwargs...)
@@ -73,7 +74,7 @@ function _csvread(str::AbstractString, delim=',';
                  header_exists=true,
                  colnames=String[],
                  #ignore_empty_rows=true,
-                 coltypes=Type[],
+                 colparsers=[],
                  type_detect_rows=20)
 
     opts = LocalOpts(delim, quotechar, escapechar, false, false)
@@ -91,7 +92,7 @@ function _csvread(str::AbstractString, delim=',';
         merged_colnames = colnames
     end
 
-    guess, pos1 = guesscoltypes(str, merged_colnames, opts, pos, type_detect_rows, coltypes,
+    guess, pos1 = guesscolparsers(str, merged_colnames, opts, pos, type_detect_rows, colparsers,
                           dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
@@ -213,8 +214,8 @@ function readcolnames(str, opts, pos, colnames)
 end
 
 
-function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, coltypes,
+function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
+                       nrows::Int, colparsers,
                        dateformats=common_date_formats,
                        datetimeformats=common_datetime_formats)
     # Field type guesses
@@ -258,7 +259,7 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
     end
 
     # override guesses with user request
-    for (i, v) in optionsiter(coltypes, header)
+    for (i, v) in optionsiter(colparsers, header)
         guess[i] = tofield(v, opts)
     end
     guess, pos
