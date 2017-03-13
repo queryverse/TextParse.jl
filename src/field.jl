@@ -306,6 +306,7 @@ const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)
 function tryparsenext{T}(na::NAToken{T}, str, i, len,
                          opts=LocalOpts(na.endchar,'"','\\',false,false))
     R = Nullable{T}
+    i = eatwhitespaces(str, i)
     if i > len
         if na.emptyisna
             @goto null
@@ -331,6 +332,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
     @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.quotechar, opts.escapechar, false, opts.includenewlines), str, i,len)
     if !isempty(searchsorted(na.nastrings, nastr))
         i=ii
+        i = eatwhitespaces(str, i)
         @goto null
     end
     return R(), i

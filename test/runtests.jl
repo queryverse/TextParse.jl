@@ -60,7 +60,7 @@ import TextParse: StringToken
 end
 
 
-import TextParse: Quoted, NAToken
+import TextParse: Quoted, NAToken, Unknown
 @testset "Quoted string parsing" begin
     @test tryparsenext(Quoted(StringToken(String)), "\"abc\"") |> unwrap == ("abc", 6)
     @test tryparsenext(Quoted(StringToken(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
@@ -73,6 +73,7 @@ import TextParse: Quoted, NAToken
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap |> unwrap == (21, 5)
     @test tryparsenext(Quoted(StringToken(String, ',','"','"')), "x,") |> unwrap == ("x", 2)
+    @test isnull(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
 end
 
 @testset "NA parsing" begin

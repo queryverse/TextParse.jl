@@ -77,6 +77,18 @@ end
     c == '\n' || c == '\r'
 end
 
+function eatwhitespaces(str, i=1, l=endof(str))
+    while i <= l
+        c, ii = next(str, i)
+        if iswhitespace(c)
+            i=ii
+        else
+            break
+        end
+    end
+    return i
+end
+
 
 function eatnewlines(str, i=1, l=endof(str))
     count = 0
