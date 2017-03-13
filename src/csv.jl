@@ -1,5 +1,6 @@
 export csvread
-const debugrec = Ref{Any}()
+const current_record = Ref{Any}()
+const debug = Ref{Bool}(false)
 
 optionsiter(opts::Associative) = opts
 optionsiter(opts::AbstractVector) = enumerate(opts)
@@ -99,7 +100,7 @@ function _csvread(str::AbstractString, delim=',';
 
     guess[end].eoldelim = true # the last one is delimited by line end
     rec = Record((guess...,))
-    debugrec[] = rec
+    current_record[] = rec
 
     if nrows == 0
         meanrowsize = (pos1-pos) / type_detect_rows
@@ -112,7 +113,7 @@ function _csvread(str::AbstractString, delim=',';
 
     @label retry
     try
-        parsefill!(str, rec, nrows, cols, pos, lineno, rowno, endof(str))
+        parsefill!(str, opts, rec, nrows, cols, pos, lineno, rowno, endof(str))
     catch err
         if !isa(err, CSVParseError)
             rethrow(err)
@@ -121,19 +122,29 @@ function _csvread(str::AbstractString, delim=',';
         rng = getlineat(str, err.fieldpos)
         f, l = first(rng), last(rng)
         field = rec.fields[err.colno]
-        failed_text = quotedsplit(str[err.fieldpos:l], delim, quotechar, escapechar, true)[1]
+        failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
         # figure out a new token type
         newtoken = guesstoken(failed_text, opts, field.inner)
 
-        if string(field.inner) == string(newtoken)
-            println(STDERR, "Could not determine which type to promote column to.")
-            rethrow(err)
+        if debug[]
+            if string(field.inner) == string(newtoken)
+                println(STDERR, "Could not determine which type to promote column to.")
+                rethrow(err)
+            end
+
+            println(STDERR, "Converting column $(err.colno) to type $(newtoken) from $(field.inner) because it seems to have a different type:")
+            println(STDERR, showerrorchar(str, err.pos, 100))
         end
 
         newcol = try
             promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
-        catch
-            rethrow(err) # rethrow original error
+        catch err2
+            if debug[]
+                retrhow(err2)
+                Base.showerror(STDERR, err)
+            else
+                rethrow(err)
+            end
         end
 
         fieldsvec = Any[rec.fields...]
@@ -172,8 +183,9 @@ function promote_column(col, rowno, T, inner=false)
             isnullarray[rowno:end] = true
             NullableArray(promote_column(col, rowno, eltype(T)), isnullarray)
         else
-            NullableArray(promote_column(col.values, rowno,
-                                         eltype(T)), col.isnull)
+            # Both input and output are nullable arrays
+            vals = promote_column(col.values, rowno, eltype(T))
+            NullableArray(vals, col.isnull)
         end
     else
         @assert !isa(col, PooledArray) # Pooledarray of strings should never fail
@@ -190,9 +202,7 @@ function readcolnames(str, opts, pos, colnames)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
-    colnames_inferred = quotedsplit(str, opts.endchar,
-                                    opts.quotechar, opts.escapechar,
-                                    false, pos, lineend)
+    colnames_inferred = quotedsplit(str, opts, false, pos, lineend)
     # TODO: unescape
 
     # set a subset of column names
@@ -219,7 +229,7 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
         lineend = getlineend(str, pos)
 
-        fields = quotedsplit(str, opts.endchar, opts.quotechar, opts.escapechar, true, pos, lineend)
+        fields = quotedsplit(str, opts, true, pos, lineend)
         if i == 1
             guess = Any[Unknown() for i=1:length(fields)] # idk
         end
@@ -254,14 +264,14 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
     guess, pos
 end
 
-function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
+function parsefill!{N}(str::String, opts, rec::RecN{N}, nrecs, cols,
                        pos, lineno, rowno, l=endof(str))
     sizemargin = sqrt(2)
     while true
         prev_j = pos
         pos, lines = eatnewlines(str, pos)
         lineno += lines
-        res = tryparsesetindex(rec, str, pos, l, cols, rowno)
+        res = tryparsesetindex(rec, str, pos, l, cols, rowno, opts)
         if !issuccess(res)
             pos, fieldpos, colno = geterror(res)
             throw(CSVParseError(str, rec, lineno, rowno,
@@ -357,19 +367,18 @@ function showerrorchar(str, pos, maxchar)
     substr * "\n" * pointer
 end
 
-function quotedsplit(str, delim, quotechar, escapechar, includequotes, i=start(str), l=endof(str))
-    strtok = Quoted(StringToken(String),
-                    required=false, escapechar=escapechar,
-                    quotechar=quotechar,includequotes=includequotes)
+function quotedsplit(str, opts, includequotes, i=start(str), l=endof(str))
+    strtok = Quoted(StringToken(String), required=false,
+                    includequotes=includequotes)
 
-    f = Field(strtok, delim=delim, eoldelim=true)
+    f = Field(strtok, eoldelim=true)
     strs = String[]
     while i <= l # this means that there was an empty field at the end of the line
-        @chk2 x, i = tryparsenext(f, str, i, l)
+        @chk2 x, i = tryparsenext(f, str, i, l, opts)
         push!(strs, x)
     end
     c, i = next(str, prevind(str, i))
-    if c == delim
+    if c == opts.endchar
         # edge case where there's a delim at the end of the string
         push!(strs, "")
     end

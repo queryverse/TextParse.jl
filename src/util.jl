@@ -139,7 +139,6 @@ end
 
 unwrap(xs) = (get(xs[1]), xs[2:end]...)
 failedat(xs) = (@assert isnull(xs[1]); xs[2])
-tryparsenext(tok, str) = tryparsenext(tok, str, 1, endof(str))
 
 # String speedup hacks
 

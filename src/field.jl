@@ -16,9 +16,17 @@ immutable LocalOpts
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
-function tryparsenext(tok::AbstractToken, str, i, len, locopts)
+const default_opts = LocalOpts(',', '"', '\\', false, false)
+# helper function for easy testing:
+@inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
+    tryparsenext(tok, str, start(str), endof(str), opts)
+end
+
+# fallback for tryparsenext methods which don't care about local opts
+@inline function tryparsenext(tok::AbstractToken, str, i, len, locopts)
     tryparsenext(tok, str, i, len)
 end
+
 
 # needed for promoting guessses
 immutable Unknown <: AbstractToken{Union{}} end
@@ -38,7 +46,7 @@ fromtype{N<:Number}(::Type{N}) = Numeric(N)
 
 ### Unsigned integers
 
-@inline function tryparsenext{T<:Signed}(::Numeric{T}, str, i, len)
+function tryparsenext{T<:Signed}(::Numeric{T}, str, i, len)
     R = Nullable{T}
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
@@ -90,30 +98,15 @@ end
 end
 
 immutable StringToken{T} <: AbstractToken{T}
-    endchar::Char
-    quotechar::Char
-    escapechar::Char
-    includequotes::Bool
-    includenewlines::Bool
 end
 
-function StringToken{T}(t::Type{T},
-               endchar=',',
-               quotechar='"',
-               escapechar='\\',
-               includequotes=false,
-               includenewlines=false)
-
-    StringToken{T}(endchar, quotechar, escapechar,
-                   includequotes, includenewlines)
+function StringToken{T}(t::Type{T})
+    StringToken{T}()
 end
 
 fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
 
-function tryparsenext{T}(s::StringToken{T}, str, i, len,
-                         opts=LocalOpts(s.endchar, s.quotechar,
-                                        s.escapechar, s.includequotes,
-                                        s.includenewlines))
+function tryparsenext{T}(s::StringToken{T}, str, i, len, opts)
     R = Nullable{T}
     p = ' '
     i0 = i
@@ -199,30 +192,44 @@ end
 
 export Quoted
 
-@qtype Quoted{T, S<:AbstractToken}(
+immutable Quoted{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
-  ; output_type::Type{T}=fieldtype(inner)
-  , required::Bool=false
-  , includequotes::Bool=false
-  , includenewlines::Bool=true
-  , quotechar::Char='"'
-  , escapechar::Char='\\'
-) <: AbstractToken{T}
+    required::Bool
+    includequotes::Bool
+    includenewlines::Bool
+    quotechar::Nullable{Char}
+    escapechar::Nullable{Char}
+end
+
+function Quoted{S<:AbstractToken}(inner::S;
+    required=false,
+    includequotes=false,
+    includenewlines=true,
+    quotechar=Nullable{Char}(),   # This is to allow file-wide config
+    escapechar=Nullable{Char}())
+
+    T = fieldtype(S)
+    Quoted{T,S}(inner, required, includequotes,
+                includenewlines, quotechar, escapechar)
+end
+
+@inline quotechar(q::Quoted, opts) = get(q.quotechar, opts.quotechar)
+@inline escapechar(q::Quoted, opts) = get(q.escapechar, opts.escapechar)
 
 Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
 
-function tryparsenext{T}(q::Quoted{T}, str, i, len)
+function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
     R = Nullable{T}
     x = R()
     if i > len
         q.required && @goto error
         # check to see if inner thing is ok with an empty field
-        @chk2 x, i = tryparsenext(q.inner, str, i, len) error
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, opts) error
         @goto done
     end
     c, ii = next(str, i)
     quotestarted = false
-    if q.quotechar == c
+    if quotechar(q, opts) == c
         quotestarted = true
         if !q.includequotes
             i = ii
@@ -232,11 +239,11 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
     end
 
     @chk2 x, i = if quotestarted
-        opts = LocalOpts(q.quotechar, q.quotechar, q.escapechar,
+        qopts = LocalOpts(quotechar(q, opts), quotechar(q, opts), escapechar(q, opts),
                          q.includequotes, q.includenewlines)
-        tryparsenext(q.inner, str, i, len, opts)
+        tryparsenext(q.inner, str, i, len, qopts)
     else
-        tryparsenext(q.inner, str, i, len)
+        tryparsenext(q.inner, str, i, len, opts)
     end
 
     if i > len
@@ -248,7 +255,7 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len)
     c, ii = next(str, i)
     # TODO: eat up whitespaces?
     if quotestarted && !q.includequotes
-        c != q.quotechar && @goto error
+        c != quotechar(q, opts) && @goto error
         i = ii
     end
 
@@ -295,16 +302,26 @@ const nastrings_upcase = ["NA", "NULL", "N/A","#N/A", "#N/A N/A", "#NA",
 
 const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)))
 
-@qtype NAToken{T, S<:AbstractToken}(
+immutable NAToken{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
-  ; emptyisna=true
-  , endchar=','
-  , nastrings=NA_STRINGS
-  , output_type::Type{T}=Nullable{fieldtype(inner)}
-) <: AbstractToken{T}
+    emptyisna::Bool
+    endchar::Nullable{Char}
+    nastrings::Vector{String}
+end
 
-function tryparsenext{T}(na::NAToken{T}, str, i, len,
-                         opts=LocalOpts(na.endchar,'"','\\',false,false))
+function NAToken{S}(
+    inner::S,
+  ; emptyisna=true
+  , endchar=Nullable{Char}()
+  , nastrings=NA_STRINGS)
+
+    T = fieldtype(inner)
+    NAToken{Nullable{T}, S}(inner, emptyisna, endchar, nastrings)
+end
+
+endchar(na::NAToken, opts) = get(na.endchar, opts.endchar)
+
+function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
     R = Nullable{T}
     i = eatwhitespaces(str, i)
     if i > len
@@ -316,7 +333,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
     end
 
     c, ii=next(str,i)
-    if (c == opts.endchar || isnewline(c)) && na.emptyisna
+    if (c == endchar(na, opts) || isnewline(c)) && na.emptyisna
        @goto null
     end
 
@@ -329,7 +346,9 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len,
     return R(T(x)), ii
 
     @label maybe_null
-    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString, opts.endchar, opts.quotechar, opts.escapechar, false, opts.includenewlines), str, i,len)
+    naopts = LocalOpts(endchar(na,opts), opts.quotechar,
+                       opts.escapechar, false, opts.includenewlines)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
         i=ii
         i = eatwhitespaces(str, i)
@@ -350,15 +369,24 @@ fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
 
 abstract AbstractField{T} <: AbstractToken{T} # A rocord is a collection of abstract fields
 
-@qtype Field{T,S<:AbstractToken}(
+type Field{T,S<:AbstractToken} <: AbstractField{T}
     inner::S
-  ; ignore_init_whitespace::Bool=true
-  , ignore_end_whitespace::Bool=true
-  , eoldelim::Bool=false
-  , spacedelim::Bool=false
-  , delim::Char=','
-  , output_type::Type{T}=fieldtype(inner)
-) <: AbstractField{T}
+    ignore_init_whitespace::Bool
+    ignore_end_whitespace::Bool
+    eoldelim::Bool
+    spacedelim::Bool
+    delim::Nullable{Char}
+end
+
+function Field{S}(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true,
+               eoldelim=false, spacedelim=false, delim=Nullable{Char}(),
+               output_type=fieldtype(inner))
+    T = fieldtype(inner)
+    Field{T,S}(inner, ignore_init_whitespace, ignore_end_whitespace,
+               eoldelim, spacedelim, delim)
+end
+
+@inline delim(f::Field, opts) = get(f.delim, opts.endchar)
 
 function swapinner(f::Field, inner::AbstractToken)
     Field(inner;
@@ -370,7 +398,7 @@ function swapinner(f::Field, inner::AbstractToken)
      )
 
 end
-function tryparsenext{T}(f::Field{T}, str, i, len)
+function tryparsenext{T}(f::Field{T}, str, i, len, opts)
     R = Nullable{T}
     i > len && @goto error
     if f.ignore_init_whitespace
@@ -380,7 +408,6 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
             i = ii
         end
     end
-    opts = LocalOpts(f.delim, '"', '\\', false, false)
     @chk2 res, i = tryparsenext(f.inner, str, i, len, opts)
 
     if f.ignore_end_whitespace
@@ -389,7 +416,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
             @inbounds c, ii = next(str, i)
             !iswhitespace(c) && break
             i = ii
-            f.delim == '\t' && c == '\t' && @goto done
+            delim(f, opts) == '\t' && c == '\t' && @goto done
         end
 
         f.spacedelim && i > i0 && @goto done
@@ -404,7 +431,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
     end
 
     @inbounds c, ii = next(str, i)
-    f.delim == c && (i=ii; @goto done)
+    delim(f, opts) == c && (i=ii; @goto done)
     f.spacedelim && iswhitespace(c) && (i=ii; @goto done)
 
     if f.eoldelim

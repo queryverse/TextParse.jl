@@ -1,5 +1,6 @@
 using TextParse
-import TextParse: tryparsenext, unwrap, failedat, AbstractToken
+
+import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 using Base.Test
 
 # dumb way to compare two AbstractTokens
@@ -38,24 +39,27 @@ import TextParse: StringToken
     for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 6)]
         @test tryparsenext(StringToken(String), s) |> unwrap == (s[1:till-1], till)
     end
+    opts = LocalOpts(',', '"', '"', false, true)
     for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(StringToken(String, ',', '"', '"', false, true), s) |> unwrap == (s[1:till-1], till)
+        @test tryparsenext(StringToken(String), s, opts) |> unwrap == (s[1:till-1], till)
     end
-    @test tryparsenext(StringToken(String, ',', '"', '"',false, true), "") |> unwrap == ("", 1)
-    tok = StringToken(String, '"', '"', '"', false, true)
 
-    @test tryparsenext(Quoted(String), "\"x\"", 1,3) |> unwrap == ("x", 4)
-    @test tryparsenext(Quoted(String, includequotes=true), "\"x\"", 1,3) |> unwrap == ("\"x\"", 4)
-    @test tryparsenext(Quoted(String, escapechar='"', includequotes=true), "\"x\"", 1,3) |> unwrap == ("\"x\"", 4)
-    @test tryparsenext(Quoted(String, includequotes=true, escapechar='"'), "\"x \"\"y\"\" z\"", 1,11) |> unwrap == ("\"x \"\"y\"\" z\"", 12)
+    @test tryparsenext(StringToken(String), "", 1, 0, opts) |> unwrap == ("", 1)
+    tok = StringToken(String)
+
+    opts = LocalOpts(',', '"', '\\', false, false)
+    @test tryparsenext(Quoted(String), "\"x\"", 1,3, opts) |> unwrap == ("x", 4)
+    @test tryparsenext(Quoted(String, includequotes=true), "\"x\"", 1,3, opts) |> unwrap == ("\"x\"", 4)
+    @test tryparsenext(Quoted(String, escapechar=Nullable('"'), includequotes=true), "\"x\"", 1,3, opts) |> unwrap == ("\"x\"", 4)
+    @test tryparsenext(Quoted(String, includequotes=true, escapechar=Nullable('"')), "\"x \"\"y\"\" z\"", 1,11, opts) |> unwrap == ("\"x \"\"y\"\" z\"", 12)
     str =  "Owner 2 ”Vicepresident\"\""
     @test tryparsenext(tok, str) |> unwrap == (str, endof(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
-    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == (str, endof(str1)+1)
+    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == (str, endof(str1)+1)
     str2 =  "\"\"\"\""
-    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"", endof(str2)+1)
+    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str2) |> unwrap == ("\"\"", endof(str2)+1)
     str2 =  "\"\"\"\"\"\","
-    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str2) |> unwrap == ("\"\"\"\"", endof(str2))
+    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str2) |> unwrap == ("\"\"\"\"", endof(str2))
 
 end
 
@@ -72,7 +76,8 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap |> failedat == 1
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap |> unwrap == (21, 5)
-    @test tryparsenext(Quoted(StringToken(String, ',','"','"')), "x,") |> unwrap == ("x", 2)
+    opts = LocalOpts(',', '"', '"', false, false)
+    @test tryparsenext(Quoted(StringToken(String)), "x,", opts) |> unwrap == ("x", 2)
     @test isnull(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
 end
 
@@ -86,21 +91,21 @@ end
 import TextParse: Field
 @testset "Field parsing" begin
     f = fromtype(Int)
-    @test tryparsenext(Field(f,delim=','), "12,3", 1,4) |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,delim=','), "12 ,3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,delim=','), " 12 ,3", 1,6) |> unwrap == (12, 6)
-    @test tryparsenext(Field(f,delim='\t'), "12\t3", 1,4) |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,delim='\t'), "12 \t3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,delim='\t'), " 12 \t 3", 1,7) |> unwrap == (12, 6)
-    @test tryparsenext(Field(f,spacedelim=true), " 12 3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,spacedelim=true), " 12 3", 1,5) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,spacedelim=true, ignore_end_whitespace=false), " 12 \t 3", 1,7) |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim=' '), "12 3", 1,4) |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), "12 \t3", 1,5) |> failedat == 3
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), " 12\t 3", 1,5) |> unwrap == (12,5)
-    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n", 1,4) |> unwrap == (12,5)
-    @test tryparsenext(Field(f,eoldelim=true), " 12", 1,3) |> unwrap == (12,4)
-    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n\r\n", 1,6) |> unwrap == (12,6)
+    @test tryparsenext(Field(f,delim=','), "12,3") |> unwrap == (12, 4)
+    @test tryparsenext(Field(f,delim=','), "12 ,3") |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,delim=','), " 12 ,3") |> unwrap == (12, 6)
+    @test tryparsenext(Field(f,delim='\t'), "12\t3") |> unwrap == (12, 4)
+    @test tryparsenext(Field(f,delim='\t'), "12 \t3") |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,delim='\t'), " 12 \t 3") |> unwrap == (12, 6)
+    @test tryparsenext(Field(f,spacedelim=true), " 12 3") |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,spacedelim=true), " 12 3") |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,spacedelim=true, ignore_end_whitespace=false), " 12 \t 3") |> unwrap == (12, 5)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim=' '), "12 3") |> unwrap == (12, 4)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), "12 \t3") |> failedat == 3
+    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), " 12\t 3") |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n") |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), " 12") |> unwrap == (12,4)
+    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n\r\n") |> unwrap == (12,6)
 end
 
 
@@ -135,16 +140,18 @@ end
 
 import TextParse: quotedsplit
 @testset "quotedsplit" begin
-    @test quotedsplit("x", ',', '"','\\',false, 1, 1) == ["x"]
-    @test quotedsplit("x, y", ',', '"','\\',false, 1, 4) == ["x", "y"]
-    @test quotedsplit("\"x\", \"y\"", ',', '"','\\',false, 1, 8) == ["x", "y"]
-    @test quotedsplit("\"x\", \"y\"", ',', '"','\\',true, 1, 8) == ["\"x\"", "\"y\""]
+    opts = LocalOpts(',', '"', '\\', false, false)
+    @test quotedsplit("x", opts, false, 1, 1) == ["x"]
+    @test quotedsplit("x, y", opts, false, 1, 4) == ["x", "y"]
+    @test quotedsplit("\"x\", \"y\"", opts,false, 1, 8) == ["x", "y"]
+    @test quotedsplit("\"x\", \"y\"", opts,true, 1, 8) == ["\"x\"", "\"y\""]
     str = """x\nx,"s,", "\\",x" """
-    @test quotedsplit(str, ',','"','\\', false, 3, length(str)) == ["x", "s,", "\\\",x"]
-    @test quotedsplit(",", ',','"','\\', true, 1, 1) == ["", ""]
-    @test quotedsplit(", ", ',','"','\\', false, 1, 2) == ["", ""]
+    @test quotedsplit(str, opts, false, 3, length(str)) == ["x", "s,", "\\\",x"]
+    @test quotedsplit(",", opts, true, 1, 1) == ["", ""]
+    @test quotedsplit(", ", opts, false, 1, 2) == ["", ""]
     str = "1, \"x \"\"y\"\" z\", 1"
-    @test quotedsplit(str, ',', '"','"',true, 1, endof(str)) == ["1", "\"x \"\"y\"\" z\"", "1"]
+    qopts = LocalOpts(',', '"', '"', false, false)
+    @test quotedsplit(str, qopts,true, 1, endof(str)) == ["1", "\"x \"\"y\"\" z\"", "1"]
 end
 
 import TextParse: LocalOpts, readcolnames
@@ -184,8 +191,11 @@ import TextParse: guesscoltypes, StrRange
     @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(3) |> first == map(fromtype, [StrRange, Int, Float64, Int])
-    @test testtill(4) |> first == map(fromtype, [StrRange, Float64, Float64, Nullable{Int}])
-    @test testtill(5) |> first == map(fromtype, [StrRange, Float64, Nullable{Float64}, Nullable{Int}])
+    @test testtill(4) |> first == vcat(map(fromtype, [StrRange, Float64, Float64]),
+                                       NAToken(fromtype(Int)))
+    @test testtill(5) |> first == vcat(map(fromtype, [StrRange, Float64]),
+                                       NAToken(fromtype(Float64)),
+                                       NAToken(fromtype(Int)))
 end
 
 

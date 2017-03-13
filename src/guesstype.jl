@@ -20,10 +20,6 @@ isna(x) = x == "" || x in NA_STRINGS
 
 const DEFAULT_QUOTES = ('"', ''')
 
-function StringToken(T::Type, opts::LocalOpts)
-    StringToken(T, opts.endchar, opts.quotechar, opts.escapechar, opts.includenewlines)
-end
-
 function guesstoken(x, opts, prev_guess::ANY=Unknown(),
                       strtype=StrRange,
                       dateformats=common_date_formats,
@@ -41,7 +37,7 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
                           opts.includequotes, opts.includenewlines)
         inner = guesstoken(inner_x, opts, prev, strtype,
                              dateformats, datetimeformats)
-        return Quoted(inner; quotechar=opts.quotechar, escapechar=opts.escapechar)
+        return Quoted(inner)
     end
 
     if isa(prev_guess, Quoted)
@@ -54,7 +50,7 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
     end
     guess::Any = isna(x) ?
            (isa(prev_guess, NAToken) &&
-            prev_guess!=Unknown() ? prev_guess : NAToken(prev_guess, endchar=opts.endchar)) :
+            prev_guess!=Unknown() ? prev_guess : NAToken(prev_guess)) :
            !isnull(tryparse(Int64, x)) ? fromtype(Int64) :
            !isnull(tryparse(Float64, x)) ? fromtype(Float64) :
            !isnull(tryparse(Float64, x)) ? fromtype(Float64) :
@@ -65,7 +61,7 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
        if dateguess !== nothing
            guess = dateguess
        else
-           guess = StringToken(strtype, opts)
+           guess = StringToken(strtype)
        end
    end
 
@@ -73,7 +69,7 @@ function guesstoken(x, opts, prev_guess::ANY=Unknown(),
    if isa(t, Quoted) && isa(t.inner, NAToken) && isa(t.inner.inner, StringToken)
        @show x, prev_guess, guess, t
    end
-   t == Any ? StringToken(strtype, opts) : t
+   t == Any ? StringToken(strtype) : t
 end
 
 function guessdateformat(str, dateformats=common_date_formats,

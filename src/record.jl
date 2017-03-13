@@ -15,13 +15,13 @@ else
     typealias RecN{N,U} Record{NTuple{N}, U}
 end
 
-@generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len)
+@generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len, opts=default_opts)
     quote
         R = Nullable{To}
         i > len && @goto error
 
         Base.@nexprs $N j->begin
-            @chk2 (val_j, i) = tryparsenext(r.fields[j], str, i, len)
+            @chk2 (val_j, i) = tryparsenext(r.fields[j], str, i, len, opts)
         end
 
         @label done
@@ -32,7 +32,7 @@ end
     end
 end
 
-@generated function tryparsesetindex{N,To}(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int)
+@generated function tryparsesetindex{N,To}(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int, opts)
     quote
         R = Result{Int, Tuple{Int,Int,Int}}
         err_field = 1
@@ -41,7 +41,7 @@ end
 
         Base.@nexprs $N j->begin
             err_field = j
-            @chk2 val_j, ii = tryparsenext(r.fields[j], str, i, len)
+            @chk2 val_j, ii = tryparsenext(r.fields[j], str, i, len, opts)
             i = ii
             setcell!(columns[j], row, val_j, str)
         end
@@ -90,9 +90,9 @@ function UseOne(fields::Tuple, use)
     UseOne{fieldtype(fields[use]), typeof(r), use}(r)
 end
 getthing{n}(x, ::Type{Val{n}}) = x[n]
-function tryparsenext{T,S,use}(f::UseOne{T,S,use}, str, i, len)
+function tryparsenext{T,S,use}(f::UseOne{T,S,use}, str, i, len, opts=default_opts)
     R = Nullable{T}
-    @chk2 xs, i = tryparsenext(f.record, str, i, len)
+    @chk2 xs, i = tryparsenext(f.record, str, i, len, opts)
 
     @label done
     return R(getthing(xs, Val{use})), i
@@ -110,14 +110,14 @@ Repeated{F}(f::F, n) = Repeated{F, fieldtype(f), n}(f)
 
 fieldtype{F,T,N}(::Repeated{F,T,N}) = NTuple{N,T}
 
-@generated function tryparsenext{F,T,N}(f::Repeated{F,T,N}, str, i, len)
+@generated function tryparsenext{F,T,N}(f::Repeated{F,T,N}, str, i, len, opts=default_opts)
     quote
         R = Nullable{NTuple{N,T}}
         i > len && @goto error
 
         # pefect candidate for #11902
         Base.@nexprs $N j->begin
-            @chk2 (val_j, i) = tryparsenext(f.field, str, i, len)
+            @chk2 (val_j, i) = tryparsenext(f.field, str, i, len, opts)
         end
 
         @label done
