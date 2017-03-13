@@ -113,7 +113,7 @@ function readcolnames(str, opts, pos, colnames)
     colnames_inferred = String[]
 
     len = endof(str)
-    pos = eatnewlines(str, pos, len)
+    pos, _ = eatnewlines(str, pos, len)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
@@ -137,7 +137,7 @@ function guesscoltypes(str::AbstractString, header, opts::LocalOpts, pos::Int,
     prevfields = String[]
 
     for i=1:nrows
-        pos = eatnewlines(str, pos)
+        pos, _ = eatnewlines(str, pos)
         if pos > endof(str)
             break
         end
@@ -185,7 +185,7 @@ function parsefill!{N}(str::String, rec::RecN{N}, nrecs, cols,
     sizemargin = sqrt(2)
     while true
         prev_j = j
-        j = eatnewlines(str, j)
+        j, _ = eatnewlines(str, j)
         res = tryparsesetindex(rec, str, j,l, cols, i)
         if !issuccess(res)
             j, tok = geterror(res)

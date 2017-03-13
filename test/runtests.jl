@@ -7,8 +7,8 @@ Base.:(==){T<:AbstractToken}(a::T, b::T) = string(a) == string(b)
 
 import TextParse: eatnewlines
 @testset "eatnewlines" begin
-    @test eatnewlines("\n\r\nx") == 4
-    @test eatnewlines("x\n\r\nx") == 1
+    @test eatnewlines("\n\r\nx") == (4, 2)
+    @test eatnewlines("x\n\r\nx") == (1, 0)
 end
 
 

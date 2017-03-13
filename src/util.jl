@@ -79,13 +79,33 @@ end
 
 
 function eatnewlines(str, i=1, l=endof(str))
+    count = 0
     while i<=l
         c, ii = next(str, i)
-        !isnewline(c) && break
-        i = ii
+        if c == '\r'
+            i=ii
+            if i <= l
+                @inbounds c, ii = next(str, i)
+                if c == '\n'
+                    i=ii
+                end
+            end
+            count += 1
+        elseif c == '\n'
+            i=ii
+            if i <= l
+                @inbounds c, ii = next(str, i)
+                if c == '\r'
+                    i=ii
+                end
+            end
+            count += 1
+        else
+            break
+        end
     end
 
-    return i
+    return i, count
 end
 
 function stripquotes(x)
