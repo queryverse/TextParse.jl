@@ -225,6 +225,16 @@ import TextParse: guessdateformat
     @test guessdateformat("24/09/2016") |> typeof == DateTimeToken(Date, dateformat"dd/mm/yyyy") |> typeof
 end
 
+@testset "date parsing" begin
+    tok = DateTimeToken(DateTime, dateformat"yyyy-mm-dd HH:MM:SS")
+    opts = LocalOpts('y', '"', '\\', false, false)
+    str = "1970-02-02 02:20:20"
+    @test tryparsenext(tok, str, 1, length(str), opts) |> unwrap == (DateTime("1970-02-02T02:20:20"), length(str)+1)
+    @test tryparsenext(tok, str*"x", 1, length(str)+1, opts) |> unwrap == (DateTime("1970-02-02T02:20:20"), length(str)+1)
+    @test tryparsenext(tok, str[1:end-3]*"x", 1, length(str)-2, opts) |> failedat == length(str)-2
+    @test tryparsenext(tok, str[1:end-3]*"y", 1, length(str)-2, opts) |> unwrap == (DateTime("1970-02-02T02:20"), length(str)-2)
+end
+
 
 using NullableArrays
 import TextParse: _csvread

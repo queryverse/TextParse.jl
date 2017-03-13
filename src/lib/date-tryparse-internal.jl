@@ -1,4 +1,4 @@
-@generated function tryparse_internal{T<:TimeType, S, F}(::Type{T}, str::AbstractString, df::DateFormat{S, F}, pos::Int, len, raise::Bool=false)
+@generated function tryparse_internal{T<:TimeType, S, F}(::Type{T}, str::AbstractString, df::DateFormat{S, F}, pos::Int, len, endchar=Char(0xff1), raise::Bool=false)
     token_types = Type[dp <: DatePart ? SLOT_RULE[first(dp.parameters)] : Void for dp in F.parameters]
     N = length(F.parameters)
 
@@ -26,7 +26,13 @@
         Base.@nexprs $N i->(begin
             pos > len && @goto done
             nv, next_pos = tryparsenext(t[i], str, pos, len, l)
-            isnull(nv) && @goto error
+            if isnull(nv)
+                c, _ = next(str, pos)
+                if c == endchar
+                    @goto done
+                end
+                @goto error
+            end
             val_i, pos = unsafe_get(nv), next_pos
             err_idx += 1
         end)

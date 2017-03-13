@@ -280,9 +280,9 @@ function fromtype(nd::Nullable{DateFormat})
     end
 end
 
-function tryparsenext{T}(dt::DateTimeToken{T}, str, i, len)
+function tryparsenext{T}(dt::DateTimeToken{T}, str, i, len, opts)
     R = Nullable{T}
-    nt, i = tryparse_internal(T, str, dt.format, i, len)
+    nt, i = tryparse_internal(T, str, dt.format, i, len, opts.endchar)
     if isnull(nt)
         return R(), i
     else
@@ -368,7 +368,8 @@ function tryparsenext{T}(f::Field{T}, str, i, len)
             i = ii
         end
     end
-    @chk2 res, i = tryparsenext(f.inner, str, i, len)
+    opts = LocalOpts(f.delim, '"', '\\', false, false)
+    @chk2 res, i = tryparsenext(f.inner, str, i, len, opts)
 
     if f.ignore_end_whitespace
         i0 = i
