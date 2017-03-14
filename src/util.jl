@@ -77,7 +77,7 @@ end
     c == '\n' || c == '\r'
 end
 
-function eatwhitespaces(str, i=1, l=endof(str))
+@inline function eatwhitespaces(str, i=1, l=endof(str))
     while i <= l
         c, ii = next(str, i)
         if iswhitespace(c)

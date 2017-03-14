@@ -236,12 +236,12 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
         q.required && @goto error
     end
 
-    @chk2 x, i = if quotestarted
+    if quotestarted
         qopts = LocalOpts(quotechar(q, opts), quotechar(q, opts), escapechar(q, opts),
                          q.includequotes, q.includenewlines)
-        tryparsenext(q.inner, str, i, len, qopts)
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
     else
-        tryparsenext(q.inner, str, i, len, opts)
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, opts)
     end
 
     if i > len

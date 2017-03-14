@@ -179,7 +179,7 @@ function promote_column(col, rowno, T, inner=false)
       end
     elseif T <: Nullable
         if !isa(col, NullableArray)
-            isnullarray = Array(Bool, length(col))
+            isnullarray = Array{Bool}(length(col))
             isnullarray[1:rowno-1] = false
             isnullarray[rowno:end] = true
             NullableArray(promote_column(col, rowno, eltype(T)), isnullarray)
