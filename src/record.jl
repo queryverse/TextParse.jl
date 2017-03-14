@@ -10,7 +10,7 @@ end
 
 # for dispatch on N
 if VERSION >= v"0.6.0-dev"
-    eval(parse("typealias RecN{N,U} Record{T,U} where T<:NTuple{N, Any}"))
+    eval(parse("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}"))
 else
     typealias RecN{N,U} Record{NTuple{N}, U}
 end

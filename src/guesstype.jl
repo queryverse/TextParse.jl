@@ -1,4 +1,4 @@
-typealias StringLike Union{AbstractString, StrRange}
+const StringLike = Union{AbstractString, StrRange}
 
 const common_date_formats = Any[dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
                                 dateformat"mm-dd-yyyy", dateformat"mm/dd/yyyy",
