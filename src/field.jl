@@ -219,8 +219,6 @@ end
 Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
 
 function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
-    R = Nullable{T}
-    x = R()
     if i > len
         q.required && @goto error
         # check to see if inner thing is ok with an empty field
@@ -261,10 +259,10 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
 
 
     @label done
-    return R(x), i
+    return Nullable{T}(x), i
 
     @label error
-    return R(), i
+    return Nullable{T}(), i
 end
 
 ## Date and Time
