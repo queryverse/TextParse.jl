@@ -333,3 +333,27 @@ using PooledArrays
     @test eltype(col.refs) == UInt8
     @test xs == col
 end
+
+import TextParse: eatwhitespaces
+@testset "custom parser" begin
+    const floatparser = Numeric(Float64)
+    percentparser = CustomParser(Float64) do str, i, len, opts
+        num, ii = tryparsenext(floatparser, str, i, len, opts)
+        if isnull(num)
+            return num, ii
+        else
+            # parse away the % char
+            ii = eatwhitespaces(str, ii, len)
+            c, k = next(str, ii)
+            if c != '%'
+                return Nullable{Float64}(), ii # failed to parse %
+            else
+                return num, k # the point after %
+            end
+        end
+    end
+
+    @test tryparsenext(percentparser, "10%")  |> unwrap == (10.0, 4)
+    @test tryparsenext(percentparser, "10.32 %") |> unwrap == (10.32, 8)
+    @test tryparsenext(percentparser, "2k%") |> failedat ==  2
+end

@@ -1,5 +1,7 @@
 using QuickTypes
 
+export CustomParser, Quoted
+
 abstract AbstractToken{T}
 fieldtype{T}(::AbstractToken{T}) = T
 fieldtype{T}(::Type{AbstractToken{T}}) = T
@@ -8,6 +10,16 @@ fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 
 ## options passed down for tokens (specifically NAToken, StringToken)
 ## inside a Quoted token
+"""
+    LocalOpts
+
+Options local to the token currently being parsed.
+- `endchar`: Till where to parse. (e.g. delimiter or quote ending character)
+- `quotechar`: the quote character
+- `escapechar`: char that escapes the quote
+- `includequotes`: whether to include quotes while parsing
+- `includenewlines`: whether to include newlines while parsing
+"""
 immutable LocalOpts
     endchar::Char         # End parsing at this char
     quotechar::Char       # Quote char
@@ -34,6 +46,38 @@ fromtype(::Type{Union{}}) = Unknown()
 function tryparsenext(::Unknown, str, i, len, opts)
     Nullable{Void}(nothing), i
 end
+
+"""
+    CustomParser(f, T)
+
+Provide a custom parsing mechanism.
+
+# Arguments:
+
+- `f`: the parser function
+- `T`: The type of the parsed value
+
+The parser function must take the following arguments:
+- `str`: the entire string being parsed
+- `pos`: the position in the string at which to start parsing
+- `len`: the length of the string the maximum position where to parse till
+- `opts`: a [LocalOpts](@ref) object with options local to the current field.
+
+The parser function must return a tuple of two values:
+
+- `result`: A `Nullable{T}`. Set to null if parsing must fail, containing the value otherwise.
+- `nextpos`: If parsing succeeded this must be the next position after parsing finished, if it failed
+             This must be the position at which parsing failed.
+"""
+immutable CustomParser{T, F} <: AbstractToken{T}
+    f::Function
+end
+CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
+
+@inline function tryparsenext(c::CustomParser, str, i, len, opts)
+    c.f(str, i, len, opts)
+end
+
 
 # Numberic parsing
 immutable Numeric{T} <: AbstractToken{T}
