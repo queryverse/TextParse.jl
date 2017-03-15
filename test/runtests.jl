@@ -301,3 +301,35 @@ import TextParse: _csvread
     """
     @test_throws TextParse.CSVParseError _csvread(str3, type_detect_rows=1)
 end
+
+using PooledArrays
+
+@testset "pooled array promotion" begin
+    # test default behavior
+    xs = [randstring(10) for i=1:100]
+    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    @test isa(col, PooledArray)
+    @test eltype(col.refs) == UInt8
+    @test xs == col
+
+    # test promotion to a widened type
+    xs = [randstring(10) for i=1:300]
+    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    @test isa(col, PooledArray)
+    @test eltype(col.refs) == widen(UInt8)
+    @test xs == col
+
+    # test promotion to a dense array
+    xs = [randstring(10) for i=1:500]
+    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    @test !isa(col, PooledArray)
+    @test isa(col, Array)
+    @test xs == col
+
+    # test non-promotion
+    xs = [rand(["X", "Y"]) for i=1:500]
+    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    @test isa(col, PooledArray)
+    @test eltype(col.refs) == UInt8
+    @test xs == col
+end

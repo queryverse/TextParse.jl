@@ -116,49 +116,86 @@ function _csvread(str::AbstractString, delim=',';
     try
         parsefill!(str, opts, rec, nrows, cols, pos, lineno, rowno, endof(str))
     catch err
+
         if !isa(err, CSVParseError)
             rethrow(err)
         end
 
-        rng = getlineat(str, err.fieldpos)
-        f, l = first(rng), last(rng)
-        field = rec.fields[err.colno]
-        failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
-        # figure out a new token type
-        newtoken = guesstoken(failed_text, opts, field.inner)
+        if err.err_code == PARSE_ERROR
 
-        if debug[]
-            if string(field.inner) == string(newtoken)
-                println(STDERR, "Could not determine which type to promote column to.")
-                rethrow(err)
-            end
+            rng = getlineat(str, err.fieldpos)
+            f, l = first(rng), last(rng)
+            field = rec.fields[err.colno]
+            failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
+            # figure out a new token type
+            newtoken = guesstoken(failed_text, opts, field.inner)
 
-            println(STDERR, "Converting column $(err.colno) to type $(newtoken) from $(field.inner) because it seems to have a different type:")
-            println(STDERR, showerrorchar(str, err.pos, 100))
-        end
-
-        newcol = try
-            promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
-        catch err2
             if debug[]
-                retrhow(err2)
-                Base.showerror(STDERR, err)
-            else
-                rethrow(err)
+                if string(field.inner) == string(newtoken)
+                    println(STDERR, "Could not determine which type to promote column to.")
+                    rethrow(err)
+                end
+
+                println(STDERR, "Converting column $(err.colno) to type $(newtoken) from $(field.inner) because it seems to have a different type:")
+                println(STDERR, showerrorchar(str, err.pos, 100))
             end
+
+            newcol = try
+                promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
+            catch err2
+                if debug[]
+                    retrhow(err2)
+                    Base.showerror(STDERR, err)
+                else
+                    rethrow(err)
+                end
+            end
+
+            fieldsvec = Any[rec.fields...]
+            fieldsvec[err.colno] = swapinner(field, newtoken)
+            typeof(cols)
+            colsvec = Any[cols...]
+            colsvec[err.colno] = newcol
+
+            rec = Record((fieldsvec...))
+            cols = (colsvec...)
+            rowno = err.rowno
+            pos = f
+            @goto retry
+
+        elseif err.err_code == POOL_CROWDED
+
+            colsvec = Any[cols...]
+            failcol = cols[err.colno]
+            @assert isa(failcol, PooledArray)
+            # promote to a dense array
+            newcol = Array(failcol)
+            colsvec[err.colno] = newcol
+
+            rng = getlineat(str, err.fieldpos)
+
+            pos = first(rng)
+            rowno = err.rowno
+            cols = (colsvec...)
+            @goto retry
+
+        elseif err.err_code == POOL_OVERFLOW
+            # promote refs to a wider integer type
+            colsvec = Any[cols...]
+            failcol = cols[err.colno]
+            @assert isa(failcol, PooledArray)
+            T = widen(eltype(failcol.refs))
+            newrefs = convert(Array{T}, failcol.refs)
+            newcol = PooledArray(PooledArrays.RefArray(newrefs), failcol.pool)
+            colsvec[err.colno] = newcol
+            rng = getlineat(str, err.fieldpos)
+
+            cols = (colsvec...)
+            pos = first(rng)
+            rowno = err.rowno
+            @goto retry
         end
 
-        fieldsvec = Any[rec.fields...]
-        fieldsvec[err.colno] = swapinner(field, newtoken)
-        typeof(cols)
-        colsvec = Any[cols...]
-        colsvec[err.colno] = newcol
-
-        rec = Record((fieldsvec...))
-        cols = (colsvec...)
-        rowno = err.rowno
-        pos = f
-        @goto retry
     end
 
     cols, merged_colnames
@@ -274,8 +311,8 @@ function parsefill!{N}(str::String, opts, rec::RecN{N}, nrecs, cols,
         lineno += lines
         res = tryparsesetindex(rec, str, pos, l, cols, rowno, opts)
         if !issuccess(res)
-            pos, fieldpos, colno = geterror(res)
-            throw(CSVParseError(str, rec, lineno, rowno,
+            pos, fieldpos, colno, err_code = geterror(res)
+            throw(CSVParseError(err_code, str, rec, lineno, rowno,
                                 colno, pos, fieldpos))
         else
             pos = value(res)
@@ -315,11 +352,7 @@ function makeoutputvec(str, eltyp, N, pooledstrings)
         NullableArray{Void}(N)
     elseif fieldtype(eltyp) == StrRange
       # By default we put strings in a PooledArray
-      if pooledstrings
-          resize!(PooledArray(Int32[], String[]), N)
-      else
-          Array{String}(N)
-      end
+      resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
     elseif fieldtype(eltyp) == Nullable{StrRange}
         NullableArray{String}(N)
     elseif fieldtype(eltyp) <: Nullable
@@ -331,6 +364,7 @@ end
 
 
 immutable CSVParseError <: Exception
+    err_code
     str
     rec
     lineno
