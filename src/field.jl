@@ -382,7 +382,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
     if isa(na.inner, Unknown)
         @goto maybe_null
     end
-    @chk2 x,ii = tryparsenext(na.inner, str, i, len) maybe_null
+    @chk2 x,ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
 
     @label done
     return R(T(x)), ii

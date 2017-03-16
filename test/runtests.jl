@@ -15,59 +15,81 @@ end
 
 import TextParse: getlineend
 @testset "getlineend" begin
-    @test getlineend("\n\r\nx") == 0
-    @test getlineend("x\n\r\nx") == 1
-    @test getlineend("x y\n\r\nxyz", 6) == 5
-    @test getlineend("x y\n\r\nxyz", 7) == 9
+    @test getlineend("\nx") == 0
+    @test getlineend("x\nx") == 1
+    @test getlineend("x\ny", 2) == 1
+    @test getlineend("x\nyz", 3) == 4
 end
 
 
 import TextParse: fromtype
 @testset "Float parsing" begin
-    @test tryparsenext(fromtype(Float64), "21", 1, 2) |> unwrap== (21.0,3)
-    @test tryparsenext(fromtype(Float64), ".21", 1, 3) |> unwrap== (.21,4)
-    @test tryparsenext(fromtype(Float64), "1.21", 1, 4) |> unwrap== (1.21,5)
-    @test tryparsenext(fromtype(Float32), "1.", 1, 2) |> unwrap== (1f0,3)
-    @test tryparsenext(fromtype(Float64), "-1.21", 1, 5) |> unwrap== (-1.21,6)
-    @test tryparsenext(fromtype(Float64), "-1.5e-12", 1, 8) |> unwrap == (-1.5e-12,9)
-    @test tryparsenext(fromtype(Float64), "-1.5E-12", 1, 8) |> unwrap == (-1.5e-12,9)
+
+    @test tryparsenext(fromtype(Float64), "1", 1, 1) |> unwrap == (1.0, 2)
+    @test tryparsenext(fromtype(Float64), "12", 1, 2) |> unwrap == (12.0, 3)
+    @test tryparsenext(fromtype(Float64), ".1", 1, 2) |> unwrap == (0.1, 3)
+    @test tryparsenext(fromtype(Float64), "1.1", 1, 3) |> unwrap == (1.1, 4)
+    @test tryparsenext(fromtype(Float32), "1.", 1, 2) |> unwrap == (1f0,3)
+    @test tryparsenext(fromtype(Float64), "-1.1", 1, 4) |> unwrap == (-1.1,5)
+    @test tryparsenext(fromtype(Float64), "-1.0e-12", 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(fromtype(Float64), "-1.0E-12", 1, 8) |> unwrap == (-1.0e-12,9)
 end
 
 
 import TextParse: StringToken
 @testset "String parsing" begin
-    for (s,till) in [("test  ",7), ("\ttest ",7), ("test\nasdf", 5), ("test,test", 5), ("test\\,test", 6)]
-        @test tryparsenext(StringToken(String), s) |> unwrap == (s[1:till-1], till)
-    end
-    opts = LocalOpts(',', '"', '"', false, true)
-    for (s,till) in [("test\nasdf", 10), ("te\nst,test", 6)]
-        @test tryparsenext(StringToken(String), s, opts) |> unwrap == (s[1:till-1], till)
-    end
 
-    @test tryparsenext(StringToken(String), "", 1, 0, opts) |> unwrap == ("", 1)
-    tok = StringToken(String)
+    # default options
+    @test tryparsenext(StringToken(String), "") |> unwrap == ("", 1)
+    @test tryparsenext(StringToken(String), "x") |> unwrap == ("x", 2)
+    @test tryparsenext(StringToken(String), "x ") |> unwrap == ("x ", 3)
+    @test tryparsenext(StringToken(String), " x") |> unwrap == (" x", 3)
+    @test tryparsenext(StringToken(String), "x\ny") |> unwrap == ("x", 2)
+    @test tryparsenext(StringToken(String), "x,y") |> unwrap == ("x", 2) # test escape
+
+    opts = LocalOpts(',', '"', '"', true, true)
+    @test tryparsenext(StringToken(String), "", opts) |> unwrap == ("", 1)
+    @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"\"", 3)
+    @test tryparsenext(StringToken(String), "x", opts) |> unwrap == ("x", 2)
+    # test including new lines
+    @test tryparsenext(StringToken(String), "x\ny", opts) |> unwrap == ("x\ny", 4)
+    @test tryparsenext(StringToken(String), "\"x\ny\"", opts) |> unwrap == ("\"x\ny\"", 6)
+
+    opts = LocalOpts(',', '"', '"', false, true)
+    # test that includequotes option doesn't affect string
+    @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"\"", 3)
 
     opts = LocalOpts(',', '"', '\\', false, false)
-    @test tryparsenext(Quoted(String), "\"x\"", 1,3, opts) |> unwrap == ("x", 4)
-    @test tryparsenext(Quoted(String, includequotes=true), "\"x\"", 1,3, opts) |> unwrap == ("\"x\"", 4)
-    @test tryparsenext(Quoted(String, escapechar=Nullable('"'), includequotes=true), "\"x\"", 1,3, opts) |> unwrap == ("\"x\"", 4)
-    @test tryparsenext(Quoted(String, includequotes=true, escapechar=Nullable('"')), "\"x \"\"y\"\" z\"", 1,11, opts) |> unwrap == ("\"x \"\"y\"\" z\"", 12)
     str =  "Owner 2 ”Vicepresident\"\""
-    @test tryparsenext(tok, str) |> unwrap == (str, endof(str)+1)
+    @test tryparsenext(Quoted(String), str) |> unwrap == (str, endof(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
     @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == (str, endof(str1)+1)
-    str2 =  "\"\"\"\""
-    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str2) |> unwrap == ("\"\"", endof(str2)+1)
-    str2 =  "\"\"\"\"\"\","
-    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str2) |> unwrap == ("\"\"\"\"", endof(str2))
 
 end
 
 
 import TextParse: Quoted, NAToken, Unknown
 @testset "Quoted string parsing" begin
+    opts = LocalOpts(',', '"', '"', true, true)
+
+    @test tryparsenext(Quoted(String), "\"\"") |> unwrap == ("", 3)
+    @test tryparsenext(Quoted(String), "\"\" ", opts) |> unwrap == ("", 3)
+    @test tryparsenext(Quoted(String), "\"x\"") |> unwrap == ("x", 4)
+    @test tryparsenext(Quoted(String, includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
+    str2 =  "\"\"\"\""
+    @test tryparsenext(Quoted(String), str2, opts) |> unwrap == ("\"\"", endof(str2)+1)
+    str1 =  "\"x”y\"\"\""
+    @test tryparsenext(Quoted(StringToken(String), required=true), "x\"y\"") |> failedat == 1
+
+    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == ("x”y\"\"", endof(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String)), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "1") |> unwrap |> unwrap == (1,2)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap |> failedat == 1
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"1\"") |> unwrap |> unwrap == (1, 4)
+
+
     @test tryparsenext(Quoted(StringToken(String)), "\"abc\"") |> unwrap == ("abc", 6)
-    @test tryparsenext(Quoted(StringToken(String)), "\"a\\\"bc\"") |> unwrap == ("a\\\"bc", 8)
     @test tryparsenext(Quoted(StringToken(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
     @test tryparsenext(Quoted(StringToken(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
     @test tryparsenext(Quoted(StringToken(String), required=true), "x\"abc\"") |> failedat == 1
