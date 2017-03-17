@@ -38,7 +38,7 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
             quotechar='"',
             escapechar='\\',
             dateformat=ISODateTimeFormat,
-            pooledstrings=false,
+            pooledstrings=true,
             header_exists=true,
             colnames=Dict(),
             colparsers=Dict(),
@@ -71,7 +71,7 @@ function _csvread(str::AbstractString, delim=',';
                  escapechar='\\',
                  dateformats=common_date_formats,
                  datetimeformats=common_datetime_formats,
-                 pooledstrings=false,
+                 pooledstrings=true,
                  nrows=0,
                  header_exists=true,
                  colnames=String[],
@@ -352,7 +352,11 @@ function makeoutputvec(str, eltyp, N, pooledstrings)
         NullableArray{Void}(N)
     elseif fieldtype(eltyp) == StrRange
       # By default we put strings in a PooledArray
-      resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
+      if pooledstrings
+          resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
+      else
+          Array{String}(N)
+      end
     elseif fieldtype(eltyp) == Nullable{StrRange}
         NullableArray{String}(N)
     elseif fieldtype(eltyp) <: Nullable
