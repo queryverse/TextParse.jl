@@ -2,6 +2,8 @@ export csvread
 const current_record = Ref{Any}()
 const debug = Ref{Bool}(false)
 
+const StringLike = Union{String, StrRange}
+
 optionsiter(opts::Associative) = opts
 optionsiter(opts::AbstractVector) = enumerate(opts)
 
@@ -92,7 +94,7 @@ function _csvread(str::AbstractString, delim=',';
         merged_colnames = colnames
     end
 
-    guess, pos1 = guesscolparsers(str, merged_colnames, opts, pos, type_detect_rows, colparsers,
+    @time guess, pos1 = guesscolparsers(str, merged_colnames, opts, pos, type_detect_rows, colparsers,
                           dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
@@ -128,7 +130,7 @@ function _csvread(str::AbstractString, delim=',';
             field = rec.fields[err.colno]
             failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
             # figure out a new token type
-            newtoken = guesstoken(failed_text, opts, field.inner)
+            newtoken = guesstoken(failed_text, field.inner)
 
             if debug[]
                 if string(field.inner) == string(newtoken)
@@ -278,9 +280,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
                 error("previous rows had $(length(guess)) fields but row $i has $(length(fields))")
             end
             try
-                guess[j] = guesstoken(fields[j], opts,
-                                      guess[j], StrRange,
-                                      dateformats, datetimeformats)
+                guess[j] = guesstoken(fields[j], guess[j])
             catch err
                 println(STDERR, "Error while guessing a common type for column $j")
                 println(STDERR, "new value: $(fields[j]), prev guess was: $(guess[j])")

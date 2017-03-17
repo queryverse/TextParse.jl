@@ -1,5 +1,7 @@
 using QuickTypes
 
+import Base.show
+
 export CustomParser, Quoted
 
 abstract AbstractToken{T}
@@ -46,6 +48,7 @@ fromtype(::Type{Union{}}) = Unknown()
 function tryparsenext(::Unknown, str, i, len, opts)
     Nullable{Void}(nothing), i
 end
+show(io::IO, ::Unknown) = print(io, "<unknown>")
 
 """
     CustomParser(f, T)
@@ -74,6 +77,8 @@ immutable CustomParser{T, F} <: AbstractToken{T}
 end
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
 
+show{T}(io::IO, c::CustomParser{T}) = print(io, "{{custom:$T}}")
+
 @inline function tryparsenext(c::CustomParser, str, i, len, opts)
     c.f(str, i, len, opts)
 end
@@ -84,6 +89,7 @@ immutable Numeric{T} <: AbstractToken{T}
     decimal::Char
     thousands::Char
 end
+show{T}(io::IO, c::Numeric{T}) = print(io, "<$T>")
 
 Numeric{T}(::Type{T}, decimal='.', thousands=',') = Numeric{T}(decimal, thousands)
 fromtype{N<:Number}(::Type{N}) = Numeric(N)
@@ -147,6 +153,7 @@ end
 function StringToken{T}(t::Type{T})
     StringToken{T}()
 end
+show(io::IO, c::StringToken) = print(io, "<string>")
 
 fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
 
@@ -243,6 +250,13 @@ immutable Quoted{T, S<:AbstractToken} <: AbstractToken{T}
     includenewlines::Bool
     quotechar::Nullable{Char}
     escapechar::Nullable{Char}
+end
+
+function show(io::IO, q::Quoted)
+    c = quotechar(q, default_opts)
+    print(io, "$c")
+    show(io, q.inner)
+    print(io, "$c")
 end
 
 function Quoted{S<:AbstractToken}(inner::S;
@@ -361,6 +375,11 @@ function NAToken{S}(
     NAToken{Nullable{T}, S}(inner, emptyisna, endchar, nastrings)
 end
 
+function show(io::IO, na::NAToken)
+    show(io, na.inner)
+    print(io, "?")
+end
+
 endchar(na::NAToken, opts) = get(na.endchar, opts.endchar)
 
 function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
@@ -418,6 +437,12 @@ type Field{T,S<:AbstractToken} <: AbstractField{T}
     eoldelim::Bool
     spacedelim::Bool
     delim::Nullable{Char}
+end
+
+function show(io::IO, f::Field)
+    show(io, f.inner)
+    d = delim(f, default_opts)
+    print(io, "$d")
 end
 
 function Field{S}(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true,

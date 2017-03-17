@@ -1,76 +1,23 @@
-const StringLike = Union{AbstractString, StrRange}
-
-const common_date_formats = Any[dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
-                                dateformat"mm-dd-yyyy", dateformat"mm/dd/yyyy",
-                                dateformat"dd-mm-yyyy", dateformat"dd/mm/yyyy",
-                                dateformat"dd u yyyy",  dateformat"e, dd u yyyy"
-                                ]
-
-const common_datetime_formats = Any[
-                                    dateformat"yyyy-mm-ddTHH:MM:SS",
-                                    dateformat"yyyy-mm-dd HH:MM:SS",
-                                    ISODateTimeFormat,
-                                    dateformat"yyyy-mm-dd HH:MM:SS.s",
-                                    RFC1123Format,
-                                    dateformat"yyyy/mm/dd HH:MM:SS.s",
-                                    dateformat"yyyymmdd HH:MM:SS.s"
-                                   ]
-
 isna(x) = x == "" || x in NA_STRINGS
 
+const common_date_formats = Any[
+    dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
+    dateformat"mm-dd-yyyy", dateformat"mm/dd/yyyy",
+    dateformat"dd-mm-yyyy", dateformat"dd/mm/yyyy",
+    dateformat"dd u yyyy",  dateformat"e, dd u yyyy"
+]
+
+const common_datetime_formats = Any[
+    dateformat"yyyy-mm-ddTHH:MM:SS",
+    dateformat"yyyy-mm-dd HH:MM:SS",
+    ISODateTimeFormat,
+    dateformat"yyyy-mm-dd HH:MM:SS.s",
+    RFC1123Format,
+    dateformat"yyyy/mm/dd HH:MM:SS.s",
+    dateformat"yyyymmdd HH:MM:SS.s"
+]
+
 const DEFAULT_QUOTES = ('"', ''')
-
-function guesstoken(x, opts, prev_guess::ANY=Unknown(),
-                      strtype=StrRange,
-                      dateformats=common_date_formats,
-                      datetimeformats=common_datetime_formats)
-    # detect quoting
-    if length(x) > 0 && x[1] in DEFAULT_QUOTES && last(x) == x[1]
-        # this is a reliable quoted situation
-        inner_x = strip(strip(x, x[1]))
-        prev = prev_guess
-        if isa(prev_guess, Quoted)
-            prev = prev_guess.inner
-        end
-
-        opts1 = LocalOpts(opts.endchar, x[1], opts.escapechar,
-                          opts.includequotes, opts.includenewlines)
-        inner = guesstoken(inner_x, opts, prev, strtype,
-                             dateformats, datetimeformats)
-        return Quoted(inner)
-    end
-
-    if isa(prev_guess, Quoted)
-        # It seems this field is not quoted.
-        # promote the inner thing
-        inner = guesstoken(x, opts, prev_guess.inner, strtype,
-                             dateformats, datetimeformats)
-        return Quoted(inner; required=false, quotechar=prev_guess.quotechar,
-                             escapechar=prev_guess.escapechar)
-    end
-    guess::Any = isna(x) ?
-           (isa(prev_guess, NAToken) &&
-            prev_guess!=Unknown() ? prev_guess : NAToken(prev_guess)) :
-           !isnull(tryparse(Int64, x)) ? fromtype(Int64) :
-           !isnull(tryparse(Float64, x)) ? fromtype(Float64) :
-           !isnull(tryparse(Float64, x)) ? fromtype(Float64) :
-           Any
-
-   if guess == Any
-       dateguess = guessdateformat(x, dateformats, datetimeformats)
-       if dateguess !== nothing
-           guess = dateguess
-       else
-           guess = StringToken(strtype)
-       end
-   end
-
-   t = promote_guess(opts, prev_guess, guess)
-   if isa(t, Quoted) && isa(t.inner, NAToken) && isa(t.inner.inner, StringToken)
-       @show x, prev_guess, guess, t
-   end
-   t == Any ? StringToken(strtype) : t
-end
 
 function guessdateformat(str, dateformats=common_date_formats,
                          datetimeformats=common_datetime_formats)
@@ -92,21 +39,72 @@ function guessdateformat(str, dateformats=common_date_formats,
     return nothing
 end
 
-promote_guess(opts, T,S) = fromtype(promote_type(fieldtype(T),fieldtype(S)))
+function getquotechar(x)
+    if (length(x) > 0 && x[1] in DEFAULT_QUOTES) && last(x) == x[1]
+        return x[1]
+    end
+    return '\0'
+end
 
-promote_guess(opts, str::StringToken, ::Any) = str
-promote_guess(opts,r::Any, str::StringToken) = str
-promote_guess(opts, str::StringToken, str2::StringToken) = str2
-promote_guess(opts, str::StringToken, na::NAToken) = str
+function guesstoken(x, prev_guess::ANY=Unknown())
+    q = getquotechar(x)
 
-promote_guess(opts, ::Unknown, S::DateTimeToken) = S
-promote_guess(opts, T, d::DateTimeToken) = fromtype(StrRange)
-promote_guess(opts, d::DateTimeToken, T) = fromtype(StrRange)
-promote_guess(opts, d1::DateTimeToken, d2::DateTimeToken) = d2 # TODO: check compatibility
+    if isa(prev_guess, StringToken)
+        # there is nothing wider than a string
+        return prev_guess
+    elseif q !== '\0'
+        # remove quotes and detect inner token
+        if isa(prev_guess, Quoted)
+            prev_inner = prev_guess.inner
+        else
+            prev_inner = prev_guess
+        end
+        inner_token = guesstoken(strip(strip(x, q)), prev_inner)
+        return Quoted(inner_token)
+    elseif isa(prev_guess, Quoted)
+        # but this token is not quoted
+        return Quoted(guesstoken(x, prev_guess.inner))
+    elseif isa(prev_guess, NAToken)
+        # This column is nullable
+        if isna(x)
+            # x is null too, return previous guess
+            return prev_guess
+        else
+            tok = guesstoken(x, prev_guess.inner)
+            if isa(tok, StringToken)
+                return tok # never wrap a string in NAToken
+            elseif isa(tok, Quoted)
+                # Always put the quoted wrapper on top
+                return Quoted(NAToken(tok.inner))
+            else
+                return NAToken(tok)
+            end
+        end
+    elseif isna(x)
+        return NAToken(prev_guess)
+    else
+        # x is neither quoted, nor null,
+        # prev_guess is not a NAToken or a StringToken
+        if !isnull(tryparse(Int, x)) || !isnull(tryparse(Float64, x))
+            T = isnull(tryparse(Int, x)) ? Float64 : Int
 
-promote_guess(opts, T, na::NAToken) = NAToken(promote_guess(opts, T,na.inner), endchar=na.endchar)
-promote_guess(opts, na1::NAToken, na2::NAToken) = NAToken(promote_guess(opts, na2.inner,na1.inner), endchar=na2.endchar) # XXX: na1.endchar == na2.endchar ?
+            if prev_guess == Unknown()
+                return Numeric(T)
+            elseif isa(prev_guess, Numeric)
+                return Numeric(promote_type(T, fieldtype(prev_guess)))
+            else
+                # something like a date turned into a single number?
+                return StringToken(StrRange)
+            end
+        else
+            maybedate = guessdateformat(x)
+            if maybedate == nothing
+                return StringToken(StrRange)
+            else
+                return maybedate
+            end
+        end
+    end
+end
 
-promote_guess(opts, T, q::Quoted) = Quoted(promote_guess(opts, T,q.inner), endchar=q.quotechar, escapechar=q.escapechar, required=false)
-promote_guess(opts, q1::Quoted, q2::Quoted) = Quoted(promote_guess(opts, q1.inner,q2.inner), required=q2.required, quotechar=q2.quotechar, escapechar=q2.escapechar) # XXX: are the options same?
 

@@ -98,9 +98,9 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap |> failedat == 1
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap |> unwrap == (21, 5)
+    @test isnull(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
     opts = LocalOpts(',', '"', '"', false, false)
     @test tryparsenext(Quoted(StringToken(String)), "x,", opts) |> unwrap == ("x", 2)
-    @test isnull(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
 end
 
 @testset "NA parsing" begin
@@ -196,7 +196,57 @@ import TextParse: LocalOpts, readcolnames
     #@test readcolnames("$str2", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "d\" e"], 24)
 end
 
-import TextParse: guesscolparsers, StrRange
+import TextParse: guesstoken, Unknown, Numeric, DateTimeToken, StrRange
+@testset "guesstoken" begin
+    # Test null values
+    @test guesstoken("", Unknown()) == NAToken(Unknown())
+    @test guesstoken("null", Unknown()) == NAToken(Unknown())
+    @test guesstoken("", NAToken(Unknown())) == NAToken(Unknown())
+    @test guesstoken("null", NAToken(Unknown())) == NAToken(Unknown())
+
+    # Test NA
+    @test guesstoken("1", NAToken(Unknown())) == NAToken(Numeric(Int))
+    @test guesstoken("1", NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+    @test guesstoken("", NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+
+    # Test non-null numeric
+    @test guesstoken("1", Unknown()) == Numeric(Int)
+    @test guesstoken("1", Numeric(Int)) == Numeric(Int)
+    @test guesstoken("", Numeric(Int)) == NAToken(Numeric(Int))
+    @test guesstoken("1.0", Numeric(Int)) == Numeric(Float64)
+
+    # Test strings
+    @test guesstoken("x", Unknown()) == StringToken(StrRange)
+
+    # Test nullable to string
+    @test guesstoken("x", NAToken(Unknown())) == StringToken(StrRange)
+
+    # Test string to non-null (short circuit)
+    @test guesstoken("1", StringToken(StrRange)) == StringToken(StrRange)
+
+    # Test quoting
+    @test guesstoken("\"1\"", Unknown()) == Quoted(Numeric(Int))
+    @test guesstoken("\"1\"", Quoted(Numeric(Int))) == Quoted(Numeric(Int))
+
+    # Test quoting with Nullable tokens
+    @test guesstoken("\"\"", Quoted(Unknown())) == Quoted(NAToken(Unknown()))
+    @test guesstoken("\"\"", Quoted(NAToken(Unknown()))) == Quoted(NAToken(Unknown()))
+    @test guesstoken("\"\"", Quoted(Numeric(Int))) == Quoted(NAToken(Numeric(Int)))
+    @test guesstoken("\"\"", Unknown()) == Quoted(NAToken(Unknown()))
+    @test guesstoken("\"\"", Numeric(Int)) == Quoted(NAToken(Numeric(Int)))
+    @test guesstoken("", Quoted(Numeric(Int))) == Quoted(NAToken(Numeric(Int)))
+    @test guesstoken("", Quoted(NAToken(Numeric(Int)))) == Quoted(NAToken(Numeric(Int)))
+    @test guesstoken("1", Quoted(NAToken(Numeric(Int)))) == Quoted(NAToken(Numeric(Int)))
+    @test guesstoken("\"1\"", Quoted(NAToken(Numeric(Int)))) == Quoted(NAToken(Numeric(Int)))
+
+    # Test DateTime detection:
+    tok = guesstoken("2016-01-01 10:10:10.10", Unknown())
+    @test tok == DateTimeToken(DateTime, dateformat"yyyy-mm-dd HH:MM:SS.s")
+    @test guesstoken("2016-01-01 10:10:10.10", tok) == tok
+    @test guesstoken("2016-01-01 10:10:10.10", Quoted(NAToken(Unknown()))) == Quoted(NAToken(tok))
+end
+
+import TextParse: guesscolparsers
 @testset "CSV type detect" begin
     str1 = """
      a, b,c d, e
@@ -230,26 +280,6 @@ import TextParse: getlineat
     @test str[getlineat(str,endof(str))] == "defg"
 end
 
-import TextParse: guesstoken, Unknown, Numeric, DateTimeToken
-@testset "guesstoken" begin
-    opts = LocalOpts(',', '"', '\\', false, false)
-    @test guesstoken("21", opts) == fromtype(Int)
-    @test guesstoken("", opts) == NAToken(Unknown())
-    @test guesstoken("NA", opts) == NAToken(Unknown())
-    @test guesstoken("21", opts, NAToken(Unknown())) == NAToken(fromtype(Int))
-    @test guesstoken("", opts, fromtype(Int)) == NAToken(fromtype(Int))
-    @test guesstoken("", opts, NAToken(fromtype(Int))) == NAToken(fromtype(Int))
-    @test guesstoken("21", opts, fromtype(Float64)) == fromtype(Float64)
-    @test guesstoken("\"21\"", opts, fromtype(Float64)) == Quoted(Numeric(Float64), required=false)
-    @test guesstoken("abc", opts, fromtype(Float64), String) == fromtype(String)
-    @test guesstoken("\"abc\"", opts, fromtype(Float64), String) == Quoted(fromtype(String))
-    @test guesstoken("abc", opts, Quoted(fromtype(Float64)), String) == Quoted(fromtype(String))
-    @test guesstoken("abc", opts, NAToken(Unknown()), String) == StringToken(String)
-    @test guesstoken("abc", opts, NAToken(fromtype(Int)), String) == StringToken(String)
-    @test guesstoken("20160909 12:12:12", opts, Unknown()) |> typeof == DateTimeToken(DateTime, dateformat"yyyymmdd HH:MM:SS.s") |> typeof
-    @test guesstoken("\"12\"", opts, NAToken(Unknown()), String) == Quoted(NAToken(fromtype(Int)))
-    @test guesstoken("\"\"", opts, Quoted(fromtype(Int)), String) == Quoted(NAToken(fromtype(Int)))
-end
 
 import TextParse: guessdateformat
 @testset "date detection" begin

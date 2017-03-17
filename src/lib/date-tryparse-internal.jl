@@ -28,7 +28,7 @@
             nv, next_pos = tryparsenext(t[i], str, pos, len, l)
             if isnull(nv)
                 c, _ = next(str, pos)
-                if c == endchar
+                if Char(c) == Char(endchar)
                     @goto done
                 end
                 @goto error
