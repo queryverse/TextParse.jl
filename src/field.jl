@@ -1,5 +1,3 @@
-using QuickTypes
-
 import Base.show
 
 export CustomParser, Quoted
@@ -324,10 +322,11 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
 end
 
 ## Date and Time
-@qtype DateTimeToken{T,S<:DateFormat}(
-    output_type::Type{T},
+immutable DateTimeToken{T,S<:DateFormat} <: AbstractToken{T}
     format::S
-) <: AbstractToken{T}
+end
+DateTimeToken{S<:DateFormat}(T::Type, df::S) = DateTimeToken{T, S}(df)
+DateTimeToken{S<:DateFormat}(df::S) = DateTimeToken{DateTime, S}(df)
 fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
 fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
@@ -430,7 +429,7 @@ fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
 
 abstract AbstractField{T} <: AbstractToken{T} # A rocord is a collection of abstract fields
 
-type Field{T,S<:AbstractToken} <: AbstractField{T}
+immutable Field{T,S<:AbstractToken} <: AbstractField{T}
     inner::S
     ignore_init_whitespace::Bool
     ignore_end_whitespace::Bool
@@ -439,17 +438,18 @@ type Field{T,S<:AbstractToken} <: AbstractField{T}
     delim::Nullable{Char}
 end
 
-function show(io::IO, f::Field)
-    show(io, f.inner)
-    d = delim(f, default_opts)
-    print(io, "$d")
-end
-
 function Field{S}(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true,
-               eoldelim=false, spacedelim=false, delim=Nullable{Char}(),
-               output_type=fieldtype(inner))
+                  eoldelim=false, spacedelim=false, delim=Nullable{Char}())
     T = fieldtype(inner)
     Field{T,S}(inner, ignore_init_whitespace, ignore_end_whitespace,
+               eoldelim, spacedelim, delim)
+end
+
+function Field(f::Field; inner=f.inner, ignore_init_whitespace=f.ignore_init_whitespace,
+                  ignore_end_whitespace=f.ignore_end_whitespace,
+                  eoldelim=f.eoldelim, spacedelim=f.spacedelim, delim=f.delim)
+    T = fieldtype(inner)
+    Field{T,typeof(inner)}(inner, ignore_init_whitespace, ignore_end_whitespace,
                eoldelim, spacedelim, delim)
 end
 

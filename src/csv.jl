@@ -94,14 +94,15 @@ function _csvread(str::AbstractString, delim=',';
         merged_colnames = colnames
     end
 
-    @time guess, pos1 = guesscolparsers(str, merged_colnames, opts, pos, type_detect_rows, colparsers,
+    guess, pos1 = guesscolparsers(str, merged_colnames, opts, pos, type_detect_rows, colparsers,
                           dateformats, datetimeformats)
 
     for (i, v) in enumerate(guess)
         guess[i] = tofield(v, opts)
     end
 
-    guess[end].eoldelim = true # the last one is delimited by line end
+    # the last field is delimited by line end
+    guess[end] = Field(guess[end]; eoldelim = true)
     rec = Record((guess...,))
     current_record[] = rec
 

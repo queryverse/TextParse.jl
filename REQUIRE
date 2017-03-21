@@ -2,4 +2,3 @@ julia 0.5
 NullableArrays
 PooledArrays
 WeakRefStrings
-QuickTypes
