@@ -133,12 +133,12 @@ function _csvread(str::AbstractString, delim=',';
             # figure out a new token type
             newtoken = guesstoken(failed_text, field.inner)
 
-            if debug[]
-                if string(field.inner) == string(newtoken)
-                    println(STDERR, "Could not determine which type to promote column to.")
-                    rethrow(err)
-                end
+            if field.inner == newtoken
+                println(STDERR, "Could not determine which type to promote column to.")
+                rethrow(err)
+            end
 
+            if debug[]
                 println(STDERR, "Converting column $(err.colno) to type $(newtoken) from $(field.inner) because it seems to have a different type:")
                 println(STDERR, showerrorchar(str, err.pos, 100))
             end
@@ -147,7 +147,7 @@ function _csvread(str::AbstractString, delim=',';
                 promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
             catch err2
                 if debug[]
-                    retrhow(err2)
+                    rethrow(err2)
                     Base.showerror(STDERR, err)
                 else
                     rethrow(err)
@@ -170,6 +170,11 @@ function _csvread(str::AbstractString, delim=',';
 
             colsvec = Any[cols...]
             failcol = cols[err.colno]
+
+            if debug[]
+                println(STDERR, "Pool too crowded. $(length(failcol.pool)) unique out of $(length(failcol)). Promoting to array of string")
+            end
+
             @assert isa(failcol, PooledArray)
             # promote to a dense array
             newcol = Array(failcol)
@@ -186,6 +191,9 @@ function _csvread(str::AbstractString, delim=',';
             # promote refs to a wider integer type
             colsvec = Any[cols...]
             failcol = cols[err.colno]
+            if debug[]
+                println(STDERR, "Pool overflow.")
+            end
             @assert isa(failcol, PooledArray)
             T = widen(eltype(failcol.refs))
             newrefs = convert(Array{T}, failcol.refs)
