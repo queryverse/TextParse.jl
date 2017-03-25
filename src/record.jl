@@ -12,7 +12,7 @@ end
 if VERSION >= v"0.6.0-dev"
     eval(parse("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}"))
 else
-    typealias RecN{N,U} Record{NTuple{N}, U}
+    const RecN{N,U} = Record{NTuple{N}, U}
 end
 
 @generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len, opts=default_opts)

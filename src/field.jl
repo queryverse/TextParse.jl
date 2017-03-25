@@ -2,7 +2,9 @@ import Base.show
 
 export CustomParser, Quoted
 
-abstract AbstractToken{T}
+using Compat
+
+@compat abstract type AbstractToken{T} end
 fieldtype{T}(::AbstractToken{T}) = T
 fieldtype{T}(::Type{AbstractToken{T}}) = T
 fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
@@ -427,7 +429,7 @@ fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
 
 ### Field parsing
 
-abstract AbstractField{T} <: AbstractToken{T} # A rocord is a collection of abstract fields
+@compat abstract type AbstractField{T} <: AbstractToken{T} end # A rocord is a collection of abstract fields
 
 immutable Field{T,S<:AbstractToken} <: AbstractField{T}
     inner::S

@@ -1,7 +1,9 @@
+using Compat
+
 immutable IRef{T}
     value::T
-    IRef() = new()
-    IRef(value) = new(value)
+    @compat (::Type{IRef{T}}){T}() = new{T}()
+    @compat (::Type{IRef{T}}){T}(value) = new{T}(value)
 end
 
 function Base.show(io::IO, r::IRef)
@@ -16,10 +18,10 @@ immutable Result{T,S}
     issuccess::Bool
     value::IRef{T}
     error::IRef{S}
-    function Result(issuccess, val)
+    function (::Type{Result{T,S}}){T,S}(issuccess, val)
         issuccess ?
-            new(issuccess, IRef{T}(val), IRef{S}()) :
-            new(issuccess, IRef{T}(), IRef{S}(val))
+            new{T,S}(issuccess, IRef{T}(val), IRef{S}()) :
+            new{T,S}(issuccess, IRef{T}(), IRef{S}(val))
     end
 end
 
