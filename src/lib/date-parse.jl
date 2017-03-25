@@ -1,33 +1,24 @@
+# This file is a part of Julia. License is MIT: http://julialang.org/license
+
 ### Parsing utilities
 
-if (!isdefined(Base, :unsafe_get))
-    unsafe_get(x::Nullable) = x.value
-else
-    import Base: unsafe_get
+_directives{S,T}(::Type{DateFormat{S,T}}) = T.parameters
+
+character_codes{S,T}(df::Type{DateFormat{S,T}}) = character_codes(_directives(df))
+function character_codes(directives::SimpleVector)
+    letters = sizehint!(Char[], length(directives))
+    for (i, directive) in enumerate(directives)
+        if directive <: DatePart
+            letter = first(directive.parameters)
+            push!(letters, letter)
+        end
+    end
+    return letters
 end
 
+genvar(t::DataType) = Symbol(lowercase(string(datatype_name(t))))
 
 include("date-tryparse-internal.jl")
-
-function Base.tryparse{T<:TimeType}(::Type{T}, str::AbstractString, df::DateFormat)
-    nt,_ = tryparse_internal(T, str, df, start(str), endof(str), false)
-    if isnull(nt)
-        return Nullable{T}()
-    else
-        return Nullable{T}(T(unsafe_get(nt)...))
-    end
-end
-
-default_format(::Type{Date}) = ISODateFormat
-default_format(::Type{DateTime}) = ISODateTimeFormat
-
-function Base.parse{T<:TimeType}(::Type{T},
-                                 str::AbstractString,
-                                 df::DateFormat)
-    nt, _ = tryparse_internal(T, str, df, start(str), endof(str), true)
-    T(unsafe_get(nt)...)
-end
-
 @inline function tryparsenext_base10(str::AbstractString, i::Int, len::Int, min_width::Int=1, max_width::Int=0)
     i > len && (return Nullable{Int64}(), i)
     min_pos = min_width <= 0 ? i : i + min_width - 1
@@ -133,4 +124,50 @@ function Base.parse(::Type{DateTime}, s::AbstractString, df::typeof(ISODateTimeF
 
     @label error
     throw(ArgumentError("Invalid DateTime string"))
+end
+
+function Base.parse{T<:TimeType}(
+    ::Type{T}, str::AbstractString, df::DateFormat=default_format(T),
+)
+    pos, len = start(str), endof(str)
+    values, pos = tryparsenext_internal(T, str, pos, len, df, true)
+    T(unsafe_get(values)...)
+end
+
+function Base.tryparse{T<:TimeType}(
+    ::Type{T}, str::AbstractString, df::DateFormat=default_format(T),
+)
+    pos, len = start(str), endof(str)
+    values, pos = tryparsenext_internal(T, str, pos, len, df, false)
+    if isnull(values)
+        Nullable{T}()
+    else
+        Nullable{T}(T(unsafe_get(values)...))
+    end
+end
+
+"""
+    parse_components(str::AbstractString, df::DateFormat) -> Array{Any}
+
+Parse the string into its components according to the directives in the DateFormat.
+Each component will be a distinct type, typically a subtype of Period. The order of the
+components will match the order of the `DatePart` directives within the DateFormat. The
+number of components may be less than the total number of `DatePart`.
+"""
+@generated function parse_components(str::AbstractString, df::DateFormat)
+    letters = character_codes(df)
+    tokens = Type[CONVERSION_SPECIFIERS[letter] for letter in letters]
+
+    quote
+        pos, len = start(str), endof(str)
+        values, pos, num_parsed = tryparsenext_core(str, pos, len, df, true)
+        t = unsafe_get(values)
+        types = $(Expr(:tuple, tokens...))
+        result = Vector{Any}(num_parsed)
+        for (i, typ) in enumerate(types)
+            i > num_parsed && break
+            result[i] = typ(t[i])  # Constructing types takes most of the time
+        end
+        return result
+    end
 end

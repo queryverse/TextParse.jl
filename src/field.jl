@@ -341,7 +341,7 @@ end
 
 function tryparsenext{T}(dt::DateTimeToken{T}, str, i, len, opts)
     R = Nullable{T}
-    nt, i = tryparse_internal(T, str, dt.format, i, len, opts.endchar)
+    nt, i = tryparsenext_internal(T, str, i, len, dt.format, opts.endchar)
     if isnull(nt)
         return R(), i
     else
