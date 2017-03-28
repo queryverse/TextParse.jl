@@ -1,6 +1,6 @@
 using Documenter, TextParse
 
 deploydocs(
-    repo = "github.com/shashi/TextParse.jl.git",
+    repo = "github.com/JuliaComputing/TextParse.jl.git",
     deps   = Deps.pip("mkdocs"),
 )

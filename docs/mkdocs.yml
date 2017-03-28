@@ -1,7 +1,7 @@
 site_name:        TextParse.jl
-repo_url:         https://github.com/shashi/TextParse.jl
+repo_url:         https://github.com/JuliaComputing/TextParse.jl
 site_description: Fast text parsing utilities
-site_author:      shashi
+site_author:      JuliaComputing
 
 theme: readthedocs
 

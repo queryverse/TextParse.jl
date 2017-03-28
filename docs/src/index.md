@@ -8,7 +8,7 @@ TextParse uses Julia's generated functions to generate efficient specialized par
 ## Installation
 
 ```
-Pkg.clone("https://github.com/shashi/TextParse.jl.git")
+Pkg.clone("https://github.com/JuliaComputing/TextParse.jl.git")
 ```
 
 ## Reading CSV
