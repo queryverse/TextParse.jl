@@ -9,6 +9,14 @@ fieldtype{T}(::AbstractToken{T}) = T
 fieldtype{T}(::Type{AbstractToken{T}}) = T
 fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
 
+"""
+`tryparsenext{T}(tok::AbstractToken{T}, str, i, till, localopts)`
+
+Parses the string `str` starting at position `i` and ending at or before position `till`. `localopts` is a [LocalOpts](@ref) object which contains contextual options for quoting and NA parsing. (see [LocalOpts](@ref) documentation)
+
+`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Nullable{T}`, null if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
+"""
+function tryparsenext end
 
 ## options passed down for tokens (specifically NAToken, StringToken)
 ## inside a Quoted token
@@ -49,6 +57,9 @@ function tryparsenext(::Unknown, str, i, len, opts)
     Nullable{Void}(nothing), i
 end
 show(io::IO, ::Unknown) = print(io, "<unknown>")
+immutable CustomParser{T, F} <: AbstractToken{T}
+    f::Function
+end
 
 """
     CustomParser(f, T)
@@ -69,12 +80,8 @@ The parser function must take the following arguments:
 The parser function must return a tuple of two values:
 
 - `result`: A `Nullable{T}`. Set to null if parsing must fail, containing the value otherwise.
-- `nextpos`: If parsing succeeded this must be the next position after parsing finished, if it failed
-             This must be the position at which parsing failed.
+- `nextpos`: If parsing succeeded this must be the next position after parsing finished, if it failed this must be the position at which parsing failed.
 """
-immutable CustomParser{T, F} <: AbstractToken{T}
-    f::Function
-end
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
 
 show{T}(io::IO, c::CustomParser{T}) = print(io, "{{custom:$T}}")
@@ -85,6 +92,9 @@ end
 
 
 # Numberic parsing
+"""
+parse numbers of type T
+"""
 immutable Numeric{T} <: AbstractToken{T}
     decimal::Char
     thousands::Char
@@ -147,6 +157,11 @@ end
     return R(), i
 end
 
+"""
+Parses string to the AbstractString type `T`. If `T` is `StrRange` returns a
+`StrRange` with start position (`offset`) and `length` of the substring.
+It is used internally by `csvparse` for avoiding allocating strings.
+"""
 immutable StringToken{T} <: AbstractToken{T}
 end
 
@@ -259,6 +274,17 @@ function show(io::IO, q::Quoted)
     print(io, "$c")
 end
 
+"""
+`Quoted(inner::AbstractToken; <kwargs>...)`
+
+# Arguments:
+- `inner`: The token inside quotes to parse
+- `required`: are quotes required for parsing to succeed? defaults to `false`
+- `includequotes`: include the quotes in the output. Defaults to `false`
+- `includenewlines`: include newlines that appear within quotes. Defaults to `true`
+- `quotechar`: character to use to quote (default decided by `LocalOpts`)
+- `escapechar`: character that escapes the quote char (default set by `LocalOpts`)
+"""
 function Quoted{S<:AbstractToken}(inner::S;
     required=false,
     includequotes=false,
@@ -327,6 +353,13 @@ end
 immutable DateTimeToken{T,S<:DateFormat} <: AbstractToken{T}
     format::S
 end
+
+"""
+    DateTimeToken(T, fmt::DateFormat)
+
+Parse a date time string of format `fmt` into type `T` which is
+either `Date`, `Time` or `DateTime`.
+"""
 DateTimeToken{S<:DateFormat}(T::Type, df::S) = DateTimeToken{T, S}(df)
 DateTimeToken{S<:DateFormat}(df::S) = DateTimeToken{DateTime, S}(df)
 fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
@@ -366,6 +399,16 @@ immutable NAToken{T, S<:AbstractToken} <: AbstractToken{T}
     nastrings::Vector{String}
 end
 
+"""
+`NAToken(inner::AbstractToken; options...)`
+
+Parses a Nullable item.
+
+# Arguments
+- `inner`: the token to parse if non-null.
+- `emptyisna`: should an empty item be considered NA? defaults to true
+- `nastrings`: strings that are to be considered NA. Defaults to $NA_STRINGS
+"""
 function NAToken{S}(
     inner::S,
   ; emptyisna=true

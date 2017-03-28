@@ -1,0 +1,5 @@
+.*~
+.*.sw?
+*.mem
+docs/build/
+docs/site/

@@ -34,25 +34,24 @@ tofield(f::Type, opts) = tofield(fromtype(f), opts)
 tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
 
 """
-    csvread(file::IO, delim=',';
-            quotechar='"',
-            escapechar='\\',
-            dateformat=ISODateTimeFormat,
-            pooledstrings=true,
-            header_exists=true,
-            colnames=Dict(),
-            colparsers=Dict(),
-            type_detect_rows=20)
+    csvread(file::Union{String,IO}, delim=','; <arguments>...)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
 1. A tuple of columns each as a Vector or NullableArray
-2. column names if header_exists=true
+2. column names if header_exists=true, empty string array otherwise
 
-Notes:
-- `type_detect_rows` is the number of rows used to detect the type
-  of the column. If the column changes type later, you must specify
-  the right type in `colparsers`
-- Empty lines will be ignored
+# Arguments:
+
+- `file`: either an IO object or file name string
+- `delim`: the delimiter character
+- `quotechar`: character used to quote strings, defaults to `"`
+- `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
+- `pooledstrings`: whether to try and create PooledArray of strings
+- `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
+- `header_exists`: boolean specifying whether CSV file contains a header
+- `colnames`: manually specified column names. Could be a vector or a dictionary from Int index (the column) to String column name.
+- `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior
+- `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
 """
 function csvread(file::String, delim=','; kwargs...)
     open(file, "r") do io
