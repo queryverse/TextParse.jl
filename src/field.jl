@@ -407,7 +407,7 @@ Parses a Nullable item.
 # Arguments
 - `inner`: the token to parse if non-null.
 - `emptyisna`: should an empty item be considered NA? defaults to true
-- `nastrings`: strings that are to be considered NA. Defaults to $NA_STRINGS
+- `nastrings`: strings that are to be considered NA. Defaults to `$NA_STRINGS`
 """
 function NAToken{S}(
     inner::S,

@@ -37,8 +37,8 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
-1. A tuple of columns each as a Vector or NullableArray
-2. column names if header_exists=true, empty string array otherwise
+1. A tuple of columns each either a `Vector`, `NullableArray` or `PooledArray`
+2. column names if `header_exists=true`, empty array otherwise
 
 # Arguments:
 
