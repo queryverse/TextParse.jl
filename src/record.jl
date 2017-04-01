@@ -9,10 +9,10 @@ function Record{T<:Tuple}(t::T)
 end
 
 # for dispatch on N
-if VERSION >= v"0.6.0-dev"
-    eval(parse("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}"))
+if VERSION >= v"0.6.0-dev.2123" # new type system, julia PR #18457
+    include_string("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
 else
-    eval(parse("typealias RecN{N,U} Record{NTuple{N}, U}"))
+    include_string("typealias RecN{N,U} Record{NTuple{N}, U}")
 end
 
 @generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len, opts=default_opts)
