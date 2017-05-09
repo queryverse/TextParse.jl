@@ -12,22 +12,6 @@ define the tryparsenext and format methods.
 @compat abstract type AbstractDateToken end
 
 """
-    tryparsenext(tok::AbstractDateToken, str::String, i::Int, len::Int, locale::DateLocale)
-
-`tryparsenext` parses for the `tok` token in `str` starting at index `i`.
-`len` is the length of the string.  parsing can be optionally based on the
-`locale`. If a `tryparsenext` method does not need a locale, it can leave
-the argument out in the method definition.
-
-Returns a tuple of 2 elements `(res, idx)`, where:
-
-* `res` is a `Nullable{T}` - the result of the parsing, null if parsing failed.
-* `idx` is an `Int` - if parsing failed, the index at which it failed; if
-   parsing succeeded, `idx` is the index _after_ the index at which parsing ended.
-"""
-function tryparsenext end
-
-"""
     format(io::IO, tok::AbstractDateToken, dt::TimeType, locale)
 
 Format the `tok` token from `dt` and write it to `io`. The formatting can
