@@ -194,3 +194,6 @@ function getlineat(str, i)
     line_start:line_end
 end
 
+_widen(::Type{UInt8}) = UInt16 # fix for bad Base behavior
+_widen(::Type{Int8}) = Int16
+_widen(T) = widen(T)

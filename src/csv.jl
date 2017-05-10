@@ -194,7 +194,7 @@ function _csvread(str::AbstractString, delim=',';
                 println(STDERR, "Pool overflow.")
             end
             @assert isa(failcol, PooledArray)
-            T = widen(eltype(failcol.refs))
+            T = _widen(eltype(failcol.refs))
             newrefs = convert(Array{T}, failcol.refs)
             newcol = PooledArray(PooledArrays.RefArray(newrefs), failcol.pool)
             colsvec[err.colno] = newcol

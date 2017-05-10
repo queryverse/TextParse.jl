@@ -368,7 +368,7 @@ using PooledArrays
     xs = [randstring(10) for i=1:300]
     col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test isa(col, PooledArray)
-    @test eltype(col.refs) == widen(UInt8)
+    @test eltype(col.refs) == UInt16
     @test xs == col
 
     # test promotion to a dense array
