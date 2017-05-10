@@ -61,7 +61,7 @@ end
 
 function csvread(file::IO, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
-    _csvread(String(mmap_data), delim; kwargs...)
+    _csvread(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
 end
 
 # read CSV in a string
@@ -310,7 +310,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     guess, pos
 end
 
-function parsefill!{N}(str::String, opts, rec::RecN{N}, nrecs, cols,
+function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
                        pos, lineno, rowno, l=endof(str))
     sizemargin = sqrt(2)
     while true

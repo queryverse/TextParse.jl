@@ -245,7 +245,7 @@ end
 fromtype(::Type{StrRange}) = StringToken(StrRange)
 
 @inline function alloc_string(str, r::StrRange)
-    unsafe_string(pointer(str, 1+r.offset), r.length)
+    unsafe_string(_pointer(str, 1+r.offset), r.length)
 end
 
 @inline function _substring(::Type{StrRange}, str, i, j)

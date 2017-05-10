@@ -160,8 +160,11 @@ end
 using WeakRefStrings
 using PooledArrays
 
+_pointer(x::WeakRefString, n) = x.ptr + n - 1
+_pointer(x::String, n) = pointer(x, n)
+
 @inline function nonallocating_setindex!{T}(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString)
-    wstr = WeakRefString(pointer(str, 1+rng.offset), rng.length)
+    wstr = WeakRefString(_pointer(str, 1+rng.offset), rng.length)
     pool_idx = findfirst(pa.pool, wstr)
     if pool_idx <= 0
         # allocate only here.
