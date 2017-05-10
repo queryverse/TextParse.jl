@@ -165,8 +165,8 @@ _pointer(x::String, n) = pointer(x, n)
 
 @inline function nonallocating_setindex!{T}(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString)
     wstr = WeakRefString(_pointer(str, 1+rng.offset), rng.length)
-    pool_idx = findfirst(pa.pool, wstr)
-    if pool_idx <= 0
+    pool_idx = searchsortedfirst(pa.pool, wstr)
+    if pool_idx > length(pa.pool) || pa.pool[pool_idx] != wstr
         # allocate only here.
         val = convert(T,alloc_string(str, rng))
         pool_idx = PooledArrays.unsafe_pool_push!(pa, val)
