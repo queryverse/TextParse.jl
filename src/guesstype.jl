@@ -85,8 +85,16 @@ function guesstoken(x, prev_guess::ANY=Unknown())
     else
         # x is neither quoted, nor null,
         # prev_guess is not a NAToken or a StringToken
+        ispercent = strip(x)[end] == '%'
+        if ispercent
+            x = x[1:end-1]
+        end
         if !isnull(tryparse(Int, x)) || !isnull(tryparse(Float64, x))
             T = isnull(tryparse(Int, x)) ? Float64 : Int
+
+            if ispercent
+                return Percentage()
+            end
 
             if prev_guess == Unknown()
                 return Numeric(T)

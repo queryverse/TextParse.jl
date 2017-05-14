@@ -22,7 +22,7 @@ import TextParse: getlineend
 end
 
 
-import TextParse: fromtype
+import TextParse: fromtype, Percentage
 @testset "Float parsing" begin
 
     @test tryparsenext(fromtype(Float64), "1", 1, 1) |> unwrap == (1.0, 2)
@@ -33,6 +33,8 @@ import TextParse: fromtype
     @test tryparsenext(fromtype(Float64), "-1.1", 1, 4) |> unwrap == (-1.1,5)
     @test tryparsenext(fromtype(Float64), "-1.0e-12", 1, 8) |> unwrap == (-1.0e-12,9)
     @test tryparsenext(fromtype(Float64), "-1.0E-12", 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(Percentage(), "33%") |> unwrap == (.33,4)
+    @test tryparsenext(Percentage(), "3.3%") |> unwrap == (.033,5)
 end
 
 
@@ -208,6 +210,7 @@ import TextParse: guesstoken, Unknown, Numeric, DateTimeToken, StrRange
     @test guesstoken("1", NAToken(Unknown())) == NAToken(Numeric(Int))
     @test guesstoken("1", NAToken(Numeric(Int))) == NAToken(Numeric(Int))
     @test guesstoken("", NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+    @test guesstoken("1%", NAToken(Unknown())) == NAToken(Percentage())
 
     # Test non-null numeric
     @test guesstoken("1", Unknown()) == Numeric(Int)

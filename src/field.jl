@@ -157,6 +157,26 @@ end
     return R(), i
 end
 
+immutable Percentage <: AbstractToken{Float64}
+end
+
+const floatparser = Numeric(Float64)
+function tryparsenext(::Percentage, str, i, len, opts)
+    num, ii = tryparsenext(floatparser, str, i, len, opts)
+    if isnull(num)
+        return num, ii
+    else
+        # parse away the % char
+        ii = eatwhitespaces(str, ii, len)
+        c, k = next(str, ii)
+        if c != '%'
+            return Nullable{Float64}(), ii # failed to parse %
+        else
+            return Nullable{Float64}(num.value / 100.0), k # the point after %
+        end
+    end
+end
+
 """
 Parses string to the AbstractString type `T`. If `T` is `StrRange` returns a
 `StrRange` with start position (`offset`) and `length` of the substring.
