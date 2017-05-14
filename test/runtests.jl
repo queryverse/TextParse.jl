@@ -352,6 +352,11 @@ import TextParse: _csvread
     x,1,1,1
     """
     @test_throws TextParse.CSVParseError _csvread(str3, type_detect_rows=1)
+
+    # test growing of columns if prediction is too low
+    @test TextParse._csvread("x,y\nabcd, defg\n,\n,\n", type_detect_rows=1) ==
+        ((String["abcd", "", ""], String["defg", "", ""]), String["x", "y"])
+
 end
 
 using PooledArrays

@@ -338,7 +338,7 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
         if rowno > nrecs
             # grow
             sizemargin = (sizemargin-1.0)/2 + 1.0
-            nrecs = ceil(Int, pos/rowno * sizemargin) # updated estimate
+            nrecs = ceil(Int, (endof(str) / pos) * rowno * sizemargin) # updated estimate
             growcols(cols, nrecs)
         end
     end
