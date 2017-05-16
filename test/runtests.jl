@@ -32,6 +32,7 @@ import TextParse: fromtype, Percentage
     @test tryparsenext(fromtype(Float32), "1.", 1, 2) |> unwrap == (1f0,3)
     @test tryparsenext(fromtype(Float64), "-1.1", 1, 4) |> unwrap == (-1.1,5)
     @test tryparsenext(fromtype(Float64), "-1.0e-12", 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(fromtype(Float64), "-1e-12") |> unwrap == (-1.0e-12,7)
     @test tryparsenext(fromtype(Float64), "-1.0E-12", 1, 8) |> unwrap == (-1.0e-12,9)
     @test tryparsenext(Percentage(), "33%") |> unwrap == (.33,4)
     @test tryparsenext(Percentage(), "3.3%") |> unwrap == (.033,5)
