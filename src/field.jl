@@ -275,7 +275,7 @@ end
 end
 
 @inline function _substring(::Type{WeakRefString}, str, i, j)
-    WeakRefString(pointer(str, i), j-i+1)
+    WeakRefString(_pointer(str, i), j-i+1)
 end
 
 export Quoted
