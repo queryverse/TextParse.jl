@@ -48,6 +48,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
 - `pooledstrings`: whether to try and create PooledArray of strings
 - `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
+- `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
 - `colnames`: manually specified column names. Could be a vector or a dictionary from Int index (the column) to String column name.
 - `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior
@@ -72,6 +73,7 @@ function _csvread(str::AbstractString, delim=',';
                  datetimeformats=common_datetime_formats,
                  pooledstrings=true,
                  nrows=0,
+                 skiplines_begin=0,
                  header_exists=true,
                  colnames=String[],
                  #ignore_empty_rows=true,
@@ -86,6 +88,12 @@ function _csvread(str::AbstractString, delim=',';
 
     pos, lines = eatnewlines(str, pos)
     lineno += lines
+    while lineno < skiplines_begin
+        pos = getlineend(str, pos)
+        _, pos = next(str, pos)
+        pos, lines = eatnewlines(str, pos)
+        lineno += lines
+    end
     if header_exists
         merged_colnames, pos = readcolnames(str, opts, pos, colnames)
         lineno += 1

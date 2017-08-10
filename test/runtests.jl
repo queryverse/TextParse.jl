@@ -366,6 +366,17 @@ import TextParse: _csvread
 
 end
 
+@testset "skiplines_begin" begin
+    str1 = """
+    hello
+
+    world
+    x,y,z
+    1,1,1
+    """
+    @test _csvread(str1, skiplines_begin=3) == (([1], [1], [1]), String["x", "y","z"])
+end
+
 using PooledArrays
 
 @testset "pooled array promotion" begin
