@@ -8,7 +8,7 @@ optionsiter(opts::Associative) = opts
 optionsiter(opts::AbstractVector) = enumerate(opts)
 
 getbyheader(opts, header, i::Int) = opts[i]
-getbyheader(opts, header, i::Symbol) = getcol(opts, header, string(i))
+getbyheader(opts, header, i::Symbol) = getbyheader(opts, header, string(i))
 function getbyheader(opts, header, i::AbstractString)
     if !(i in header)
         throw(ArgumentError("Unknown column $i"))
