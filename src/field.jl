@@ -538,7 +538,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len, opts)
     if f.ignore_init_whitespace
         while i <= len
             @inbounds c, ii = next(str, i)
-            !iswhitespace(c) && break
+            !isspace(c) && break
             i = ii
         end
     end
@@ -548,7 +548,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len, opts)
         i0 = i
         while i <= len
             @inbounds c, ii = next(str, i)
-            !iswhitespace(c) && break
+            !isspace(c) && break
             i = ii
             delim(f, opts) == '\t' && c == '\t' && @goto done
         end
@@ -566,7 +566,7 @@ function tryparsenext{T}(f::Field{T}, str, i, len, opts)
 
     @inbounds c, ii = next(str, i)
     delim(f, opts) == c && (i=ii; @goto done)
-    f.spacedelim && iswhitespace(c) && (i=ii; @goto done)
+    f.spacedelim && isspace(c) && (i=ii; @goto done)
 
     if f.eoldelim
         if c == '\r'

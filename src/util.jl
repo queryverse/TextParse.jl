@@ -69,8 +69,8 @@ end
     end
 end
 
-@inline function iswhitespace(c::Char)
-    c == ' ' || c == '\t'
+@inline function isspace(c::Char)
+    c == ' '
 end
 
 @inline function isnewline(c::Char)
@@ -80,7 +80,7 @@ end
 @inline function eatwhitespaces(str, i=1, l=endof(str))
     while i <= l
         c, ii = next(str, i)
-        if iswhitespace(c)
+        if isspace(c)
             i=ii
         else
             break
