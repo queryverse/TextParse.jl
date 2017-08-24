@@ -107,6 +107,10 @@ import TextParse: Quoted, NAToken, Unknown
     @test isnull(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
     opts = LocalOpts(',', '"', '"', false, false)
     @test tryparsenext(Quoted(StringToken(String)), "x,", opts) |> unwrap == ("x", 2)
+
+    # stripspaces
+    @test tryparsenext(Quoted(Percentage()), "\" 10%\",", opts) |> unwrap == (0.1, 7)
+    @test tryparsenext(Quoted(String), "\" 10%\",", opts) |> unwrap == (" 10%", 7)
 end
 
 @testset "NA parsing" begin

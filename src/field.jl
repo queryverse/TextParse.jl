@@ -283,6 +283,7 @@ export Quoted
 immutable Quoted{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
     required::Bool
+    stripwhitespaces::Bool
     includequotes::Bool
     includenewlines::Bool
     quotechar::Nullable{Char}
@@ -309,13 +310,14 @@ end
 """
 function Quoted{S<:AbstractToken}(inner::S;
     required=false,
+    stripwhitespaces=fieldtype(S)<:Number,
     includequotes=false,
     includenewlines=true,
     quotechar=Nullable{Char}(),   # This is to allow file-wide config
     escapechar=Nullable{Char}())
 
     T = fieldtype(S)
-    Quoted{T,S}(inner, required, includequotes,
+    Quoted{T,S}(inner, required, stripwhitespaces, includequotes,
                 includenewlines, quotechar, escapechar)
 end
 
@@ -338,6 +340,10 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
         if !q.includequotes
             i = ii
         end
+
+        if q.stripwhitespaces
+            i = eatwhitespaces(str, i)
+        end
     else
         q.required && @goto error
     end
@@ -356,8 +362,12 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
         end
         @goto done
     end
+
+    if q.stripwhitespaces
+        i = eatwhitespaces(str, i)
+    end
     c, ii = next(str, i)
-    # TODO: eat up whitespaces?
+
     if quotestarted && !q.includequotes
         c != quotechar(q, opts) && @goto error
         i = ii
