@@ -220,7 +220,7 @@ function _csvread(str::AbstractString, delim=',';
 end
 
 function promote_column(col, rowno, T, inner=false)
-    if typeof(col) <: NullableArray{Void}
+    if typeof(col) <: NullableArray{Union{}}
         if T <: StringLike
             arr = Array{String, 1}(length(col))
             for i = 1:rowno-1
@@ -229,9 +229,9 @@ function promote_column(col, rowno, T, inner=false)
             return arr
         elseif T <: Nullable
             NullableArray(Array{eltype(T)}(length(col)), zeros(Bool, length(col)))
-      else
-          error("empty to non-nullable")
-      end
+        else
+            error("empty to non-nullable")
+        end
     elseif T <: Nullable
         if !isa(col, NullableArray)
             isnullarray = Array{Bool}(length(col))
@@ -365,7 +365,7 @@ end
 function makeoutputvec(str, eltyp, N, pooledstrings)
     if fieldtype(eltyp) == Nullable{Union{}} # we weren't able to detect the type,
                                          # all columns were blank
-        NullableArray{Void}(N)
+        NullableArray{Union{}}(N)
     elseif fieldtype(eltyp) == StrRange
       # By default we put strings in a PooledArray
       if pooledstrings

@@ -69,6 +69,10 @@ end
     PARSE_SUCCESS
 end
 
+@inline function setcell!(col::NullableArray{Union{}}, i, val::Void, str)
+    PARSE_SUCCESS
+end
+
 const MAX_POOL_FRACTION = 0.05
 const ROWS_BEFORE_CROWDING = 400
 @inline function setcell!{R}(col::PooledArray{String,R}, i, val::StrRange, str)
