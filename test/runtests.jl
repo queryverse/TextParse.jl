@@ -379,6 +379,8 @@ import TextParse: _csvread
     res = (([1, 2, 1], [1, 2, 2], String["x", "x", "x \"\"y\"\""]), String["x", "y", "z"])
     @test _csvread(s, type_detect_rows=1, escapechar='"') == res
     @test _csvread(s, type_detect_rows=2, escapechar='"') == res
+
+    @test csvread(IOBuffer("x\n1")) == (([1],),["x"])
 end
 
 @testset "skiplines_begin" begin
