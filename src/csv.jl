@@ -30,6 +30,8 @@ optionsiter(opts::AbstractVector, header) = optionsiter(opts)
 tofield(f::AbstractField, opts) = f
 tofield(f::AbstractToken, opts) =
     Field(f, delim=opts.endchar)
+tofield(f::StringToken, opts) =
+    Field(Quoted(f), delim=opts.endchar)
 tofield(f::Type, opts) = tofield(fromtype(f), opts)
 tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
 

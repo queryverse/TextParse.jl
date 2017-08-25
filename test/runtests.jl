@@ -368,6 +368,17 @@ import TextParse: _csvread
     @test TextParse._csvread("x,y\nabcd, defg\n,\n,\n", type_detect_rows=1) ==
         ((String["abcd", "", ""], String["defg", "", ""]), String["x", "y"])
 
+    # #19
+    s="""
+    x,y,z
+    1,1,x
+    "2",2,x
+    1,2,"x \"\"y\"\""
+    """
+
+    res = (([1, 2, 1], [1, 2, 2], String["x", "x", "x \"\"y\"\""]), String["x", "y", "z"])
+    @test _csvread(s, type_detect_rows=1, escapechar='"') == res
+    @test _csvread(s, type_detect_rows=2, escapechar='"') == res
 end
 
 @testset "skiplines_begin" begin
