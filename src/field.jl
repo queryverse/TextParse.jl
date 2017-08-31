@@ -49,6 +49,17 @@ end
     tryparsenext(tok, str, i, len)
 end
 
+immutable WrapLocalOpts{T, X<:AbstractToken} <: AbstractToken{T}
+    opts::LocalOpts
+    inner::X
+end
+
+WrapLocalOpts(opts, inner) = WrapLocalOpts{fieldtype(inner), typeof(inner)}(opts, inner)
+
+@inline function tryparsenext(tok::WrapLocalOpts, str, i, len, opts::LocalOpts=default_opts)
+    tryparsenext(tok.inner, str, i, len, tok.opts)
+end
+
 
 # needed for promoting guessses
 immutable Unknown <: AbstractToken{Union{}} end

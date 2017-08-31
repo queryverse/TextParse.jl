@@ -143,11 +143,24 @@ function _csvread(str::AbstractString, delim=',';
 
             rng = getlineat(str, err.fieldpos)
             f, l = first(rng), last(rng)
-            if err.pos >= l && !err.rec.fields[err.colno].eoldelim
+            field = rec.fields[err.colno]
+
+            if err.pos >= l && !field.eoldelim
+                if fieldtype(field) <: AbstractString || fieldtype(field) <: StrRange
+                    # retry assuming newlines can be part of the field
+                    wopts = LocalOpts(opts.endchar, opts.quotechar, opts.escapechar, opts.includequotes, true)
+                    fieldsvec = Any[rec.fields...]
+                    fieldsvec[err.colno] = swapinner(field, WrapLocalOpts(wopts, field.inner))
+                    rec = Record((fieldsvec...))
+                    pos = f
+                    rowno = err.rowno
+                    lineno = err.lineno
+                    @goto retry
+                end
                 println(STDERR, "Expected another field on row $(err.rowno) (line $(err.lineno))")
                 rethrow(err)
             end
-            field = rec.fields[err.colno]
+
             failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
             # figure out a new token type
             newtoken = guesstoken(failed_text, field.inner)
