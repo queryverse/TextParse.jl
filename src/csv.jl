@@ -33,6 +33,7 @@ tofield(f::AbstractToken, opts) =
 tofield(f::StringToken, opts) =
     Field(Quoted(f), delim=opts.endchar)
 tofield(f::Type, opts) = tofield(fromtype(f), opts)
+tofield(f::Type{String}, opts) = tofield(fromtype(StrRange), opts)
 tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
 
 """
