@@ -339,11 +339,11 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
     while true
         prev_j = pos
         pos, lines = eatnewlines(str, pos)
-        lineno += lines + 1
+        lineno += lines
         res = tryparsesetindex(rec, str, pos, l, cols, rowno, opts)
         if !issuccess(res)
             pos, fieldpos, colno, err_code = geterror(res)
-            throw(CSVParseError(err_code, str, rec, lineno, rowno,
+            throw(CSVParseError(err_code, str, rec, lineno+1, rowno,
                                 colno, pos, fieldpos))
         else
             pos = value(res)
@@ -357,6 +357,7 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
             return cols
         end
         rowno += 1
+        lineno += 1
         if rowno > nrecs
             # grow
             sizemargin = (sizemargin-1.0)/2 + 1.0
