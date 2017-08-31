@@ -143,6 +143,10 @@ function _csvread(str::AbstractString, delim=',';
 
             rng = getlineat(str, err.fieldpos)
             f, l = first(rng), last(rng)
+            if err.pos >= l && !err.rec.fields[err.colno].eoldelim
+                println(STDERR, "Expected another field on row $(err.rowno) (line $(err.lineno))")
+                rethrow(err)
+            end
             field = rec.fields[err.colno]
             failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
             # figure out a new token type
@@ -178,6 +182,7 @@ function _csvread(str::AbstractString, delim=',';
             rec = Record((fieldsvec...))
             cols = (colsvec...)
             rowno = err.rowno
+            lineno = err.lineno
             pos = f
             @goto retry
 
@@ -199,6 +204,7 @@ function _csvread(str::AbstractString, delim=',';
 
             pos = first(rng)
             rowno = err.rowno
+            lineno = err.lineno
             cols = (colsvec...)
             @goto retry
 
@@ -219,6 +225,7 @@ function _csvread(str::AbstractString, delim=',';
             cols = (colsvec...)
             pos = first(rng)
             rowno = err.rowno
+            lineno = err.lineno
             @goto retry
         end
 
@@ -332,7 +339,7 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
     while true
         prev_j = pos
         pos, lines = eatnewlines(str, pos)
-        lineno += lines
+        lineno += lines + 1
         res = tryparsesetindex(rec, str, pos, l, cols, rowno, opts)
         if !issuccess(res)
             pos, fieldpos, colno, err_code = geterror(res)
@@ -350,7 +357,6 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
             return cols
         end
         rowno += 1
-        lineno += 1
         if rowno > nrecs
             # grow
             sizemargin = (sizemargin-1.0)/2 + 1.0
