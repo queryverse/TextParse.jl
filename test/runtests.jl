@@ -383,6 +383,16 @@ import TextParse: _csvread
     @test csvread(IOBuffer("x\n1")) == (([1],),["x"])
 
     @test _csvread("x\n1\n") == (([1],),["x"])
+
+    # test detection of newlines in fields
+    s = """x, y
+        abc, def
+        g
+        hi,jkl
+        mno,pqr
+        """
+
+    @test TextParse._csvread(s, type_detect_rows=1) == ((["abc", "g\nhi", "mno"], ["def", "jkl", "pqr"]), ["x", "y"])
 end
 
 @testset "skiplines_begin" begin
