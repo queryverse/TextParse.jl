@@ -381,6 +381,8 @@ import TextParse: _csvread
     @test _csvread(s, type_detect_rows=2, escapechar='"') == res
 
     @test csvread(IOBuffer("x\n1")) == (([1],),["x"])
+
+    @test _csvread("x\n1\n") == (([1],),["x"])
 end
 
 @testset "skiplines_begin" begin

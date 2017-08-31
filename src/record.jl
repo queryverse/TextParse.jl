@@ -41,9 +41,9 @@ const POOL_OVERFLOW = 0x03
     quote
         R = Result{Int, Tuple{Int,Int,Int,UInt8}}
         err_field = 1
-        i > len && @goto error
         ii = i
         err_code = PARSE_ERROR
+        i > len && @goto error
 
         Base.@nexprs $N j->begin
             err_field = j

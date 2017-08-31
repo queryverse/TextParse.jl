@@ -336,9 +336,10 @@ end
 function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
                        pos, lineno, rowno, l=endof(str))
     sizemargin = sqrt(2)
-    while true
+    pos, lines = eatnewlines(str, pos)
+    lineno += lines
+    pos <= l && while true
         prev_j = pos
-        pos, lines = eatnewlines(str, pos)
         lineno += lines
         res = tryparsesetindex(rec, str, pos, l, cols, rowno, opts)
         if !issuccess(res)
@@ -348,6 +349,9 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
         else
             pos = value(res)
         end
+
+        pos, lines = eatnewlines(str, pos)
+        lineno += lines
 
         if pos > l
             #shrink
