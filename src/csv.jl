@@ -399,23 +399,26 @@ end
 
 immutable CSVParseError <: Exception
     err_code
-    str
+    location_display
     rec
     lineno
     rowno
     colno
     pos
     fieldpos
+    charinline
 end
 
-function Base.showerror(io::IO, err::CSVParseError)
-    str = err.str
-    pos = err.pos
-
+function CSVParseError(e_code, str, rec, lineno, rowno, colno, pos, fieldpos)
     rng = getlineat(str, pos)
-    charinline = err.pos - first(rng)
-    err = "Parse error at line $(err.lineno) at char $charinline:\n" *
-            showerrorchar(str, pos, 100) *
+    charinline = pos - first(rng)
+    CSVParseError(e_code, showerrorchar(str, pos, 100), rec, lineno, rowno, colno, pos, fieldpos, charinline)
+end
+
+
+function Base.showerror(io::IO, err::CSVParseError)
+    err = "Parse error at line $(err.lineno) at char $(err.charinline):\n" *
+            err.location_display *
             "\nCSV column $(err.colno) is expected to be: " *
             string(err.rec.fields[err.colno])
     print(io, err)
