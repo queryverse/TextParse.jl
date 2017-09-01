@@ -1,4 +1,4 @@
-isna(x) = x == "" || x in NA_STRINGS
+isna(x, nastrings) = x == "" || x in nastrings
 
 const common_date_formats = Any[
     dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
@@ -19,11 +19,10 @@ const common_datetime_formats = Any[
 
 const DEFAULT_QUOTES = ('"', ''')
 
-function guessdateformat(str, dateformats=common_date_formats,
-                         datetimeformats=common_datetime_formats)
+function guessdateformat(str)
 
-    dts = Any[Date => d for d in dateformats]
-    dts = vcat(dts, Any[DateTime => d for d in datetimeformats])
+    dts = Any[Date => d for d in common_date_formats]
+    dts = vcat(dts, Any[DateTime => d for d in common_datetime_formats])
 
     for (typ, df) in dts
         x, len = tryparsenext_internal(typ, str, 1, endof(str), df)
@@ -46,7 +45,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, prev_guess::ANY=Unknown())
+function guesstoken(x, prev_guess::ANY=Unknown(), nastrings=NA_STRINGS)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -59,29 +58,29 @@ function guesstoken(x, prev_guess::ANY=Unknown())
         else
             prev_inner = prev_guess
         end
-        inner_token = guesstoken(strip(strip(x, q)), prev_inner)
+        inner_token = guesstoken(strip(strip(x, q)), prev_inner, nastrings)
         return Quoted(inner_token)
     elseif isa(prev_guess, Quoted)
         # but this token is not quoted
-        return Quoted(guesstoken(x, prev_guess.inner))
+        return Quoted(guesstoken(x, prev_guess.inner, nastrings))
     elseif isa(prev_guess, NAToken)
         # This column is nullable
-        if isna(x)
+        if isna(x, nastrings)
             # x is null too, return previous guess
             return prev_guess
         else
-            tok = guesstoken(x, prev_guess.inner)
+            tok = guesstoken(x, prev_guess.inner, nastrings)
             if isa(tok, StringToken)
                 return tok # never wrap a string in NAToken
             elseif isa(tok, Quoted)
                 # Always put the quoted wrapper on top
                 return Quoted(NAToken(tok.inner))
             else
-                return NAToken(tok)
+                return NAToken(tok, nastrings=nastrings)
             end
         end
-    elseif isna(x)
-        return NAToken(prev_guess)
+    elseif isna(x, nastrings)
+        return NAToken(prev_guess, nastrings=nastrings)
     else
         # x is neither quoted, nor null,
         # prev_guess is not a NAToken or a StringToken

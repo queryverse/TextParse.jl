@@ -365,7 +365,7 @@ import TextParse: _csvread
     @test_throws TextParse.CSVParseError _csvread(str3, type_detect_rows=1)
 
     # test growing of columns if prediction is too low
-    @test TextParse._csvread("x,y\nabcd, defg\n,\n,\n", type_detect_rows=1) ==
+    @test _csvread("x,y\nabcd, defg\n,\n,\n", type_detect_rows=1) ==
         ((String["abcd", "", ""], String["defg", "", ""]), String["x", "y"])
 
     # #19
@@ -392,7 +392,17 @@ import TextParse: _csvread
         mno,pqr
         """
 
-    @test TextParse._csvread(s, type_detect_rows=1) == ((["abc", "g\nhi", "mno"], ["def", "jkl", "pqr"]), ["x", "y"])
+    @test _csvread(s, type_detect_rows=1) == ((["abc", "g\nhi", "mno"], ["def", "jkl", "pqr"]), ["x", "y"])
+    # test custom na strings
+    s = """
+    x,y
+    1,2
+    ?,3
+    4,*
+    """
+    nullness = ([false, true, false], [false, false, true])
+    @test map(x->x.isnull, first(_csvread(s, nastrings=["?","*"]))) == nullness
+    @test map(x->x.isnull, first(_csvread(s, nastrings=["?","*"], type_detect_rows=1))) == nullness
 end
 
 @testset "skiplines_begin" begin
@@ -411,28 +421,28 @@ using PooledArrays
 @testset "pooled array promotion" begin
     # test default behavior
     xs = [randstring(10) for i=1:100]
-    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test isa(col, PooledArray)
     @test eltype(col.refs) == UInt8
     @test xs == col
 
     # test promotion to a widened type
     xs = [randstring(10) for i=1:300]
-    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test isa(col, PooledArray)
     @test eltype(col.refs) == UInt16
     @test xs == col
 
     # test promotion to a dense array
     xs = [randstring(10) for i=1:500]
-    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test !isa(col, PooledArray)
     @test isa(col, Array)
     @test xs == col
 
     # test non-promotion
     xs = [rand(["X", "Y"]) for i=1:500]
-    col = TextParse._csvread(join(xs, "\n"), header_exists=false)[1][1]
+    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test isa(col, PooledArray)
     @test eltype(col.refs) == UInt8
     @test xs == col

@@ -53,6 +53,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
 - `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
+- `nastrings`: strings that are to be considered NA. Defaults to `TextParse.NA_STRINGS`
 - `colnames`: manually specified column names. Could be a vector or a dictionary from Int index (the column) to String column name.
 - `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior
 - `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
@@ -77,12 +78,11 @@ end
 function _csvread(str::AbstractString, delim=',';
                  quotechar='"',
                  escapechar='\\',
-                 dateformats=common_date_formats,
-                 datetimeformats=common_datetime_formats,
                  pooledstrings=true,
                  nrows=0,
                  skiplines_begin=0,
                  header_exists=true,
+                 nastrings=NA_STRINGS,
                  colnames=String[],
                  #ignore_empty_rows=true,
                  colparsers=[],
@@ -109,8 +109,12 @@ function _csvread(str::AbstractString, delim=',';
         merged_colnames = colnames
     end
 
-    guess, pos1 = guesscolparsers(str, merged_colnames, opts, pos, type_detect_rows, colparsers,
-                          dateformats, datetimeformats)
+    if !issorted(nastrings)
+        nastrings = sort(nastrings)
+    end
+    guess, pos1 = guesscolparsers(str, merged_colnames, opts,
+                                  pos, type_detect_rows, colparsers,
+                                  nastrings)
 
     for (i, v) in enumerate(guess)
         guess[i] = tofield(v, opts)
@@ -163,7 +167,7 @@ function _csvread(str::AbstractString, delim=',';
 
             failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
             # figure out a new token type
-            newtoken = guesstoken(failed_text, field.inner)
+            newtoken = guesstoken(failed_text, field.inner, nastrings)
 
             if field.inner == newtoken
                 println(STDERR, "Could not determine which type to promote column to.")
@@ -298,9 +302,7 @@ end
 
 
 function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, colparsers,
-                       dateformats=common_date_formats,
-                       datetimeformats=common_datetime_formats)
+                       nrows::Int, colparsers, nastrings=NA_STRINGS)
     # Field type guesses
     guess = []
     prevfields = String[]
@@ -324,7 +326,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
                 error("previous rows had $(length(guess)) fields but row $i has $(length(fields))")
             end
             try
-                guess[j] = guesstoken(fields[j], guess[j])
+                guess[j] = guesstoken(fields[j], guess[j], nastrings)
             catch err
                 println(STDERR, "Error while guessing a common type for column $j")
                 println(STDERR, "new value: $(fields[j]), prev guess was: $(guess[j])")
