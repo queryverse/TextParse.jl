@@ -184,8 +184,8 @@ function getlineat(str, i)
         ii = prevind(str, line_start)
     end
 
-    c, ii = next(str, i)
-    line_end = i
+    c, ii = next(str, line_start)
+    line_end = line_start
     while !isnewline(c) && ii <= l
         line_end = ii
         c, ii = next(str, ii)

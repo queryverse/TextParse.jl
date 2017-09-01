@@ -289,6 +289,7 @@ import TextParse: getlineat
     @test str[getlineat(str,4)] == "abc\n"
     @test str[getlineat(str,5)] == "defg"
     @test str[getlineat(str,endof(str))] == "defg"
+    @test getlineat("x", 5) == 1:1
 end
 
 

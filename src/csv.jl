@@ -149,7 +149,7 @@ function _csvread(str::AbstractString, delim=',';
             f, l = first(rng), last(rng)
             field = rec.fields[err.colno]
 
-            if err.pos >= l && !field.eoldelim
+            if l !== endof(str) && err.pos >= l && !field.eoldelim
                 if fieldtype(field) <: AbstractString || fieldtype(field) <: StrRange
                     # retry assuming newlines can be part of the field
                     wopts = LocalOpts(opts.endchar, opts.quotechar, opts.escapechar, opts.includequotes, true)
