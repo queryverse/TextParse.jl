@@ -104,8 +104,13 @@ function guesstoken(x, prev_guess::ANY=Unknown(), nastrings=NA_STRINGS)
                 return StringToken(StrRange)
             end
         else
+            # fast-path
+            if length(filter(isnumber, x)) < 4
+                return StringToken(StrRange)
+            end
+
             maybedate = guessdateformat(x)
-            if maybedate == nothing
+            if maybedate === nothing
                 return StringToken(StrRange)
             else
                 return maybedate
