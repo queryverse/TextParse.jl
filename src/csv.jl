@@ -165,36 +165,25 @@ function _csvread(str::AbstractString, delim=',';
                 rethrow(err)
             end
 
-            failed_text = quotedsplit(str[err.fieldpos:l], opts, true)[1]
+            failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
             # figure out a new token type
-            newtoken = guesstoken(failed_text, field.inner, nastrings)
+            promoted = map(failed_strs, [cols[err.colno:end]...], [rec.fields[err.colno:end]...]) do s, col, f
+                promote_field(s, f, col, err, nastrings)
+            end
 
-            if field.inner == newtoken
+            newfields = map(first, promoted)
+            newcols = map(last, promoted)
+
+            if field.inner == newfields[1].inner
                 println(STDERR, "Could not determine which type to promote column to.")
                 rethrow(err)
             end
 
-            if debug[]
-                println(STDERR, "Converting column $(err.colno) to type $(newtoken) from $(field.inner) because it seems to have a different type:")
-                println(STDERR, showerrorchar(str, err.pos, 100))
-            end
-
-            newcol = try
-                promote_column(cols[err.colno],  err.rowno, fieldtype(newtoken))
-            catch err2
-                if debug[]
-                    rethrow(err2)
-                    Base.showerror(STDERR, err)
-                else
-                    rethrow(err)
-                end
-            end
-
             fieldsvec = Any[rec.fields...]
-            fieldsvec[err.colno] = swapinner(field, newtoken)
+            fieldsvec[err.colno:end] = newfields
             typeof(cols)
             colsvec = Any[cols...]
-            colsvec[err.colno] = newcol
+            colsvec[err.colno:end] = newcols
 
             rec = Record((fieldsvec...))
             cols = (colsvec...)
@@ -249,6 +238,25 @@ function _csvread(str::AbstractString, delim=',';
     end
 
     cols, merged_colnames
+end
+
+function promote_field(failed_str, field, col, err, nastrings)
+    newtoken = guesstoken(failed_str, field.inner, nastrings)
+    if newtoken == field.inner
+        # no need to change
+        return field, col
+    end
+    newcol = try
+        promote_column(col,  err.rowno, fieldtype(newtoken))
+    catch err2
+        if debug[]
+            rethrow(err2)
+            Base.showerror(STDERR, err)
+        else
+            rethrow(err)
+        end
+    end
+    swapinner(field, newtoken), newcol
 end
 
 function promote_column(col, rowno, T, inner=false)
