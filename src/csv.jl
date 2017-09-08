@@ -166,7 +166,8 @@ function _csvread(str::AbstractString, delim=',';
             end
 
             failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
-            # figure out a new token type
+            # figure out a new token type for this column and the rest
+            # it's very likely that a number of columns change type in a single row
             promoted = map(failed_strs, [cols[err.colno:end]...], [rec.fields[err.colno:end]...]) do s, col, f
                 promote_field(s, f, col, err, nastrings)
             end
