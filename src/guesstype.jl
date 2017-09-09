@@ -38,6 +38,9 @@ function guessdateformat(str)
     return nothing
 end
 
+# force precompilation
+guessdateformat("xyz")
+
 function getquotechar(x)
     if (length(x) > 0 && x[1] in DEFAULT_QUOTES) && last(x) == x[1]
         return x[1]
