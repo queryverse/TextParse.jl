@@ -313,7 +313,7 @@ end
 
 using NullableArrays
 import TextParse: _csvread
-@testset "_csvread" begin
+@testset "csvread" begin
 
     str1 = """
      a, b,c d, e
@@ -404,6 +404,9 @@ import TextParse: _csvread
     nullness = ([false, true, false], [false, false, true])
     @test map(x->x.isnull, first(_csvread(s, nastrings=["?","*"]))) == nullness
     @test map(x->x.isnull, first(_csvread(s, nastrings=["?","*"], type_detect_rows=1))) == nullness
+
+    @test isequal(csvread(["data/a.csv", "data/b.csv"]),
+                  (([1.0, 1.0, 1.0, 1.0], Nullable{Int64}[2, 2, nothing, 2]), String["x", "y"]))
 end
 
 @testset "skiplines_begin" begin

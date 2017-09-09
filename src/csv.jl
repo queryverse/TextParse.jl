@@ -66,7 +66,7 @@ end
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
-    _csvread(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
+    _csvread_f(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
 end
 
 function csvread(buffer::IO, delim=','; kwargs...)
@@ -74,17 +74,46 @@ function csvread(buffer::IO, delim=','; kwargs...)
     _csvread(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
 end
 
+function _csvread(str::AbstractString, delim=','; kwargs...)
+    _csvread_internal(str, delim; kwargs...)[1:2]
+end
+
+function _csvread_f(file::AbstractString, delim=','; kwargs...)
+    mmap_data = Mmap.mmap(file)
+    _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
+end
+
+function csvread{T<:AbstractString}(files::AbstractVector{T},
+                                    delim=','; kwargs...)
+    @assert !isempty(files)
+    cols, headers, rec, nrows = _csvread_f(files[1], delim;
+                                           noresize=true, kwargs...)
+    for f in files[2:end]
+        cols, _, rec, nrows = _csvread_f(f, delim; cols=cols, rowno=nrows+1,
+                                  noresize=true, rec=rec,
+                                  kwargs...)
+    end
+    for c in cols
+        resize!(c, nrows)
+    end
+    cols, headers
+end
+
 # read CSV in a string
-function _csvread(str::AbstractString, delim=',';
+function _csvread_internal(str::AbstractString, delim=',';
                  quotechar='"',
                  escapechar='\\',
                  pooledstrings=true,
                  nrows=0,
+                 noresize=false,
+                 rowno::Int=1,
                  skiplines_begin=0,
                  header_exists=true,
                  nastrings=NA_STRINGS,
                  colnames=String[],
                  #ignore_empty_rows=true,
+                 cols = nothing,
+                 rec = nothing,
                  colparsers=[],
                  type_detect_rows=20)
 
@@ -112,31 +141,48 @@ function _csvread(str::AbstractString, delim=',';
     if !issorted(nastrings)
         nastrings = sort(nastrings)
     end
-    guess, pos1 = guesscolparsers(str, merged_colnames, opts,
-                                  pos, type_detect_rows, colparsers,
-                                  nastrings)
 
-    for (i, v) in enumerate(guess)
-        guess[i] = tofield(v, opts)
+    pos1 = pos
+
+    if rec === nothing
+        guess, pos1 = guesscolparsers(str, merged_colnames, opts,
+                                      pos, type_detect_rows, colparsers,
+                                      nastrings)
+
+        for (i, v) in enumerate(guess)
+            guess[i] = tofield(v, opts)
+        end
+
+        # the last field is delimited by line end
+        guess[end] = Field(guess[end]; eoldelim = true)
+        rec = Record((guess...,))
     end
 
-    # the last field is delimited by line end
-    guess[end] = Field(guess[end]; eoldelim = true)
-    rec = Record((guess...,))
     current_record[] = rec
 
     if nrows == 0
-        meanrowsize = (pos1-pos) / type_detect_rows
         # just an estimate, with some margin
-        nrows = ceil(Int, (endof(str)-pos) / meanrowsize * sqrt(2))
+        nrows = ceil(Int, pos1/max(1, lineno) * sqrt(2))
     end
 
-    cols = makeoutputvecs(str, rec, nrows, pooledstrings)
-    rowno = 1
+    if cols === nothing
+        cols = makeoutputvecs(str, rec, nrows, pooledstrings)
+    end
 
+    if length(cols[1]) !== nrows
+        foreach(x->resize!(x, nrows), cols)
+    end
+
+    finalrows = rowno
     @label retry
     try
-        parsefill!(str, opts, rec, nrows, cols, pos, lineno, rowno, endof(str))
+        finalrows = parsefill!(str, opts, rec, nrows, cols, pos,
+                   lineno, rowno, endof(str))
+        if !noresize
+            for c in cols
+                resize!(c, finalrows)
+            end
+        end
     catch err
 
         if !isa(err, CSVParseError)
@@ -238,7 +284,7 @@ function _csvread(str::AbstractString, delim=',';
 
     end
 
-    cols, merged_colnames
+    cols, merged_colnames, rec, finalrows
 end
 
 function promote_field(failed_str, field, col, err, nastrings)
@@ -359,7 +405,6 @@ end
 
 function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
                        pos, lineno, rowno, l=endof(str))
-    sizemargin = sqrt(2)
     pos, lines = eatnewlines(str, pos)
     lineno += lines
     pos <= l && while true
@@ -379,17 +424,13 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
 
         if pos > l
             #shrink
-            for c in cols
-                resize!(c, rowno)
-            end
-            return cols
+            return rowno
         end
         rowno += 1
         lineno += 1
         if rowno > nrecs
             # grow
-            sizemargin = (sizemargin-1.0)/2 + 1.0
-            nrecs = ceil(Int, (endof(str) / pos) * rowno * sizemargin) # updated estimate
+            nrecs = ceil(Int, rowno * sqrt(2)) # updated estimate
             growcols(cols, nrecs)
         end
     end
