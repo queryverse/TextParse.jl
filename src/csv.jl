@@ -88,15 +88,17 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
     @assert !isempty(files)
     cols, headers, rec, nrows = _csvread_f(files[1], delim;
                                            noresize=true, kwargs...)
+    count = Int[nrows]
     for f in files[2:end]
         cols, _, rec, nrows = _csvread_f(f, delim; cols=cols, rowno=nrows+1,
                                   noresize=true, rec=rec,
                                   kwargs...)
+        push!(count, nrows - count[end])
     end
     for c in cols
         resize!(c, nrows)
     end
-    cols, headers
+    cols, headers, count
 end
 
 # read CSV in a string

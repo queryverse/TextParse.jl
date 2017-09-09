@@ -406,7 +406,7 @@ import TextParse: _csvread
     @test map(x->x.isnull, first(_csvread(s, nastrings=["?","*"], type_detect_rows=1))) == nullness
 
     @test isequal(csvread(["data/a.csv", "data/b.csv"]),
-                  (([1.0, 1.0, 1.0, 1.0], Nullable{Int64}[2, 2, nothing, 2]), String["x", "y"]))
+                  (([1.0, 2.0, 1.0, 2.0, 3.0], Nullable{Int64}[2, 2, nothing, 2, 1]), String["x", "y"], [2,3]))
 end
 
 @testset "skiplines_begin" begin
