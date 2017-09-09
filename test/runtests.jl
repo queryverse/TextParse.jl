@@ -438,7 +438,7 @@ using PooledArrays
     @test xs == col
 
     # test promotion to a dense array
-    xs = [randstring(10) for i=1:500]
+    xs = [randstring(10) for i=1:513]
     col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test !isa(col, PooledArray)
     @test isa(col, Array)
