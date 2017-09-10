@@ -66,7 +66,7 @@ end
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
-    _csvread_f(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
+    _csvread(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
 end
 
 function csvread(buffer::IO, delim=','; kwargs...)
@@ -89,11 +89,19 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
     cols, headers, rec, nrows = _csvread_f(files[1], delim;
                                            noresize=true, kwargs...)
     count = Int[nrows]
+    prev = nrows
     for f in files[2:end]
+        if length(cols[1]) == nrows
+            n = ceil(Int, nrows * sqrt(2))
+            for c in cols
+                resize!(c, n)
+            end
+        end
         cols, _, rec, nrows = _csvread_f(f, delim; cols=cols, rowno=nrows+1,
                                   noresize=true, rec=rec,
                                   kwargs...)
-        push!(count, nrows - count[end])
+        push!(count, nrows - prev)
+        prev = nrows
     end
     for c in cols
         resize!(c, nrows)
@@ -106,7 +114,6 @@ function _csvread_internal(str::AbstractString, delim=',';
                  quotechar='"',
                  escapechar='\\',
                  pooledstrings=true,
-                 nrows=0,
                  noresize=false,
                  rowno::Int=1,
                  skiplines_begin=0,
@@ -115,6 +122,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  colnames=String[],
                  #ignore_empty_rows=true,
                  cols = nothing,
+                 nrows = cols !== nothing ? length(cols[1]) : 0,
                  rec = nothing,
                  colparsers=[],
                  type_detect_rows=20)
@@ -425,7 +433,6 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
         lineno += lines
 
         if pos > l
-            #shrink
             return rowno
         end
         rowno += 1
