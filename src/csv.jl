@@ -538,3 +538,24 @@ function quotedsplit(str, opts, includequotes, i=start(str), l=endof(str))
     @label error
     error("Couldn't split line, error at char $i:\n$(showerrorchar(str, i, 100))")
 end
+
+function lookupbyheader(header, key)
+    if isa(key, Symbol)
+        return lookupbyheader(header, string(key))
+    elseif isa(key, String)
+        return findfirst(x->x==key, header)
+    elseif isa(key, Int)
+        return 0 < key <= length(header) ? key : 0
+    elseif isa(key, Tuple) || isa(key, Vector)
+        for k in key
+            x = lookupbyheader(header, k)
+            x != 0 && return x
+        end
+        return 0
+    end
+end
+
+canonical_name(n::AbstractString, xs) = n
+canonical_name(n::Integer, xs) = canonical_name(xs[n], xs)
+canonical_name(n::Symbol, xs) = string(n)
+canonical_name(n::Union{Tuple, Vector}, xs) = canonical_name(first(n), xs)
