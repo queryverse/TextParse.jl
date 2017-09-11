@@ -1,3 +1,5 @@
+using DataStructures
+
 export csvread
 const current_record = Ref{Any}()
 const debug = Ref{Bool}(false)
@@ -83,30 +85,32 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
     _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
 end
 
+const ColsPool = OrderedDict{Union{Int, String}, AbstractVector}
+
 function csvread{T<:AbstractString}(files::AbstractVector{T},
                                     delim=','; kwargs...)
     @assert !isempty(files)
+    colspool = ColsPool()
     cols, headers, rec, nrows = _csvread_f(files[1], delim;
-                                           noresize=true, kwargs...)
+                                           noresize=true,
+                                           colspool=colspool,
+                                           kwargs...)
+
     count = Int[nrows]
     prev = nrows
     for f in files[2:end]
         if length(cols[1]) == nrows
             n = ceil(Int, nrows * sqrt(2))
-            for c in cols
-                resize!(c, n)
-            end
+            resizecols(colspool, n)
         end
-        cols, _, rec, nrows = _csvread_f(f, delim; cols=cols, rowno=nrows+1,
-                                  noresize=true, rec=rec,
-                                  kwargs...)
+        cols, headers, rec, nrows = _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
+                                               prevheaders=headers, noresize=true, rec=rec, kwargs...)
         push!(count, nrows - prev)
         prev = nrows
     end
-    for c in cols
-        resize!(c, nrows)
-    end
-    cols, headers, count
+
+    resizecols(colspool, nrows)
+    (values(colspool)...), collect(keys(colspool)), count
 end
 
 # read CSV in a string
@@ -116,13 +120,16 @@ function _csvread_internal(str::AbstractString, delim=',';
                  pooledstrings=true,
                  noresize=false,
                  rowno::Int=1,
+                 prevheaders=nothing,
                  skiplines_begin=0,
+                 samecols=nothing,
                  header_exists=true,
                  nastrings=NA_STRINGS,
                  colnames=String[],
                  #ignore_empty_rows=true,
-                 cols = nothing,
-                 nrows = cols !== nothing ? length(cols[1]) : 0,
+                 colspool = ColsPool(),
+                 nrows = !isempty(colspool) ?
+                     length(first(colspool)[2]) : 0,
                  rec = nothing,
                  colparsers=[],
                  type_detect_rows=20)
@@ -147,6 +154,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     else
         merged_colnames = colnames
     end
+    merged_colnames = map(string, merged_colnames)
 
     if !issorted(nastrings)
         nastrings = sort(nastrings)
@@ -154,18 +162,44 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     pos1 = pos
 
-    if rec === nothing
-        guess, pos1 = guesscolparsers(str, merged_colnames, opts,
+    if samecols === nothing
+        canonnames = merged_colnames
+    else
+        canonnames = map(merged_colnames) do c
+            canonical_name(samecols, c)
+        end
+    end
+
+    if rec === nothing || canonnames != prevheaders
+        # this is the first file or has a different
+        # format than the previous one
+
+        prevs = rec !== nothing ? Dict(zip(prevheaders, map(x->x.inner, rec.fields))) : nothing
+        guess, pos1 = guesscolparsers(str, canonnames, opts,
                                       pos, type_detect_rows, colparsers,
-                                      nastrings)
+                                      nastrings, prevs)
+
+        if isempty(canonnames)
+            canonnames = Any[1:length(guess);]
+        end
 
         for (i, v) in enumerate(guess)
+            c = canonnames[i]
+            # Make column nullable if it's showing up for the
+            # first time, but not in the first file
+            if rec !== nothing && !haskey(colspool, c)
+                v = isa(v, NAToken) ? v : NAToken(v)
+            end
             guess[i] = tofield(v, opts)
         end
 
         # the last field is delimited by line end
         guess[end] = Field(guess[end]; eoldelim = true)
         rec = Record((guess...,))
+    end
+
+    if isempty(canonnames)
+        canonnames = Any[1:length(rec.fields);]
     end
 
     current_record[] = rec
@@ -175,23 +209,49 @@ function _csvread_internal(str::AbstractString, delim=',';
         nrows = ceil(Int, pos1/max(1, lineno) * sqrt(2))
     end
 
-    if cols === nothing
-        cols = makeoutputvecs(str, rec, nrows, pooledstrings)
+    if isempty(colspool)
+        # this is the first file, use nrows
+        cols = makeoutputvecs(rec, nrows, pooledstrings)
+        for (c, h) in zip(cols, canonnames)
+            colspool[h] = c
+        end
+    else
+        _cols = map(canonnames, [rec.fields...]) do c, f
+            if haskey(colspool, c)
+                if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString)
+                    return colspool[c]
+                else
+                    return colspool[c] = promote_column(colspool[c],
+                                                        rowno-1,
+                                                        fieldtype(f))
+                end
+            else
+                return colspool[c] = makeoutputvec(f, nrows, pooledstrings)
+            end
+        end
+        # promote missing columns to nullable
+        missingcols = setdiff(collect(keys(colspool)), canonnames)
+        for k in missingcols
+            if !(eltype(colspool[k]) <: Nullable)
+                colspool[k] = promote_column(colspool[k],
+                                             rowno-1,
+                                             Nullable{eltype(colspool[k])})
+            end
+        end
+        cols = (_cols...)
     end
 
-    if length(cols[1]) !== nrows
-        foreach(x->resize!(x, nrows), cols)
+    if any(c->length(c) != nrows, cols)
+        resizecols(colspool, nrows)
     end
 
     finalrows = rowno
     @label retry
     try
-        finalrows = parsefill!(str, opts, rec, nrows, cols, pos,
-                   lineno, rowno, endof(str))
+        finalrows = parsefill!(str, opts, rec, nrows, cols, colspool,
+                               pos, lineno, rowno, endof(str))
         if !noresize
-            for c in cols
-                resize!(c, finalrows)
-            end
+            resizecols(colspool, finalrows)
         end
     catch err
 
@@ -224,8 +284,10 @@ function _csvread_internal(str::AbstractString, delim=',';
             failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
             # figure out a new token type for this column and the rest
             # it's very likely that a number of columns change type in a single row
-            promoted = map(failed_strs, [cols[err.colno:end]...], [rec.fields[err.colno:end]...]) do s, col, f
-                promote_field(s, f, col, err, nastrings)
+            promoted = map(failed_strs, [cols[err.colno:end]...], [rec.fields[err.colno:end]...], canonnames[err.colno:end]) do s, col, f, name
+                c = promote_field(s, f, col, err, nastrings)
+                colspool[name] = c[2]
+                c
             end
 
             newfields = map(first, promoted)
@@ -262,6 +324,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             # promote to a dense array
             newcol = Array(failcol)
             colsvec[err.colno] = newcol
+            colspool[canonnames[err.colno]] = newcol
 
             rng = getlineat(str, err.fieldpos)
 
@@ -283,6 +346,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             newrefs = convert(Array{T}, failcol.refs)
             newcol = PooledArray(PooledArrays.RefArray(newrefs), failcol.pool)
             colsvec[err.colno] = newcol
+            colspool[canonnames[err.colno]] = newcol
             rng = getlineat(str, err.fieldpos)
 
             cols = (colsvec...)
@@ -294,7 +358,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     end
 
-    cols, merged_colnames, rec, finalrows
+    cols, canonnames, rec, finalrows
 end
 
 function promote_field(failed_str, field, col, err, nastrings)
@@ -304,7 +368,7 @@ function promote_field(failed_str, field, col, err, nastrings)
         return field, col
     end
     newcol = try
-        promote_column(col,  err.rowno, fieldtype(newtoken))
+        promote_column(col,  err.rowno-1, fieldtype(newtoken))
     catch err2
         if debug[]
             rethrow(err2)
@@ -320,7 +384,7 @@ function promote_column(col, rowno, T, inner=false)
     if typeof(col) <: NullableArray{Union{}}
         if T <: StringLike
             arr = Array{String, 1}(length(col))
-            for i = 1:rowno-1
+            for i = 1:rowno
                 arr[i] = ""
             end
             return arr
@@ -332,8 +396,8 @@ function promote_column(col, rowno, T, inner=false)
     elseif T <: Nullable
         if !isa(col, NullableArray)
             isnullarray = Array{Bool}(length(col))
-            isnullarray[1:rowno-1] = false
-            isnullarray[rowno:end] = true
+            isnullarray[1:rowno] = false
+            isnullarray[(rowno+1):end] = true
             NullableArray(promote_column(col, rowno, eltype(T)), isnullarray)
         else
             # Both input and output are nullable arrays
@@ -343,7 +407,7 @@ function promote_column(col, rowno, T, inner=false)
     else
         @assert !isa(col, PooledArray) # Pooledarray of strings should never fail
         newcol = Array{T, 1}(length(col))
-        copy!(newcol, 1, col, 1, rowno-1)
+        copy!(newcol, 1, col, 1, rowno)
         newcol
     end
 end
@@ -367,7 +431,7 @@ end
 
 
 function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, colparsers, nastrings=NA_STRINGS)
+                       nrows::Int, colparsers, nastrings=NA_STRINGS, prevs=nothing)
     # Field type guesses
     guess = []
     prevfields = String[]
@@ -382,7 +446,11 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
         fields = quotedsplit(str, opts, true, pos, lineend)
         if i == 1
-            guess = Any[Unknown() for i=1:length(fields)] # idk
+            if prevs !== nothing && !isempty(header)
+                guess = Any[get(prevs, h, Unknown()) for h in header]
+            else
+                guess = Any[Unknown() for i=1:length(fields)] # idk
+            end
         end
 
         # update guess
@@ -413,7 +481,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     guess, pos
 end
 
-function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
+function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
                        pos, lineno, rowno, l=endof(str))
     pos, lines = eatnewlines(str, pos)
     lineno += lines
@@ -440,22 +508,22 @@ function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols,
         if rowno > nrecs
             # grow
             nrecs = ceil(Int, rowno * sqrt(2)) # updated estimate
-            growcols(cols, nrecs)
+            resizecols(colspool, nrecs)
         end
     end
 end
 
-function growcols(cols, nrecs)
-    for c in cols
+function resizecols(colspool, nrecs)
+    for (h, c) in colspool
         resize!(c, nrecs)
     end
 end
 
-function makeoutputvecs(str, rec, N, pooledstrings)
-    map(f->makeoutputvec(str, f, N, pooledstrings), rec.fields)
+function makeoutputvecs(rec, N, pooledstrings)
+    map(f->makeoutputvec(f, N, pooledstrings), rec.fields)
 end
 
-function makeoutputvec(str, eltyp, N, pooledstrings)
+function makeoutputvec(eltyp, N, pooledstrings)
     if fieldtype(eltyp) == Nullable{Union{}} # we weren't able to detect the type,
                                          # all columns were blank
         NullableArray{Union{}}(N)
@@ -539,23 +607,11 @@ function quotedsplit(str, opts, includequotes, i=start(str), l=endof(str))
     error("Couldn't split line, error at char $i:\n$(showerrorchar(str, i, 100))")
 end
 
-function lookupbyheader(header, key)
-    if isa(key, Symbol)
-        return lookupbyheader(header, string(key))
-    elseif isa(key, String)
-        return findfirst(x->x==key, header)
-    elseif isa(key, Int)
-        return 0 < key <= length(header) ? key : 0
-    elseif isa(key, Tuple) || isa(key, Vector)
-        for k in key
-            x = lookupbyheader(header, k)
-            x != 0 && return x
+function canonical_name(opts, name)
+    for list in opts
+        if name in list
+            return first(list)
         end
-        return 0
     end
+    return name
 end
-
-canonical_name(n::AbstractString, xs) = n
-canonical_name(n::Integer, xs) = canonical_name(xs[n], xs)
-canonical_name(n::Symbol, xs) = string(n)
-canonical_name(n::Union{Tuple, Vector}, xs) = canonical_name(first(n), xs)

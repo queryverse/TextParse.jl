@@ -3,3 +3,4 @@ Compat 0.17
 NullableArrays
 PooledArrays 0.0.2
 WeakRefStrings
+DataStructures
