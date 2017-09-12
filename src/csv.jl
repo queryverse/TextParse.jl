@@ -344,7 +344,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             @assert isa(failcol, PooledArray)
             T = _widen(eltype(failcol.refs))
             newrefs = convert(Array{T}, failcol.refs)
-            newcol = PooledArray(PooledArrays.RefArray(newrefs), failcol.pool)
+            newcol = PooledArray(PooledArrays.RefArray(newrefs), convert(Dict{eltype(failcol), T}, failcol.pool))
             colsvec[err.colno] = newcol
             colspool[canonnames[err.colno]] = newcol
             rng = getlineat(str, err.fieldpos)
@@ -530,7 +530,7 @@ function makeoutputvec(eltyp, N, pooledstrings)
     elseif fieldtype(eltyp) == StrRange
       # By default we put strings in a PooledArray
       if pooledstrings
-          resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
+          resize!(PooledArray(PooledArrays.RefArray(UInt8[]), Dict{String, UInt8}()), N)
       else
           Array{String}(N)
       end

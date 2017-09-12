@@ -73,7 +73,7 @@ end
     PARSE_SUCCESS
 end
 
-const MAX_POOL_FRACTION = 0.15
+const MAX_POOL_FRACTION = 0.05
 const ROWS_BEFORE_CROWDING = 510
 @inline function setcell!{R}(col::PooledArray{String,R}, i, val::StrRange, str)
     if i > ROWS_BEFORE_CROWDING && length(col.pool) > i * MAX_POOL_FRACTION
