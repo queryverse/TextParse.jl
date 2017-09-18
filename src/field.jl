@@ -64,8 +64,9 @@ end
 # needed for promoting guessses
 immutable Unknown <: AbstractToken{Union{}} end
 fromtype(::Type{Union{}}) = Unknown()
+const nullableNA = Nullable{DataValue{Union{}}}(DataValue{Union{}}())
 function tryparsenext(::Unknown, str, i, len, opts)
-    Nullable{Void}(nothing), i
+    nullableNA, i
 end
 show(io::IO, ::Unknown) = print(io, "<unknown>")
 immutable CustomParser{T, F} <: AbstractToken{T}
@@ -409,11 +410,11 @@ fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
 fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
 
-function fromtype(nd::Nullable{DateFormat})
+function fromtype(nd::Union{Nullable{DateFormat}, DataValue{DateFormat}})
     if !isnull(nd)
         NAToken(DateTimeToken(DateTime, get(nd)))
     else
-        fromtype(Nullable{DateTime})
+        fromtype(DataValue{DateTime})
     end
 end
 
@@ -459,7 +460,7 @@ function NAToken{S}(
   , nastrings=NA_STRINGS)
 
     T = fieldtype(inner)
-    NAToken{Nullable{T}, S}(inner, emptyisna, endchar, nastrings)
+    NAToken{DataValue{T}, S}(inner, emptyisna, endchar, nastrings)
 end
 
 function show(io::IO, na::NAToken)
@@ -512,6 +513,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
 end
 
 fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
+fromtype{N<:DataValue}(::Type{N}) = NAToken(fromtype(eltype(N)))
 
 ### Field parsing
 
@@ -553,6 +555,7 @@ function swapinner(f::Field, inner::AbstractToken)
      )
 
 end
+
 function tryparsenext{T}(f::Field{T}, str, i, len, opts)
     R = Nullable{T}
     i > len && @goto error
@@ -615,6 +618,10 @@ function tryparsenext{T}(f::Field{T}, str, i, len, opts)
     return R(), i
 
     @label done
+    if R <: Nullable{DataValue{Union{}}}
+        # optimization to remove allocation
+        return nullableNA, i
+    end
     return R(res), i
 end
 

@@ -311,7 +311,7 @@ end
 end
 
 
-using NullableArrays
+using DataValues
 import TextParse: _csvread
 @testset "csvread" begin
 
@@ -325,16 +325,16 @@ import TextParse: _csvread
     """
     data = ((["x", "","x","x y","x"],
               ones(5),
-              NullableArray(ones(5), Bool[0,1,0,0,1]),
-              NullableArray(ones(Int,5), Bool[0,0,0,1,0])),
+              DataValueArray(ones(5), Bool[0,1,0,0,1]),
+              DataValueArray(ones(Int,5), Bool[0,0,0,1,0])),
               ["a", "b", "c d", "e"])
     @test isequal(_csvread(str1, ','), data)
     coltype_test1 = _csvread(str1,
                             colparsers=Dict("b"=>Nullable{Float64},
-                                          "e"=>Nullable{Float64}))
+                                          "e"=>DataValue{Float64}))
     coltype_test2 = _csvread(str1,
                             colparsers=Dict(2=>Nullable{Float64},
-                                          4=>Nullable{Float64}))
+                                          4=>DataValue{Float64}))
 
     str2 = """
     x,1,1,1
@@ -346,12 +346,12 @@ import TextParse: _csvread
     coltype_test3 = _csvread(str2, header_exists=false,
                             colparsers=Dict(2=>Nullable{Float64},
                                           4=>Nullable{Float64}))
-    @test eltype(coltype_test1[1][2]) == Nullable{Float64}
-    @test eltype(coltype_test1[1][4]) == Nullable{Float64}
-    @test eltype(coltype_test2[1][2]) == Nullable{Float64}
-    @test eltype(coltype_test2[1][4]) == Nullable{Float64}
-    @test eltype(coltype_test3[1][2]) == Nullable{Float64}
-    @test eltype(coltype_test3[1][4]) == Nullable{Float64}
+    @test eltype(coltype_test1[1][2]) == DataValue{Float64}
+    @test eltype(coltype_test1[1][4]) == DataValue{Float64}
+    @test eltype(coltype_test2[1][2]) == DataValue{Float64}
+    @test eltype(coltype_test2[1][4]) == DataValue{Float64}
+    @test eltype(coltype_test3[1][2]) == DataValue{Float64}
+    @test eltype(coltype_test3[1][4]) == DataValue{Float64}
 
     @test isequal(data, _csvread(str1, type_detect_rows=1))
     @test isequal(data, _csvread(str1, type_detect_rows=2))
@@ -406,10 +406,10 @@ import TextParse: _csvread
     @test map(x->x.isnull, first(_csvread(s, nastrings=["?","*"], type_detect_rows=1))) == nullness
 
     @test isequal(csvread(["data/a.csv", "data/b.csv"]),
-                  (([1.0, 2.0, 1.0, 2.0, 3.0], Nullable{Int64}[2, 2, nothing, nothing, nothing],
-                    Nullable{Int64}[nothing, nothing, nothing, 2, 1]), String["x", "y", "z"], [2, 3]))
+                  (([1.0, 2.0, 1.0, 2.0, 3.0], DataValue{Int64}[2, 2, nothing, nothing, nothing],
+                    DataValue{Int64}[nothing, nothing, nothing, 2, 1]), String["x", "y", "z"], [2, 3]))
     @test isequal(csvread(["data/a.csv", "data/b.csv"], samecols=[("y","z")]),
-                  (([1.0, 2.0, 1.0, 2.0, 3.0], Nullable{Int64}[2, 2, nothing, 2, 1]), String["x", "y"], [2,3]))
+                  (([1.0, 2.0, 1.0, 2.0, 3.0], DataValue{Int64}[2, 2, nothing, 2, 1]), String["x", "y"], [2,3]))
 end
 
 @testset "skiplines_begin" begin

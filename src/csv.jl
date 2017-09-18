@@ -42,7 +42,7 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
-1. A tuple of columns each either a `Vector`, `NullableArray` or `PooledArray`
+1. A tuple of columns each either a `Vector`, `DataValueArray` or `PooledArray`
 2. column names if `header_exists=true`, empty array otherwise
 
 # Arguments:
@@ -232,10 +232,10 @@ function _csvread_internal(str::AbstractString, delim=',';
         # promote missing columns to nullable
         missingcols = setdiff(collect(keys(colspool)), canonnames)
         for k in missingcols
-            if !(eltype(colspool[k]) <: Nullable)
+            if !(eltype(colspool[k]) <: DataValue)
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
-                                             Nullable{eltype(colspool[k])})
+                                             DataValue{eltype(colspool[k])})
             end
         end
         cols = (_cols...)
@@ -284,7 +284,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
             # figure out a new token type for this column and the rest
             # it's very likely that a number of columns change type in a single row
-            promoted = map(failed_strs, [cols[err.colno:end]...], [rec.fields[err.colno:end]...], canonnames[err.colno:end]) do s, col, f, name
+            promoted = map(failed_strs, Any[cols[err.colno:end]...], [rec.fields[err.colno:end]...], canonnames[err.colno:end]) do s, col, f, name
                 c = promote_field(s, f, col, err, nastrings)
                 colspool[name] = c[2]
                 c
@@ -381,28 +381,28 @@ function promote_field(failed_str, field, col, err, nastrings)
 end
 
 function promote_column(col, rowno, T, inner=false)
-    if typeof(col) <: NullableArray{Union{}}
+    if typeof(col) <: DataValueArray{Union{}}
         if T <: StringLike
             arr = Array{String, 1}(length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
             return arr
-        elseif T <: Nullable
-            NullableArray(Array{eltype(T)}(length(col)), zeros(Bool, length(col)))
+        elseif T <: DataValue
+            DataValueArray(Array{eltype(T)}(length(col)), zeros(Bool, length(col)))
         else
             error("empty to non-nullable")
         end
-    elseif T <: Nullable
-        if !isa(col, NullableArray)
+    elseif T <: DataValue
+        if !isa(col, DataValueArray)
             isnullarray = Array{Bool}(length(col))
             isnullarray[1:rowno] = false
             isnullarray[(rowno+1):end] = true
-            NullableArray(promote_column(col, rowno, eltype(T)), isnullarray)
+            DataValueArray(promote_column(col, rowno, eltype(T)), isnullarray)
         else
             # Both input and output are nullable arrays
             vals = promote_column(col.values, rowno, eltype(T))
-            NullableArray(vals, col.isnull)
+            DataValueArray(vals, col.isnull)
         end
     else
         @assert !isa(col, PooledArray) # Pooledarray of strings should never fail
@@ -524,9 +524,9 @@ function makeoutputvecs(rec, N, pooledstrings)
 end
 
 function makeoutputvec(eltyp, N, pooledstrings)
-    if fieldtype(eltyp) == Nullable{Union{}} # we weren't able to detect the type,
+    if fieldtype(eltyp) == DataValue{Union{}} # we weren't able to detect the type,
                                          # all columns were blank
-        NullableArray{Union{}}(N)
+        DataValueArray{Union{}}(N)
     elseif fieldtype(eltyp) == StrRange
       # By default we put strings in a PooledArray
       if pooledstrings
@@ -534,10 +534,10 @@ function makeoutputvec(eltyp, N, pooledstrings)
       else
           Array{String}(N)
       end
-    elseif fieldtype(eltyp) == Nullable{StrRange}
-        NullableArray{String}(N)
-    elseif fieldtype(eltyp) <: Nullable
-        NullableArray{fieldtype(eltyp)|>eltype}(N)
+    elseif fieldtype(eltyp) == DataValue{StrRange}
+        DataValueArray{String}(N)
+    elseif fieldtype(eltyp) <: DataValue
+        DataValueArray{fieldtype(eltyp)|>eltype}(N)
     else
         Array{fieldtype(eltyp)}(N)
     end

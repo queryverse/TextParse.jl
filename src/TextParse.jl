@@ -2,7 +2,7 @@ __precompile__()
 
 module TextParse
 
-using NullableArrays
+using DataValues
 using Base.Test
 
 include("lib/compat.jl")
