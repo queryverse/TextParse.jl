@@ -184,7 +184,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         end
 
         for (i, v) in enumerate(guess)
-            c = canonnames[i]
+            c = get(canonnames, i, i)
             # Make column nullable if it's showing up for the
             # first time, but not in the first file
             if rec !== nothing && !haskey(colspool, c)
@@ -216,7 +216,9 @@ function _csvread_internal(str::AbstractString, delim=',';
             colspool[h] = c
         end
     else
-        _cols = map(canonnames, [rec.fields...]) do c, f
+        _cols = map(1:length(rec.fields)) do i
+            c = get(canonnames, i, i)
+            f = rec.fields[i]
             if haskey(colspool, c)
                 if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString)
                     return colspool[c]
@@ -272,7 +274,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                     fieldsvec = Any[rec.fields...]
                     fieldsvec[err.colno] = swapinner(field, WrapLocalOpts(wopts, field.inner))
                     rec = Record((fieldsvec...))
-                    pos = f
+                    pos = first(rng)
                     rowno = err.rowno
                     lineno = err.lineno
                     @goto retry
@@ -284,7 +286,10 @@ function _csvread_internal(str::AbstractString, delim=',';
             failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
             # figure out a new token type for this column and the rest
             # it's very likely that a number of columns change type in a single row
-            promoted = map(failed_strs, Any[cols[err.colno:end]...], [rec.fields[err.colno:end]...], canonnames[err.colno:end]) do s, col, f, name
+            promoted = map(failed_strs, err.colno:length(cols)) do s, colidx
+                col = cols[colidx]
+                f = rec.fields[colidx]
+                name = get(canonnames, colidx, colidx)
                 c = promote_field(s, f, col, err, nastrings)
                 colspool[name] = c[2]
                 c
@@ -308,7 +313,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             cols = (colsvec...)
             rowno = err.rowno
             lineno = err.lineno
-            pos = f
+            pos = first(rng)
             @goto retry
 
         elseif err.err_code == POOL_CROWDED
