@@ -91,10 +91,15 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
                                     delim=','; kwargs...)
     @assert !isempty(files)
     colspool = ColsPool()
-    cols, headers, rec, nrows = _csvread_f(files[1], delim;
-                                           noresize=true,
-                                           colspool=colspool,
-                                           kwargs...)
+    try
+        cols, headers, rec, nrows = _csvread_f(files[1], delim;
+                                               noresize=true,
+                                               colspool=colspool,
+                                               kwargs...)
+    catch err
+        println(STDERR, "Error parsing $(files[1])")
+        rethrow(err)
+    end
 
     count = Int[nrows]
     prev = nrows
@@ -103,8 +108,13 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
             n = ceil(Int, nrows * sqrt(2))
             resizecols(colspool, n)
         end
-        cols, headers, rec, nrows = _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
-                                               prevheaders=headers, noresize=true, rec=rec, kwargs...)
+        try
+            cols, headers, rec, nrows = _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
+                                                   prevheaders=headers, noresize=true, rec=rec, kwargs...)
+        catch err
+            println(STDERR, "Error parsing $(f)")
+            rethrow(err)
+        end
         push!(count, nrows - prev)
         prev = nrows
     end
