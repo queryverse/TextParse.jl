@@ -300,7 +300,10 @@ function _csvread_internal(str::AbstractString, delim=',';
             failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
             # figure out a new token type for this column and the rest
             # it's very likely that a number of columns change type in a single row
-            promoted = map(failed_strs, err.colno:length(cols)) do s, colidx
+            len = min(length(failed_strs), length(cols) - err.colno+1)
+            ss = failed_strs[1:len]
+            idx = (err.colno:length(cols))[1:len]
+            promoted = map(ss, idx) do s, colidx
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
