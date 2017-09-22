@@ -91,11 +91,11 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
                                     delim=','; kwargs...)
     @assert !isempty(files)
     colspool = ColsPool()
-    try
-        cols, headers, rec, nrows = _csvread_f(files[1], delim;
-                                               noresize=true,
-                                               colspool=colspool,
-                                               kwargs...)
+    cols, headers, rec, nrows = try
+        _csvread_f(files[1], delim;
+                   noresize=true,
+                   colspool=colspool,
+                   kwargs...)
     catch err
         println(STDERR, "Error parsing $(files[1])")
         rethrow(err)
@@ -108,9 +108,9 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
             n = ceil(Int, nrows * sqrt(2))
             resizecols(colspool, n)
         end
-        try
-            cols, headers, rec, nrows = _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
-                                                   prevheaders=headers, noresize=true, rec=rec, kwargs...)
+        cols, headers, rec, nrows = try
+            _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
+                       prevheaders=headers, noresize=true, rec=rec, kwargs...)
         catch err
             println(STDERR, "Error parsing $(f)")
             rethrow(err)
@@ -464,11 +464,16 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
         lineend = getlineend(str, pos)
 
         fields = quotedsplit(str, opts, true, pos, lineend)
+
         if i == 1
+            guess = Any[Unknown() for i=1:length(fields)] # idk
             if prevs !== nothing && !isempty(header)
-                guess = Any[get(prevs, h, Unknown()) for h in header]
-            else
-                guess = Any[Unknown() for i=1:length(fields)] # idk
+                # sometimes length(fields) can be != length(header).
+                # this sucks!
+                for i in 1:length(header)
+                    i > length(fields) && break
+                    guess[i] = get(prevs, header[i], Unknown())
+                end
             end
         end
 
