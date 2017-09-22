@@ -62,7 +62,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 """
 function csvread(file::String, delim=','; kwargs...)
     open(file, "r") do io
-        csvread(io, delim; kwargs...)
+        csvread(io, delim; filename=file, kwargs...)
     end
 end
 
@@ -82,7 +82,7 @@ end
 
 function _csvread_f(file::AbstractString, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
-    _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
+    _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; filename=file, kwargs...)
 end
 
 const ColsPool = OrderedDict{Union{Int, String}, AbstractVector}
@@ -132,6 +132,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                      length(first(colspool)[2]) : 0,
                  rec = nothing,
                  colparsers=[],
+                 filename=nothing,
                  type_detect_rows=20)
 
     opts = LocalOpts(delim, quotechar, escapechar, false, false)
@@ -261,6 +262,8 @@ function _csvread_internal(str::AbstractString, delim=',';
             rethrow(err)
         end
 
+        err.filename = filename
+
         if err.err_code == PARSE_ERROR
 
             rng = getlineat(str, err.fieldpos)
@@ -280,6 +283,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                     @goto retry
                 end
                 println(STDERR, "Expected another field on row $(err.rowno) (line $(err.lineno))")
+                err.filename = filename
                 rethrow(err)
             end
 
@@ -549,7 +553,7 @@ function makeoutputvec(eltyp, N, pooledstrings)
 end
 
 
-immutable CSVParseError <: Exception
+type CSVParseError <: Exception
     err_code
     location_display
     rec
@@ -559,21 +563,27 @@ immutable CSVParseError <: Exception
     pos
     fieldpos
     charinline
+    filename
 end
 
 function CSVParseError(e_code, str, rec, lineno, rowno, colno, pos, fieldpos)
     rng = getlineat(str, pos)
     charinline = pos - first(rng)
-    CSVParseError(e_code, showerrorchar(str, pos, 100), rec, lineno, rowno, colno, pos, fieldpos, charinline)
+    CSVParseError(e_code, showerrorchar(str, pos, 100), rec, lineno, rowno, colno, pos, fieldpos, charinline, nothing)
 end
 
 
 function Base.showerror(io::IO, err::CSVParseError)
-    err = "Parse error at line $(err.lineno) at char $(err.charinline):\n" *
-            err.location_display *
-            "\nCSV column $(err.colno) is expected to be: " *
-            string(err.rec.fields[err.colno])
-    print(io, err)
+    if err.filename !== nothing
+        print(io, "CSV parsing error in $(err.filename) ")
+    else
+        print(io, "CSV parsing error ")
+    end
+
+    println(io, "at line $(err.lineno) char $(err.charinline):")
+    println(io, err.location_display)
+    print(io, "column $(err.colno) is expected to be: ")
+    print(io, string(err.rec.fields[err.colno]))
 end
 
 function showerrorchar(str, pos, maxchar)
