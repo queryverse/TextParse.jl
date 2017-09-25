@@ -197,7 +197,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         c = get(canonnames, i, i)
         # Make column nullable if it's showing up for the
         # first time, but not in the first file
-        if rec !== nothing && !haskey(colspool, c)
+        if !(fieldtype(v) <: StringLike) && rec !== nothing && !haskey(colspool, c)
             v = isa(v, NAToken) ? v : NAToken(v)
         end
         guess[i] = tofield(v, opts)
