@@ -181,33 +181,31 @@ function _csvread_internal(str::AbstractString, delim=',';
         end
     end
 
-    if rec === nothing || canonnames != prevheaders
-        # this is the first file or has a different
-        # format than the previous one
+    # seed guesses using those from previous file
+    prevs = rec !== nothing ?
+        Dict(zip(prevheaders, map(x->x.inner, rec.fields))) : nothing
 
-        prevs = rec !== nothing ? Dict(zip(prevheaders, map(x->x.inner, rec.fields))) : nothing
-        guess, pos1 = guesscolparsers(str, canonnames, opts,
-                                      pos, type_detect_rows, colparsers,
-                                      nastrings, prevs)
+    guess, pos1 = guesscolparsers(str, canonnames, opts,
+                                  pos, type_detect_rows, colparsers,
+                                  nastrings, prevs)
 
-        if isempty(canonnames)
-            canonnames = Any[1:length(guess);]
-        end
-
-        for (i, v) in enumerate(guess)
-            c = get(canonnames, i, i)
-            # Make column nullable if it's showing up for the
-            # first time, but not in the first file
-            if rec !== nothing && !haskey(colspool, c)
-                v = isa(v, NAToken) ? v : NAToken(v)
-            end
-            guess[i] = tofield(v, opts)
-        end
-
-        # the last field is delimited by line end
-        guess[end] = Field(guess[end]; eoldelim = true)
-        rec = Record((guess...,))
+    if isempty(canonnames)
+        canonnames = Any[1:length(guess);]
     end
+
+    for (i, v) in enumerate(guess)
+        c = get(canonnames, i, i)
+        # Make column nullable if it's showing up for the
+        # first time, but not in the first file
+        if rec !== nothing && !haskey(colspool, c)
+            v = isa(v, NAToken) ? v : NAToken(v)
+        end
+        guess[i] = tofield(v, opts)
+    end
+
+    # the last field is delimited by line end
+    guess[end] = swapinner(guess[end], guess[end]; eoldelim = true)
+    rec = Record((guess...,))
 
     if isempty(canonnames)
         canonnames = Any[1:length(rec.fields);]
@@ -392,12 +390,8 @@ function promote_field(failed_str, field, col, err, nastrings)
     newcol = try
         promote_column(col,  err.rowno-1, fieldtype(newtoken))
     catch err2
-        if debug[]
-            rethrow(err2)
-            Base.showerror(STDERR, err)
-        else
-            rethrow(err)
-        end
+        Base.showerror(STDERR, err)
+        rethrow(err2)
     end
     swapinner(field, newtoken), newcol
 end
