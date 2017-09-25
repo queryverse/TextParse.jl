@@ -243,7 +243,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         # promote missing columns to nullable
         missingcols = setdiff(collect(keys(colspool)), canonnames)
         for k in missingcols
-            if !(eltype(colspool[k]) <: DataValue)
+            if !(eltype(colspool[k]) <: DataValue) && !(eltype(colspool[k]) <: Union{StrRange, AbstractString})
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
                                              DataValue{eltype(colspool[k])})
