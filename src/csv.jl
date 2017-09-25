@@ -22,7 +22,14 @@ function optionsiter(opts::Associative, header)
     isempty(header) && return opts
     iter = Dict{Int,Any}()
     for (k, v) in opts
-        iter[getbyheader(1:length(header), header, k)] = v
+        i = try
+            getbyheader(1:length(header), header, k)
+        catch err
+            if isa(err, ArgumentError)
+                continue
+            end
+        end
+        iter[i] = v
     end
     iter
 end
