@@ -543,7 +543,14 @@ end
 
 function resizecols(colspool, nrecs)
     for (h, c) in colspool
+        l = length(c)
         resize!(c, nrecs)
+        if eltype(c) <: AbstractString
+            # fill with blanks
+            c[l+1:nrecs] = ""
+        elseif eltype(c) <: StrRange
+            c[l+1:nrecs] = StrRange(1,0)
+        end
     end
 end
 
