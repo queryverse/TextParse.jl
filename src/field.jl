@@ -545,13 +545,19 @@ end
 
 @inline delim(f::Field, opts) = get(f.delim, opts.endchar)
 
-function swapinner(f::Field, inner::AbstractToken)
-    Field(inner;
+function swapinner(f::Field, inner::AbstractToken;
         ignore_init_whitespace= f.ignore_end_whitespace
       , ignore_end_whitespace=f.ignore_end_whitespace
       , eoldelim=f.eoldelim
       , spacedelim=f.spacedelim
       , delim=f.delim
+  )
+    Field(inner;
+        ignore_init_whitespace=ignore_end_whitespace
+      , ignore_end_whitespace=ignore_end_whitespace
+      , eoldelim=eoldelim
+      , spacedelim=spacedelim
+      , delim=delim
      )
 
 end
