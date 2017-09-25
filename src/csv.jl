@@ -390,8 +390,8 @@ function promote_field(failed_str, field, col, err, nastrings)
     newcol = try
         promote_column(col,  err.rowno-1, fieldtype(newtoken))
     catch err2
-        Base.showerror(STDERR, err)
-        rethrow(err2)
+        Base.showerror(STDERR, err2)
+        rethrow(err)
     end
     swapinner(field, newtoken), newcol
 end
