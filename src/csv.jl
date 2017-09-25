@@ -295,13 +295,20 @@ function _csvread_internal(str::AbstractString, delim=',';
                 rethrow(err)
             end
 
-            failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
             # figure out a new token type for this column and the rest
             # it's very likely that a number of columns change type in a single row
-            len = min(length(failed_strs), length(cols) - err.colno+1)
-            ss = failed_strs[1:len]
-            idx = (err.colno:length(cols))[1:len]
-            promoted = map(ss, idx) do s, colidx
+            # so we promote all columns after the failed column
+            failed_strs = quotedsplit(str[err.fieldpos:l], opts, true)
+
+            if length(failed_strs) != length(cols[err.colno:end])
+                fn = err.filename === nothing ? "" : "In $(err.filename) "
+                warn("$(fn)line $(err.lineno) has $(length(err.colno) + length(failed_strs) - 1) fields but $(length(cols)) fields are expected. Skipping row.")
+                pos = last(rng)+1
+                rowno = err.rowno
+                lineno = err.lineno+1
+                @goto retry
+            end
+            promoted = map(failed_strs, err.colno:length(cols)) do s, colidx
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
