@@ -4,7 +4,7 @@ export csvread
 const current_record = Ref{Any}()
 const debug = Ref{Bool}(false)
 
-const StringLike = Union{String, StrRange}
+const StringLike = Union{AbstractString, StrRange}
 
 optionsiter(opts::Associative) = opts
 optionsiter(opts::AbstractVector) = enumerate(opts)
@@ -232,9 +232,13 @@ function _csvread_internal(str::AbstractString, delim=',';
                 if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString)
                     return colspool[c]
                 else
-                    return colspool[c] = promote_column(colspool[c],
-                                                        rowno-1,
-                                                        fieldtype(f))
+                    try
+                        return colspool[c] = promote_column(colspool[c],
+                                                            rowno-1,
+                                                            fieldtype(f))
+                    catch err
+                        error("Could not convert column $c of type $(eltype(colspool[c])) to type $(fieldtype(f))")
+                    end
                 end
             else
                 return colspool[c] = makeoutputvec(f, nrows, pooledstrings)
@@ -243,7 +247,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         # promote missing columns to nullable
         missingcols = setdiff(collect(keys(colspool)), canonnames)
         for k in missingcols
-            if !(eltype(colspool[k]) <: DataValue) && !(eltype(colspool[k]) <: Union{StrRange, AbstractString})
+            if !(eltype(colspool[k]) <: DataValue) && !(eltype(colspool[k]) <: StringLike)
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
                                              DataValue{eltype(colspool[k])})
