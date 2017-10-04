@@ -88,8 +88,10 @@ function _csvread(str::AbstractString, delim=','; kwargs...)
 end
 
 function _csvread_f(file::AbstractString, delim=','; kwargs...)
-    mmap_data = Mmap.mmap(file)
-    _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; filename=file, kwargs...)
+    open(file, "r") do io
+        mmap_data = Mmap.mmap(io)
+        _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; filename=file, kwargs...)
+    end
 end
 
 const ColsPool = OrderedDict{Union{Int, String}, AbstractVector}
