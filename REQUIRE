@@ -2,5 +2,4 @@ julia 0.6
 Compat 0.17
 DataValues
 PooledArrays 0.0.2
-WeakRefStrings
 DataStructures

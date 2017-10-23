@@ -75,12 +75,12 @@ end
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
-    _csvread(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
+    _csvread(String(mmap_data), delim; kwargs...)
 end
 
 function csvread(buffer::IO, delim=','; kwargs...)
     mmap_data = read(buffer)
-    _csvread(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
+    _csvread(String(mmap_data), delim; kwargs...)
 end
 
 function _csvread(str::AbstractString, delim=','; kwargs...)
@@ -90,7 +90,7 @@ end
 function _csvread_f(file::AbstractString, delim=','; kwargs...)
     open(file, "r") do io
         mmap_data = Mmap.mmap(io)
-        _csvread_internal(WeakRefString(pointer(mmap_data), length(mmap_data)), delim; filename=file, kwargs...)
+        _csvread_internal(String(mmap_data), delim; filename=file, kwargs...)
     end
 end
 
