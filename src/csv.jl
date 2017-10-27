@@ -425,7 +425,7 @@ function promote_column(col, rowno, T, inner=false)
             end
             return arr
         elseif T <: DataValue
-            DataValueArray(Array{eltype(T)}(length(col)), zeros(Bool, length(col)))
+            DataValueArray(Array{eltype(T)}(length(col)), ones(Bool, length(col)))
         else
             error("empty to non-nullable")
         end
