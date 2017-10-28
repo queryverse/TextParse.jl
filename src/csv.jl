@@ -100,7 +100,7 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
                                     delim=','; kwargs...)
     @assert !isempty(files)
     colspool = ColsPool()
-    cols, headers, rec, nrows = try
+    cols, headers, parsers, nrows = try
         _csvread_f(files[1], delim;
                    noresize=true,
                    colspool=colspool,
@@ -117,9 +117,9 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
             n = ceil(Int, nrows * sqrt(2))
             resizecols(colspool, n)
         end
-        cols, headers, rec, nrows = try
+        cols, headers, parsers, nrows = try
             _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
-                       prevheaders=headers, noresize=true, rec=rec, kwargs...)
+                       prevheaders=headers, noresize=true, prev_parsers=parsers, kwargs...)
         catch err
             println(STDERR, "Error parsing $(f)")
             rethrow(err)
@@ -149,7 +149,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  colspool = ColsPool(),
                  nrows = !isempty(colspool) ?
                      length(first(colspool)[2]) : 0,
-                 rec = nothing,
+                 prev_parsers = nothing,
                  colparsers=[],
                  filename=nothing,
                  type_detect_rows=20)
@@ -191,12 +191,9 @@ function _csvread_internal(str::AbstractString, delim=',';
     end
 
     # seed guesses using those from previous file
-    prevs = rec !== nothing ?
-        Dict(zip(prevheaders, map(x->x.inner, rec.fields))) : nothing
-
     guess, pos1 = guesscolparsers(str, canonnames, opts,
                                   pos, type_detect_rows, colparsers,
-                                  nastrings, prevs)
+                                  nastrings, prev_parsers)
 
     if isempty(canonnames)
         canonnames = Any[1:length(guess);]
@@ -206,10 +203,11 @@ function _csvread_internal(str::AbstractString, delim=',';
         c = get(canonnames, i, i)
         # Make column nullable if it's showing up for the
         # first time, but not in the first file
-        if !(fieldtype(v) <: StringLike) && rec !== nothing && !haskey(colspool, c)
+        if !(fieldtype(v) <: StringLike) && prev_parsers !== nothing && !haskey(colspool, c)
             v = isa(v, NAToken) ? v : NAToken(v)
         end
-        guess[i] = tofield(v, opts)
+        p = tofield(v, opts)
+        guess[i] = p
     end
 
     # the last field is delimited by line end
@@ -246,7 +244,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                                                             rowno-1,
                                                             fieldtype(f))
                     catch err
-                        error("Could not convert column $c of type $(eltype(colspool[c])) to type $(fieldtype(f))")
+                        error("Could not convert column $c of eltype $(eltype(colspool[c])) to eltype $(fieldtype(f))")
                     end
                 end
             else
@@ -398,7 +396,12 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     end
 
-    cols, canonnames, rec, finalrows
+    parsers = prev_parsers === nothing ? Dict() : copy(prev_parsers)
+    for i in 1:length(rec.fields)
+        name = get(canonnames, i, i)
+        parsers[name] = rec.fields[i].inner
+    end
+    cols, canonnames, parsers, finalrows
 end
 
 function promote_field(failed_str, field, col, err, nastrings)
