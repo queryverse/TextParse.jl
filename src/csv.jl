@@ -37,10 +37,8 @@ end
 optionsiter(opts::AbstractVector, header) = optionsiter(opts)
 
 tofield(f::AbstractField, opts) = f
-tofield(f::AbstractToken, opts) =
-    Field(f, delim=opts.endchar)
-tofield(f::StringToken, opts) =
-    Field(Quoted(f), delim=opts.endchar)
+tofield(f::AbstractToken, opts) = Field(f)
+tofield(f::StringToken, opts) = Field(Quoted(f))
 tofield(f::Type, opts) = tofield(fromtype(f), opts)
 tofield(f::Type{String}, opts) = tofield(fromtype(StrRange), opts)
 tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
@@ -56,6 +54,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 
 - `file`: either an IO object or file name string
 - `delim`: the delimiter character
+- `spacedelim`: (Bool) parse space-delimited files. `delim` has no effect if true.
 - `quotechar`: character used to quote strings, defaults to `"`
 - `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
 - `pooledstrings`: whether to try and create PooledArray of strings
@@ -134,6 +133,7 @@ end
 
 # read CSV in a string
 function _csvread_internal(str::AbstractString, delim=',';
+                 spacedelim=false,
                  quotechar='"',
                  escapechar='\\',
                  pooledstrings=true,
@@ -154,7 +154,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  filename=nothing,
                  type_detect_rows=20)
 
-    opts = LocalOpts(delim, quotechar, escapechar, false, false)
+    opts = LocalOpts(delim, spacedelim, quotechar, escapechar, false, false)
     len = endof(str)
     pos = start(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
@@ -292,7 +292,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             if l !== endof(str) && err.pos >= l && !field.eoldelim
                 if fieldtype(field) <: AbstractString || fieldtype(field) <: StrRange
                     # retry assuming newlines can be part of the field
-                    wopts = LocalOpts(opts.endchar, opts.quotechar, opts.escapechar, opts.includequotes, true)
+                    wopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar, opts.escapechar, opts.includequotes, true)
                     fieldsvec = Any[rec.fields...]
                     fieldsvec[err.colno] = swapinner(field, WrapLocalOpts(wopts, field.inner))
                     rec = Record((fieldsvec...))

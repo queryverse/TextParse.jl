@@ -25,6 +25,7 @@ function tryparsenext end
 
 Options local to the token currently being parsed.
 - `endchar`: Till where to parse. (e.g. delimiter or quote ending character)
+- `spacedelim`: Treat spaces as delimiters
 - `quotechar`: the quote character
 - `escapechar`: char that escapes the quote
 - `includequotes`: whether to include quotes while parsing
@@ -32,13 +33,14 @@ Options local to the token currently being parsed.
 """
 immutable LocalOpts
     endchar::Char         # End parsing at this char
+    spacedelim::Bool
     quotechar::Char       # Quote char
     escapechar::Char      # Escape char
     includequotes::Bool   # Whether to include quotes in string parsing
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
-const default_opts = LocalOpts(',', '"', '\\', false, false)
+const default_opts = LocalOpts(',', false, '"', '\\', false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
     tryparsenext(tok, str, start(str), endof(str), opts)
@@ -220,7 +222,9 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len, opts)
 
     while i <= len
         c, ii = next(str, i)
-        if c == opts.endchar
+        if opts.spacedelim && c == ' ' || c == '\t'
+            break
+        elseif !opts.spacedelim && c == opts.endchar
             if opts.endchar == opts.quotechar
                 # this means we're inside a quoted string
                 if opts.quotechar == opts.escapechar
@@ -250,6 +254,8 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len, opts)
             if opts.includequotes
                 i = ii
             end
+            break
+        elseif opts.spacedelim && c == ' ' || c == '\t'
             break
         elseif (!opts.includenewlines && isnewline(c))
             break
@@ -357,7 +363,7 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
     end
 
     if quotestarted
-        qopts = LocalOpts(quotechar(q, opts), quotechar(q, opts), escapechar(q, opts),
+        qopts = LocalOpts(quotechar(q, opts), false, quotechar(q, opts), escapechar(q, opts),
                          q.includequotes, q.includenewlines)
         @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
     else
@@ -420,7 +426,7 @@ function tryparsenext{T}(dt::DateTimeToken{T}, str, i, len, opts)
     if isnull(nt)
         return R(), i
     else
-        return R(T(unsafe_get(nt)...)), i
+        return R(T(nt.value...)), i
     end
 end
 
@@ -491,7 +497,7 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
     return R(T(x)), ii
 
     @label maybe_null
-    naopts = LocalOpts(endchar(na,opts), opts.quotechar,
+    naopts = LocalOpts(endchar(na,opts), opts.spacedelim, opts.quotechar,
                        opts.escapechar, false, opts.includenewlines)
     @chk2 nastr, ii = tryparsenext(StringToken(String), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
@@ -520,40 +526,30 @@ immutable Field{T,S<:AbstractToken} <: AbstractField{T}
     ignore_init_whitespace::Bool
     ignore_end_whitespace::Bool
     eoldelim::Bool
-    spacedelim::Bool
-    delim::Nullable{Char}
 end
 
-function Field{S}(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true,
-                  eoldelim=false, spacedelim=false, delim=Nullable{Char}())
+function Field{S}(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true, eoldelim=false)
     T = fieldtype(inner)
-    Field{T,S}(inner, ignore_init_whitespace, ignore_end_whitespace,
-               eoldelim, spacedelim, delim)
+    Field{T,S}(inner, ignore_init_whitespace, ignore_end_whitespace, eoldelim)
 end
 
 function Field(f::Field; inner=f.inner, ignore_init_whitespace=f.ignore_init_whitespace,
                   ignore_end_whitespace=f.ignore_end_whitespace,
-                  eoldelim=f.eoldelim, spacedelim=f.spacedelim, delim=f.delim)
+                  eoldelim=f.eoldelim)
     T = fieldtype(inner)
-    Field{T,typeof(inner)}(inner, ignore_init_whitespace, ignore_end_whitespace,
-               eoldelim, spacedelim, delim)
+    Field{T,typeof(inner)}(inner, ignore_init_whitespace,
+                           ignore_end_whitespace, eoldelim)
 end
-
-@inline delim(f::Field, opts) = get(f.delim, opts.endchar)
 
 function swapinner(f::Field, inner::AbstractToken;
         ignore_init_whitespace= f.ignore_end_whitespace
       , ignore_end_whitespace=f.ignore_end_whitespace
       , eoldelim=f.eoldelim
-      , spacedelim=f.spacedelim
-      , delim=f.delim
   )
     Field(inner;
         ignore_init_whitespace=ignore_end_whitespace
       , ignore_end_whitespace=ignore_end_whitespace
       , eoldelim=eoldelim
-      , spacedelim=spacedelim
-      , delim=delim
      )
 
 end
@@ -574,13 +570,14 @@ function tryparsenext{T}(f::Field{T}, str, i, len, opts)
         i0 = i
         while i <= len
             @inbounds c, ii = next(str, i)
-            !isspace(c) && break
+            !opts.spacedelim && opts.endchar == '\t' && c == '\t' && (i =ii; @goto done)
+            !isspace(c) && c != '\t' && break
             i = ii
-            delim(f, opts) == '\t' && c == '\t' && @goto done
         end
 
-        f.spacedelim && i > i0 && @goto done
+        opts.spacedelim && i > i0 && @goto done
     end
+    # todo don't ignore whitespace AND spacedelim
 
     if i > len
         if f.eoldelim
@@ -591,8 +588,8 @@ function tryparsenext{T}(f::Field{T}, str, i, len, opts)
     end
 
     @inbounds c, ii = next(str, i)
-    delim(f, opts) == c && (i=ii; @goto done)
-    f.spacedelim && isspace(c) && (i=ii; @goto done)
+    opts.spacedelim && (isspace(c) || c == '\t') && (i=ii; @goto done)
+    !opts.spacedelim && opts.endchar == c && (i=ii; @goto done)
 
     if f.eoldelim
         if c == '\r'

@@ -51,7 +51,7 @@ import TextParse: StringToken
     @test tryparsenext(StringToken(String), "x\ny") |> unwrap == ("x", 2)
     @test tryparsenext(StringToken(String), "x,y") |> unwrap == ("x", 2) # test escape
 
-    opts = LocalOpts(',', '"', '"', true, true)
+    opts = LocalOpts(',', false, '"', '"', true, true)
     @test tryparsenext(StringToken(String), "", opts) |> unwrap == ("", 1)
     @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"\"", 3)
     @test tryparsenext(StringToken(String), "x", opts) |> unwrap == ("x", 2)
@@ -59,22 +59,24 @@ import TextParse: StringToken
     @test tryparsenext(StringToken(String), "x\ny", opts) |> unwrap == ("x\ny", 4)
     @test tryparsenext(StringToken(String), "\"x\ny\"", opts) |> unwrap == ("\"x\ny\"", 6)
 
-    opts = LocalOpts(',', '"', '"', false, true)
+    opts = LocalOpts(',', false, '"', '"', false, true)
     # test that includequotes option doesn't affect string
     @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"\"", 3)
 
-    opts = LocalOpts(',', '"', '\\', false, false)
+    opts = LocalOpts(',', false, '"', '\\', false, false)
     str =  "Owner 2 ”Vicepresident\"\""
     @test tryparsenext(Quoted(String), str) |> unwrap == (str, endof(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
     @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == (str, endof(str1)+1)
 
+    opts = LocalOpts(',', true, '"', '\\', false, false)
+    @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
 end
 
 
 import TextParse: Quoted, NAToken, Unknown
 @testset "Quoted string parsing" begin
-    opts = LocalOpts(',', '"', '"', true, true)
+    opts = LocalOpts(',', false, '"', '"', true, true)
 
     @test tryparsenext(Quoted(String), "\"\"") |> unwrap == ("", 3)
     @test tryparsenext(Quoted(String), "\"\" ", opts) |> unwrap == ("", 3)
@@ -103,12 +105,15 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap |> unwrap == (21, 5)
     @test isnull(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
-    opts = LocalOpts(',', '"', '"', false, false)
+    opts = LocalOpts(',', false,'"', '"', false, false)
     @test tryparsenext(Quoted(StringToken(String)), "x,", opts) |> unwrap == ("x", 2)
 
     # stripspaces
     @test tryparsenext(Quoted(Percentage()), "\" 10%\",", opts) |> unwrap == (0.1, 7)
     @test tryparsenext(Quoted(String), "\" 10%\",", opts) |> unwrap == (" 10%", 7)
+    opts = LocalOpts(',', true,'"', '"', false, false)
+    @test tryparsenext(Quoted(StringToken(String)), "\"x y\" y", opts) |> unwrap == ("x y", 6)
+    @test tryparsenext(Quoted(StringToken(String)), "x y", opts) |> unwrap == ("x", 2)
 end
 
 @testset "NA parsing" begin
@@ -121,21 +126,24 @@ end
 import TextParse: Field
 @testset "Field parsing" begin
     f = fromtype(Int)
-    @test tryparsenext(Field(f,delim=','), "12,3") |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,delim=','), "12 ,3") |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,delim=','), " 12 ,3") |> unwrap == (12, 6)
-    @test tryparsenext(Field(f,delim='\t'), "12\t3") |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,delim='\t'), "12 \t3") |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,delim='\t'), " 12 \t 3") |> unwrap == (12, 6)
-    @test tryparsenext(Field(f,spacedelim=true), " 12 3") |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,spacedelim=true), " 12 3") |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,spacedelim=true, ignore_end_whitespace=false), " 12 \t 3") |> unwrap == (12, 5)
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim=' '), "12 3") |> unwrap == (12, 4)
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), "12 \t3") |> failedat == 3
-    @test tryparsenext(Field(f,ignore_end_whitespace=false, delim='\t'), " 12\t 3") |> unwrap == (12,5)
-    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n") |> unwrap == (12,5)
+    @test tryparsenext(Field(f), "12,3") |> unwrap == (12, 4)
+    @test tryparsenext(Field(f), "12 ,3") |> unwrap == (12, 5)
+    @test tryparsenext(Field(f), " 12 ,3") |> unwrap == (12, 6)
+    opts = LocalOpts('\t', false, 'x','x',true,false)
+    @test tryparsenext(Field(f), "12\t3", 1, 4, opts) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f), "12 \t3", 1, 5, opts) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f), " 12 \t 3", 1, 6, opts) |> unwrap == (12, 6)
+    opts = LocalOpts('\t', true, 'x','x',true,false)
+    @test tryparsenext(Field(f), " 12 3", 1, 5, opts) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f, ignore_end_whitespace=false), " 12 \t 3", 1,6, opts) |> unwrap == (12, 5)
+    opts = LocalOpts(' ', false, 'x','x',false, false)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false), "12 3", 1,4,opts) |> unwrap == (12, 4)
+#    @test tryparsenext(Field(f,ignore_end_whitespace=false), "12 \t3", 1,5,opts) |> failedat == 3
+    opts = LocalOpts('\t', false, 'x','x',false, false)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false), " 12\t 3", 1, 6, opts) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), " 12\n", 1, 4, opts) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), " 12\n\r\n", 1, 5, opts) |> unwrap == (12,6)
     @test tryparsenext(Field(f,eoldelim=true), " 12") |> unwrap == (12,4)
-    @test tryparsenext(Field(f,eoldelim=true, delim='\t'), " 12\n\r\n") |> unwrap == (12,6)
 end
 
 
@@ -151,18 +159,18 @@ end
 
 import TextParse: UseOne
 @testset "UseOne" begin
-    f = UseOne((Field(fromtype(Int), delim=';'), Field(fromtype(Float64)), Field(fromtype(Int), eoldelim=true)), 3)
-    @test tryparsenext(f, "1; 33.21, 45", 1, 12) |> unwrap == (45, 13)
+    f = UseOne((Field(fromtype(Int)), Field(fromtype(Float64)), Field(fromtype(Int), eoldelim=true)), 3)
+    @test tryparsenext(f, "1, 33.21, 45", 1, 12) |> unwrap == (45, 13)
 end
 
 import TextParse: Repeated
 @testset "Repeated" begin
-    f = Repeated(Field(fromtype(Int), delim=';'), 3)
-    @test tryparsenext(f, "1; 33; 45;", 1, 12) |> unwrap == ((1,33,45), 11)
+    f = Repeated(Field(fromtype(Int)), 3)
+    @test tryparsenext(f, "1, 33, 45,", 1, 12) |> unwrap == ((1,33,45), 11)
 
-    inp = join(map(string, [1:45;]), "; ") * "; "
+    inp = join(map(string, [1:45;]), ", ") * ", "
     out = ntuple(identity, 45)
-    f2 = Repeated(Field(fromtype(Int), delim=';'), 45)
+    f2 = Repeated(Field(fromtype(Int)), 45)
     @test tryparsenext(f2, inp, 1, length(inp)) |> unwrap == (out, length(inp))
     #@benchmark tryparsenext($f2, $inp, 1, length($inp))
 end
@@ -170,7 +178,7 @@ end
 
 import TextParse: quotedsplit
 @testset "quotedsplit" begin
-    opts = LocalOpts(',', '"', '\\', false, false)
+    opts = LocalOpts(',', false, '"', '\\', false, false)
     @test quotedsplit("x", opts, false, 1, 1) == ["x"]
     @test quotedsplit("x, y", opts, false, 1, 4) == ["x", "y"]
     @test quotedsplit("\"x\", \"y\"", opts,false, 1, 8) == ["x", "y"]
@@ -180,7 +188,7 @@ import TextParse: quotedsplit
     @test quotedsplit(",", opts, true, 1, 1) == ["", ""]
     @test quotedsplit(", ", opts, false, 1, 2) == ["", ""]
     str = "1, \"x \"\"y\"\" z\", 1"
-    qopts = LocalOpts(',', '"', '"', false, false)
+    qopts = LocalOpts(',', false,'"', '"', false, false)
     @test quotedsplit(str, qopts,true, 1, endof(str)) == ["1", "\"x \"\"y\"\" z\"", "1"]
 end
 
@@ -198,7 +206,7 @@ import TextParse: LocalOpts, readcolnames
     str2 = """
      a, " b", "c", "d\\" e "
     """
-    opts = LocalOpts(',', '"', '\\', false, false)
+    opts = LocalOpts(',', false, '"', '\\', false, false)
     @test readcolnames(str1, opts, 1, String[]) == (["a", "b", "c d", "e"], 13)
     @test readcolnames("\n\r$str1", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "e"], 15)
     #@test readcolnames("$str2", opts, 3, Dict(3=>"x")) == (["a", "b", "x", "d\" e"], 24)
@@ -265,7 +273,7 @@ import TextParse: guesscolparsers
     x y,1.0,1,
     ,1.0,,1
     """
-    opts = LocalOpts(',', '"', '\\', false, false)
+    opts = LocalOpts(',', false, '"', '\\', false, false)
     _, pos = readcolnames(str1, opts, 1, String[])
     testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers)
     @test testtill(0) |> first == Any[]
@@ -300,7 +308,7 @@ end
 
 @testset "date parsing" begin
     tok = DateTimeToken(DateTime, dateformat"yyyy-mm-dd HH:MM:SS")
-    opts = LocalOpts('y', '"', '\\', false, false)
+    opts = LocalOpts('y', false, '"', '\\', false, false)
     str = "1970-02-02 02:20:20"
     @test tryparsenext(tok, str, 1, length(str), opts) |> unwrap == (DateTime("1970-02-02T02:20:20"), length(str)+1)
     @test tryparsenext(tok, str*"x", 1, length(str)+1, opts) |> unwrap == (DateTime("1970-02-02T02:20:20"), length(str)+1)
@@ -422,6 +430,13 @@ end
     1,1,1
     """
     @test _csvread(str1, skiplines_begin=3) == (([1], [1], [1]), String["x", "y","z"])
+
+    s = """
+    x,y z
+    a,b 1
+    e  	3
+    """
+    @test _csvread(s, spacedelim=true) == ((["a,b", "e"],[1,3]), ["x,y","z"])
 end
 
 using PooledArrays
