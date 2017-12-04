@@ -222,7 +222,7 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len, opts)
 
     while i <= len
         c, ii = next(str, i)
-        if opts.spacedelim && c == ' ' || c == '\t'
+        if opts.spacedelim && (c == ' ' || c == '\t')
             break
         elseif !opts.spacedelim && c == opts.endchar
             if opts.endchar == opts.quotechar
@@ -254,8 +254,6 @@ function tryparsenext{T}(s::StringToken{T}, str, i, len, opts)
             if opts.includequotes
                 i = ii
             end
-            break
-        elseif opts.spacedelim && c == ' ' || c == '\t'
             break
         elseif (!opts.includenewlines && isnewline(c))
             break

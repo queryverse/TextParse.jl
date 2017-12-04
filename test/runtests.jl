@@ -68,7 +68,7 @@ import TextParse: StringToken
     @test tryparsenext(Quoted(String), str) |> unwrap == (str, endof(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
     @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == (str, endof(str1)+1)
-
+    @test tryparsenext(Quoted(String), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
 end
