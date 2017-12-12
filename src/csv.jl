@@ -475,6 +475,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     guess = []
     prevfields = String[]
 
+    givenkeys = !isempty(colparsers) ? first.(collect(optionsiter(colparsers, header))) : []
     for i=1:nrows
         pos, _ = eatnewlines(str, pos)
         if pos > endof(str)
@@ -499,6 +500,9 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
         # update guess
         for j in 1:length(guess)
+            if j in givenkeys
+                continue # user specified this
+            end
             if length(fields) != length(guess)
                 error("previous rows had $(length(guess)) fields but row $i has $(length(fields))")
             end

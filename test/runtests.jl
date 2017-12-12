@@ -419,6 +419,13 @@ import TextParse: _csvread
 
     # shouldn't fail because y doesn't exist
     @test _csvread("x\n1", colparsers=Dict("y"=>String)) == (([1],), ["x"])
+
+    # Don't try to guess type if it's provided by user. Issue JuliaDB.jl#109
+    s="""
+    time,value
+    "2017-11-09T07:00:07.391101180",0
+    """
+    @test _csvread(s, colparsers=Dict(:time=>String)) == ((String["2017-11-09T07:00:07.391101180"], [0]), String["time", "value"])
 end
 
 @testset "skiplines_begin" begin
