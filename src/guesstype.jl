@@ -25,7 +25,11 @@ function guessdateformat(str)
     dts = vcat(dts, Any[DateTime => d for d in common_datetime_formats])
 
     for (typ, df) in dts
-        x, len = tryparsenext_internal(typ, str, 1, endof(str), df)
+        x, len = try
+            tryparsenext_internal(typ, str, 1, endof(str), df)
+        catch err
+            continue
+        end
         if !isnull(x)
             try
                 typ(get(x)...)
