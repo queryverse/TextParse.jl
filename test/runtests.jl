@@ -427,6 +427,8 @@ import TextParse: _csvread
     """
     @test _csvread(s) == ((String["2017-11-09T07:00:07.391101180"], [0]), String["time", "value"])
     @test _csvread(s, colparsers=Dict(:time=>String)) == ((String["2017-11-09T07:00:07.391101180"], [0]), String["time", "value"])
+
+    @test _csvread("") == ((), String[])
 end
 
 @testset "skiplines_begin" begin

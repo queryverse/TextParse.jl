@@ -112,7 +112,7 @@ function csvread{T<:AbstractString}(files::AbstractVector{T},
     count = Int[nrows]
     prev = nrows
     for f in files[2:end]
-        if length(cols[1]) == nrows
+        if !isempty(cols) && length(cols[1]) == nrows
             n = ceil(Int, nrows * sqrt(2))
             resizecols(colspool, n)
         end
@@ -194,7 +194,6 @@ function _csvread_internal(str::AbstractString, delim=',';
     guess, pos1 = guesscolparsers(str, canonnames, opts,
                                   pos, type_detect_rows, colparsers,
                                   nastrings, prev_parsers)
-
     if isempty(canonnames)
         canonnames = Any[1:length(guess);]
     end
@@ -211,8 +210,14 @@ function _csvread_internal(str::AbstractString, delim=',';
     end
 
     # the last field is delimited by line end
-    guess[end] = swapinner(guess[end], guess[end]; eoldelim = true)
-    rec = Record((guess...,))
+    if !isempty(guess)
+        guess[end] = swapinner(guess[end], guess[end]; eoldelim = true)
+        rec = Record((guess...,))
+    else
+        parsers = prev_parsers === nothing ? Dict() : copy(prev_parsers)
+        rec = Record(())
+        return (), String[], parsers, 0
+    end
 
     if isempty(canonnames)
         canonnames = Any[1:length(rec.fields);]
@@ -653,6 +658,9 @@ function quotedsplit(str, opts, includequotes, i=start(str), l=endof(str))
 
     f = Field(strtok, eoldelim=true)
     strs = String[]
+    if l == 0
+        return strs
+    end
     while i <= l # this means that there was an empty field at the end of the line
         @chk2 x, i = tryparsenext(f, str, i, l, opts)
         push!(strs, x)
