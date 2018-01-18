@@ -135,7 +135,7 @@ end
 function _csvread_internal(str::AbstractString, delim=',';
                  spacedelim=false,
                  quotechar='"',
-                 escapechar='\\',
+                 escapechar='"',
                  pooledstrings=true,
                  noresize=false,
                  rowno::Int=1,
