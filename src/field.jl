@@ -40,7 +40,7 @@ immutable LocalOpts
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
-const default_opts = LocalOpts(',', false, '"', '\\', false, false)
+const default_opts = LocalOpts(',', false, '"', '"', false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
     tryparsenext(tok, str, start(str), endof(str), opts)
