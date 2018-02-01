@@ -87,8 +87,8 @@ import TextParse: Quoted, NAToken, Unknown
     str1 =  "\"x”y\"\"\""
     @test tryparsenext(Quoted(StringToken(String), required=true), "x\"y\"") |> failedat == 1
 
-    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == ("x”y\"\"", endof(str1)+1)
-    @test tryparsenext(Quoted(StringToken(String)), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
+    @test tryparsenext(Quoted(String, escapechar=Nullable('"')), str1) |> unwrap == ("x”y\"\"", endof(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String), escapechar=Nullable('\\')), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "1") |> unwrap |> unwrap == (1,2)
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap |> failedat == 1
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap |> failedat == 3
