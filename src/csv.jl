@@ -216,7 +216,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     else
         parsers = prev_parsers === nothing ? Dict() : copy(prev_parsers)
         rec = Record(())
-        return (), String[], parsers, 0
+        return (), String[], parsers, rowno-1
     end
 
     if isempty(canonnames)
