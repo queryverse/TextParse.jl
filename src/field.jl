@@ -5,9 +5,9 @@ export CustomParser, Quoted
 using Compat
 
 @compat abstract type AbstractToken{T} end
-fieldtype{T}(::AbstractToken{T}) = T
-fieldtype{T}(::Type{AbstractToken{T}}) = T
-fieldtype{T<:AbstractToken}(::Type{T}) = fieldtype(supertype(T))
+fieldtype(::AbstractToken{T}) where {T} = T
+fieldtype(::Type{AbstractToken{T}}) where {T} = T
+fieldtype(::Type{T}) where {T<:AbstractToken} = fieldtype(supertype(T))
 
 """
 `tryparsenext{T}(tok::AbstractToken{T}, str, i, till, localopts)`
@@ -31,7 +31,7 @@ Options local to the token currently being parsed.
 - `includequotes`: whether to include quotes while parsing
 - `includenewlines`: whether to include newlines while parsing
 """
-immutable LocalOpts
+struct LocalOpts
     endchar::Char         # End parsing at this char
     spacedelim::Bool
     quotechar::Char       # Quote char
@@ -51,7 +51,7 @@ end
     tryparsenext(tok, str, i, len)
 end
 
-immutable WrapLocalOpts{T, X<:AbstractToken} <: AbstractToken{T}
+struct WrapLocalOpts{T, X<:AbstractToken} <: AbstractToken{T}
     opts::LocalOpts
     inner::X
 end
@@ -64,14 +64,14 @@ end
 
 
 # needed for promoting guessses
-immutable Unknown <: AbstractToken{Union{}} end
+struct Unknown <: AbstractToken{Union{}} end
 fromtype(::Type{Union{}}) = Unknown()
 const nullableNA = Nullable{DataValue{Union{}}}(DataValue{Union{}}())
 function tryparsenext(::Unknown, str, i, len, opts)
     nullableNA, i
 end
 show(io::IO, ::Unknown) = print(io, "<unknown>")
-immutable CustomParser{T, F} <: AbstractToken{T}
+struct CustomParser{T, F} <: AbstractToken{T}
     f::Function
 end
 
@@ -98,7 +98,7 @@ The parser function must return a tuple of two values:
 """
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
 
-show{T}(io::IO, c::CustomParser{T}) = print(io, "{{custom:$T}}")
+show(io::IO, c::CustomParser{T}) where {T} = print(io, "{{custom:$T}}")
 
 @inline function tryparsenext(c::CustomParser, str, i, len, opts)
     c.f(str, i, len, opts)
@@ -109,18 +109,18 @@ end
 """
 parse numbers of type T
 """
-immutable Numeric{T} <: AbstractToken{T}
+struct Numeric{T} <: AbstractToken{T}
     decimal::Char
     thousands::Char
 end
-show{T}(io::IO, c::Numeric{T}) = print(io, "<$T>")
+show(io::IO, c::Numeric{T}) where {T} = print(io, "<$T>")
 
-Numeric{T}(::Type{T}, decimal='.', thousands=',') = Numeric{T}(decimal, thousands)
-fromtype{N<:Number}(::Type{N}) = Numeric(N)
+Numeric(::Type{T}, decimal='.', thousands=',') where {T} = Numeric{T}(decimal, thousands)
+fromtype(::Type{N}) where {N<:Number} = Numeric(N)
 
 ### Unsigned integers
 
-function tryparsenext{T<:Signed}(::Numeric{T}, str, i, len)
+function tryparsenext(::Numeric{T}, str, i, len) where {T<:Signed}
     R = Nullable{T}
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
@@ -132,11 +132,11 @@ function tryparsenext{T<:Signed}(::Numeric{T}, str, i, len)
     return R(), i
 end
 
-@inline function tryparsenext{T<:Unsigned}(::Numeric{T}, str, i, len)
+@inline function tryparsenext(::Numeric{T}, str, i, len) where {T<:Unsigned}
     tryparsenext_base10(T,str, i, len)
 end
 
-@inline function tryparsenext{F<:AbstractFloat}(::Numeric{F}, str, i, len)
+@inline function tryparsenext(::Numeric{F}, str, i, len) where {F<:AbstractFloat}
     R = Nullable{F}
     f = 0.0
     @chk2 sign, i = tryparsenext_sign(str, i, len)
@@ -173,7 +173,7 @@ end
     return R(), i
 end
 
-immutable Percentage <: AbstractToken{Float64}
+struct Percentage <: AbstractToken{Float64}
 end
 
 const floatparser = Numeric(Float64)
@@ -198,7 +198,7 @@ Parses string to the AbstractString type `T`. If `T` is `StrRange` returns a
 `StrRange` with start position (`offset`) and `length` of the substring.
 It is used internally by `csvparse` for avoiding allocating strings.
 """
-immutable StringToken{T} <: AbstractToken{T}
+struct StringToken{T} <: AbstractToken{T}
 end
 
 function StringToken{T}(t::Type{T})
@@ -206,9 +206,9 @@ function StringToken{T}(t::Type{T})
 end
 show(io::IO, c::StringToken) = print(io, "<string>")
 
-fromtype{S<:AbstractString}(::Type{S}) = StringToken(S)
+fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
-function tryparsenext{T}(s::StringToken{T}, str, i, len, opts)
+function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
     p = ' '
     i0 = i
@@ -276,7 +276,7 @@ if VERSION <= v"0.6.0-dev"
     end
 end
 
-@inline function _substring{T<:SubString}(::Type{T}, str, i, j)
+@inline function _substring(::Type{T}, str, i, j) where {T<:SubString}
     T(str, i, j)
 end
 
@@ -292,7 +292,7 @@ end
 
 export Quoted
 
-immutable Quoted{T, S<:AbstractToken} <: AbstractToken{T}
+struct Quoted{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
     required::Bool
     stripwhitespaces::Bool
@@ -338,7 +338,7 @@ end
 
 Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
 
-function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
+function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     if i > len
         q.required && @goto error
         # check to see if inner thing is ok with an empty field
@@ -394,7 +394,7 @@ function tryparsenext{T}(q::Quoted{T}, str, i, len, opts)
 end
 
 ## Date and Time
-immutable DateTimeToken{T,S<:DateFormat} <: AbstractToken{T}
+struct DateTimeToken{T,S<:DateFormat} <: AbstractToken{T}
     format::S
 end
 
@@ -418,7 +418,7 @@ function fromtype(nd::Union{Nullable{DateFormat}, DataValue{DateFormat}})
     end
 end
 
-function tryparsenext{T}(dt::DateTimeToken{T}, str, i, len, opts)
+function tryparsenext(dt::DateTimeToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
     nt, i = tryparsenext_internal(T, str, i, len, dt.format, opts.endchar)
     if isnull(nt)
@@ -436,7 +436,7 @@ const nastrings_upcase = ["NA", "NULL", "N/A","#N/A", "#N/A N/A", "#NA",
 
 const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)))
 
-immutable NAToken{T, S<:AbstractToken} <: AbstractToken{T}
+struct NAToken{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
     emptyisna::Bool
     endchar::Nullable{Char}
@@ -470,7 +470,7 @@ end
 
 endchar(na::NAToken, opts) = get(na.endchar, opts.endchar)
 
-function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
+function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
     i = eatwhitespaces(str, i)
     if i > len
@@ -512,14 +512,14 @@ function tryparsenext{T}(na::NAToken{T}, str, i, len, opts)
     return R(), i
 end
 
-fromtype{N<:Nullable}(::Type{N}) = NAToken(fromtype(eltype(N)))
-fromtype{N<:DataValue}(::Type{N}) = NAToken(fromtype(eltype(N)))
+fromtype(::Type{N}) where {N<:Nullable}  = NAToken(fromtype(eltype(N)))
+fromtype(::Type{N}) where {N<:DataValue} = NAToken(fromtype(eltype(N)))
 
 ### Field parsing
 
 @compat abstract type AbstractField{T} <: AbstractToken{T} end # A rocord is a collection of abstract fields
 
-immutable Field{T,S<:AbstractToken} <: AbstractField{T}
+struct Field{T,S<:AbstractToken} <: AbstractField{T}
     inner::S
     ignore_init_whitespace::Bool
     ignore_end_whitespace::Bool
@@ -552,7 +552,7 @@ function swapinner(f::Field, inner::AbstractToken;
 
 end
 
-function tryparsenext{T}(f::Field{T}, str, i, len, opts)
+function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     R = Nullable{T}
     i > len && @goto error
     if f.ignore_init_whitespace

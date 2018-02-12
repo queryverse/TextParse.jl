@@ -4,7 +4,7 @@
 import Base: endof, sizeof, pointer, next
 using Base: UTF_ERR_INVALID_INDEX, is_valid_continuation, utf8_trailing, utf8_offset
 
-type Str <: AbstractString
+mutable struct Str <: AbstractString
     len::Int
     function Str(p::Union{Ptr{Int8},Ptr{UInt8}}, n::Integer)
         s = ccall(:jl_gc_allocobj, Any, (Csize_t,), n+sizeof(Int))

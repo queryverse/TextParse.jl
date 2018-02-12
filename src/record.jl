@@ -1,4 +1,4 @@
-immutable Record{Tf<:Tuple, To}
+struct Record{Tf<:Tuple, To}
     fields::Tf
 end
 
@@ -15,7 +15,7 @@ else
     include_string("typealias RecN{N,U} Record{NTuple{N}, U}")
 end
 
-@generated function tryparsenext{N, To}(r::RecN{N, To}, str, i, len, opts=default_opts)
+@generated function tryparsenext(r::RecN{N, To}, str, i, len, opts=default_opts) where {N, To}
     quote
         R = Nullable{To}
         i > len && @goto error
@@ -37,7 +37,7 @@ const PARSE_ERROR   = 0x01
 const POOL_CROWDED  = 0x02
 const POOL_OVERFLOW = 0x03
 
-@generated function tryparsesetindex{N,To}(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int, opts)
+@generated function tryparsesetindex(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int, opts) where {N,To}
     quote
         R = Result{Int, Tuple{Int,Int,Int,UInt8}}
         err_field = 1
@@ -80,7 +80,7 @@ end
 
 const MAX_POOL_FRACTION = 0.05
 const ROWS_BEFORE_CROWDING = 510
-@inline function setcell!{R}(col::PooledArray{String,R}, i, val::StrRange, str)
+@inline function setcell!(col::PooledArray{String,R}, i, val::StrRange, str) where {R}
     if i > ROWS_BEFORE_CROWDING && length(col.pool) > i * MAX_POOL_FRACTION
         return POOL_CROWDED
     elseif length(col.pool) >= typemax(R)
@@ -98,18 +98,18 @@ end
 
 # Weird hybrid of records and fields
 
-immutable UseOne{T,R<:Record,use} <: AbstractToken{T}
+struct UseOne{T,R<:Record,use} <: AbstractToken{T}
     record::R
 end
 
-fieldtype{T}(::UseOne{T}) = T
+fieldtype(::UseOne{T}) where {T} = T
 
 function UseOne(fields::Tuple, use)
     r = Record(fields)
     UseOne{fieldtype(fields[use]), typeof(r), use}(r)
 end
-getthing{n}(x, ::Type{Val{n}}) = x[n]
-function tryparsenext{T,S,use}(f::UseOne{T,S,use}, str, i, len, opts=default_opts)
+getthing(x, ::Type{Val{n}}) where {n} = x[n]
+function tryparsenext(f::UseOne{T,S,use}, str, i, len, opts=default_opts) where {T,S,use}
     R = Nullable{T}
     @chk2 xs, i = tryparsenext(f.record, str, i, len, opts)
 
@@ -121,15 +121,15 @@ function tryparsenext{T,S,use}(f::UseOne{T,S,use}, str, i, len, opts=default_opt
 end
 
 
-immutable Repeated{F, T, N}
+struct Repeated{F, T, N}
     field::F
 end
 
 Repeated{F}(f::F, n) = Repeated{F, fieldtype(f), n}(f)
 
-fieldtype{F,T,N}(::Repeated{F,T,N}) = NTuple{N,T}
+fieldtype(::Repeated{F,T,N}) where {F,T,N} = NTuple{N,T}
 
-@generated function tryparsenext{F,T,N}(f::Repeated{F,T,N}, str, i, len, opts=default_opts)
+@generated function tryparsenext(f::Repeated{F,T,N}, str, i, len, opts=default_opts) where {F,T,N}
     quote
         R = Nullable{NTuple{N,T}}
         i > len && @goto error

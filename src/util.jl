@@ -150,7 +150,7 @@ failedat(xs) = (@assert isnull(xs[1]); xs[2])
 # (Nullable{StrRange}(StrRange(0,3)), 4) which makes 0 allocations.
 # later when assigning the column inside `tryparsesetindex` we
 # create the string. See `setcell!`
-immutable StrRange
+struct StrRange
     offset::Int
     length::Int
 end
@@ -161,7 +161,7 @@ using PooledArrays
 
 _pointer(x::String, n) = pointer(x, n)
 
-@inline function nonallocating_setindex!{T}(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString)
+@inline function nonallocating_setindex!(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString) where {T}
     # wstr = WeakRefString(_pointer(str, 1+rng.offset), rng.length)
     wstr = str[(1:rng.length) + rng.offset] # so now it is allocating
     pool_idx = searchsortedfirst(pa.pool, wstr)

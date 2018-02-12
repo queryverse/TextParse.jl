@@ -95,8 +95,8 @@ end
 
 const ColsPool = OrderedDict{Union{Int, String}, AbstractVector}
 
-function csvread{T<:AbstractString}(files::AbstractVector{T},
-                                    delim=','; kwargs...)
+function csvread(files::AbstractVector{T},
+                 delim=','; kwargs...) where {T<:AbstractString}
     @assert !isempty(files)
     colspool = ColsPool()
     cols, headers, parsers, nrows = try
@@ -534,8 +534,8 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     guess, pos
 end
 
-function parsefill!{N}(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
-                       pos, lineno, rowno, l=endof(str))
+function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
+                    pos, lineno, rowno, l=endof(str)) where {N}
     pos, lines = eatnewlines(str, pos)
     lineno += lines
     pos <= l && while true
@@ -604,7 +604,7 @@ function makeoutputvec(eltyp, N, pooledstrings)
 end
 
 
-type CSVParseError <: Exception
+mutable struct CSVParseError <: Exception
     err_code
     location_display
     rec
