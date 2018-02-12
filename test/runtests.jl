@@ -4,7 +4,7 @@ import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 using Base.Test
 
 # dumb way to compare two AbstractTokens
-Base.:(==){T<:AbstractToken}(a::T, b::T) = string(a) == string(b)
+Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
 
 import TextParse: eatnewlines
 @testset "eatnewlines" begin

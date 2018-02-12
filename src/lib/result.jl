@@ -1,6 +1,6 @@
 using Compat
 
-immutable IRef{T}
+struct IRef{T}
     value::T
     @compat (::Type{IRef{T}}){T}() = new{T}()
     @compat (::Type{IRef{T}}){T}(value) = new{T}(value)
@@ -14,7 +14,7 @@ function Base.show(io::IO, r::IRef)
     end
 end
 
-immutable Result{T,S}
+struct Result{T,S}
     issuccess::Bool
     value::IRef{T}
     error::IRef{S}
@@ -25,8 +25,8 @@ immutable Result{T,S}
     end
 end
 
-immutable FailedResult end
-immutable SuccessResult end
+struct FailedResult end
+struct SuccessResult end
 
 issuccess(e::Result) = e.issuccess
 value(e::Result) = e.issuccess ? e.value.value : throw(FailedResult())

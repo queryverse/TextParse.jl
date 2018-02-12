@@ -33,14 +33,14 @@ end
 end
 
 # Information for parsing and formatting date time values.
-immutable DateFormat{S, T<:Tuple}
+struct DateFormat{S, T<:Tuple}
     tokens::T
     locale::DateLocale
 end
 
 ### Token types ###
 
-immutable DatePart{letter} <: AbstractDateToken
+struct DatePart{letter} <: AbstractDateToken
     width::Int
     fixed::Bool
 end
@@ -48,13 +48,13 @@ end
 @inline min_width(d::DatePart) = d.fixed ? d.width : 1
 @inline max_width(d::DatePart) = d.fixed ? d.width : 0
 
-function _show_content{c}(io::IO, d::DatePart{c})
+function _show_content(io::IO, d::DatePart{c}) where {c}
     for i = 1:d.width
         write(io, c)
     end
 end
 
-function Base.show{c}(io::IO, d::DatePart{c})
+function Base.show(io::IO, d::DatePart{c}) where {c}
     write(io, "DatePart(")
     _show_content(io, d)
     write(io, ")")
@@ -141,14 +141,14 @@ end
 
 ### Delimiters
 
-immutable Delim{T, length} <: AbstractDateToken
+struct Delim{T, length} <: AbstractDateToken
     d::T
 end
 
 Delim(d::Char) = Delim{Char, 1}(d)
 Delim(d::String) = Delim{String, length(d)}(d)
 
-@inline function tryparsenext{N}(d::Delim{Char, N}, str, i::Int, len)
+@inline function tryparsenext(d::Delim{Char, N}, str, i::Int, len) where {N}
     R = Nullable{Bool}
     for j=1:N
         i > len && return (R(), i)
@@ -158,7 +158,7 @@ Delim(d::String) = Delim{String, length(d)}(d)
     return R(true), i
 end
 
-@inline function tryparsenext{N}(d::Delim{String, N}, str, i::Int, len)
+@inline function tryparsenext(d::Delim{String, N}, str, i::Int, len) where {N}
     R = Nullable{Bool}
     i1 = i
     i2 = start(d.d)
@@ -304,7 +304,7 @@ function DateFormat(f::AbstractString, locale::AbstractString)
     DateFormat(f, LOCALES[locale])
 end
 
-function _show_content{N}(io::IO, d::Delim{Char, N})
+function _show_content(io::IO, d::Delim{Char, N}) where {N}
     if d.d in keys(CONVERSION_SPECIFIERS)
         for i = 1:N
             write(io, '\\', d.d)
@@ -368,7 +368,7 @@ DateTime(dt::AbstractString, df::DateFormat) = parse(DateTime, dt, df)
 
 Date(dt::AbstractString,df::DateFormat) = parse(Date, dt, df)
 
-@generated function format{S, T}(io::IO, dt::TimeType, fmt::DateFormat{S, T})
+@generated function format(io::IO, dt::TimeType, fmt::DateFormat{S, T}) where {S, T}
     N = nfields(T)
     quote
         ts = fmt.tokens
@@ -432,6 +432,6 @@ function Date(Y::AbstractArray, df::DateFormat)
     return reshape(Date[Date(parse(Date, y, df)) for y in Y], size(Y))
 end
 
-function format{T<:TimeType}(Y::AbstractArray{T}, df::DateFormat)
+function format(Y::AbstractArray{<:TimeType}, df::DateFormat)
     return reshape([format(y, df) for y in Y], size(Y))
 end

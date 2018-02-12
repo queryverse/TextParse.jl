@@ -2,9 +2,9 @@
 
 ### Parsing utilities
 
-_directives{S,T}(::Type{DateFormat{S,T}}) = T.parameters
+_directives(::Type{DateFormat{S,T}}) where {S,T} = T.parameters
 
-character_codes{S,T}(df::Type{DateFormat{S,T}}) = character_codes(_directives(df))
+character_codes(df::Type{DateFormat{S,T}}) where {S,T} = character_codes(_directives(df))
 function character_codes(directives::SimpleVector)
     letters = sizehint!(Char[], length(directives))
     for (i, directive) in enumerate(directives)
@@ -126,17 +126,13 @@ function Base.parse(::Type{DateTime}, s::AbstractString, df::typeof(ISODateTimeF
     throw(ArgumentError("Invalid DateTime string"))
 end
 
-function Base.parse{T<:TimeType}(
-    ::Type{T}, str::AbstractString, df::DateFormat=default_format(T),
-)
+function Base.parse(::Type{T}, str::AbstractString, df::DateFormat=default_format(T)) where {T<:TimeType}
     pos, len = start(str), endof(str)
     values, pos = tryparsenext_internal(T, str, pos, len, df, true)
     T(unsafe_get(values)...)
 end
 
-function Base.tryparse{T<:TimeType}(
-    ::Type{T}, str::AbstractString, df::DateFormat=default_format(T),
-)
+function Base.tryparse(::Type{T}, str::AbstractString, df::DateFormat=default_format(T)) where {T<:TimeType}
     pos, len = start(str), endof(str)
     values, pos = tryparsenext_internal(T, str, pos, len, df, false)
     if isnull(values)

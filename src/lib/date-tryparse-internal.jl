@@ -13,9 +13,9 @@ Returns a 2-element tuple `(values, pos)`:
   the passed in type.
 * `pos::Int`: The character index at which parsing stopped.
 """
-@generated function tryparsenext_internal{T<:TimeType}(
-                                                       ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar='\0', raise::Bool=false,
-)
+@generated function tryparsenext_internal(
+                                          ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar='\0', raise::Bool=false,
+) where {T<:TimeType}
     letters = character_codes(df)
 
     tokens = Type[CONVERSION_SPECIFIERS[letter] for letter in letters]
