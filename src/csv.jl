@@ -66,11 +66,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior
 - `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
 """
-function csvread(file::String, delim=','; kwargs...)
-    open(file, "r") do io
-        csvread(io, delim; filename=file, kwargs...)
-    end
-end
+csvread(file::String, delim=','; kwargs...) = _csvread_f(file, delim; kwargs...)[1:2]
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
