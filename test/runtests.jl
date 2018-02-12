@@ -1,6 +1,7 @@
 using TextParse
 
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
+import CodecZlib: GzipCompressorStream
 using Base.Test
 
 # dumb way to compare two AbstractTokens
@@ -506,4 +507,19 @@ import TextParse: eatwhitespaces
     @test tryparsenext(percentparser, "10%")  |> unwrap == (10.0, 4)
     @test tryparsenext(percentparser, "10.32 %") |> unwrap == (10.32, 8)
     @test tryparsenext(percentparser, "2k%") |> failedat ==  2
+end
+
+@testset "read gzipped files" begin
+    fn   = joinpath(@__DIR__, "data", "a.csv")
+    fngz = fn*".gz"
+    open(fn, "r") do ior
+        open(GzipCompressorStream, fngz, "w") do iow
+            write(iow, ior)
+        end
+    end
+    @test csvread(fn)   == csvread(fngz)
+    @test csvread([fn]) == csvread([fngz])
+    if isfile(fngz)
+        rm(fngz)
+    end
 end

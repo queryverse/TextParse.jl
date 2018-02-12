@@ -83,9 +83,19 @@ function _csvread(str::AbstractString, delim=','; kwargs...)
 end
 
 function _csvread_f(file::AbstractString, delim=','; kwargs...)
-    open(file, "r") do io
-        mmap_data = Mmap.mmap(io)
-        _csvread_internal(String(mmap_data), delim; filename=file, kwargs...)
+    # Try to detect file extension for compressed files
+    ext = last(split(file, '.'))
+
+    if ext == "gz" # Gzipped
+        return open(GzipDecompressorStream, file, "r") do io
+            data = read(io)
+            _csvread_internal(String(data), delim; filename=file, kwargs...)
+        end
+    else # Otherwise just try to read the file
+        return open(file, "r") do io
+            data = Mmap.mmap(io)
+            _csvread_internal(String(data), delim; filename=file, kwargs...)
+        end
     end
 end
 
