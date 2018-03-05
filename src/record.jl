@@ -96,6 +96,32 @@ end
     PARSE_SUCCESS
 end
 
+@inline Base.@propagate_inbounds function setcell!(col::StringVector, i, val::StrRange, str)
+    lc = length(col)
+    if lc == i
+        # Update the last existing element in the StringVector
+        l = val.length
+        o = col.offsets[i]
+        resize!(col.buffer, o + l)
+        for j in 1:l
+            col.buffer[o + j] = unsafe_load(_pointer(str, val.offset + j))
+        end
+        col.offsets[i + 1] = o + l
+        return PARSE_SUCCESS
+    elseif lc + 1 == i
+        # push! an element
+        l = val.length
+        o = col.offsets[i]
+        for j in 1:l
+            push!(col.buffer, unsafe_load(_pointer(str, val.offset + j)))
+        end
+        push!(col.offsets, o + l)
+        return PARSE_SUCCESS
+    else
+        error("this shouldn't happen")
+    end
+end
+
 # Weird hybrid of records and fields
 
 struct UseOne{T,R<:Record,use} <: AbstractToken{T}

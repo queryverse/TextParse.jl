@@ -574,6 +574,9 @@ end
 
 function resizecols(colspool, nrecs)
     for (h, c) in colspool
+        if c isa StringVector
+            continue
+        end
         l = length(c)
         resize!(c, nrecs)
         if eltype(c) <: AbstractString
@@ -598,7 +601,7 @@ function makeoutputvec(eltyp, N, pooledstrings)
       if pooledstrings
           resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
       else
-          Array{String}(N)
+          StringVector()
       end
     elseif fieldtype(eltyp) == DataValue{StrRange}
         DataValueArray{String}(N)
