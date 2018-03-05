@@ -585,6 +585,22 @@ function resizecols(colspool, nrecs)
     end
 end
 
+struct StringVector <: AbstractVector{WeakRefString}
+    buffer::Vector{UInt8}
+    offsets::Vector{UInt32}
+end
+StringVector(n::Integer) = StringVector(Vector{UInt8}(n), Vector{UInt32}(n))
+
+Base.size(a::StringVector) = size(a.offsets)
+
+Base.IndexStyle(::Type{<:StringVector}) = IndexLinear()
+
+@inline Base.@propagate_inbounds function Base.getindex(a::StringVector, i::Integer)
+    offset = ifelse(i==1, UInt32(0), a.offsets[i - 1])
+    len = a.offsets[i] - offset
+    WeakRefString(pointer(a.buffer) + offset, len)
+end
+
 function makeoutputvecs(rec, N, pooledstrings)
     map(f->makeoutputvec(f, N, pooledstrings), rec.fields)
 end
@@ -598,7 +614,7 @@ function makeoutputvec(eltyp, N, pooledstrings)
       if pooledstrings
           resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
       else
-          Array{String}(N)
+          StringVector(N)
       end
     elseif fieldtype(eltyp) == DataValue{StrRange}
         DataValueArray{String}(N)
