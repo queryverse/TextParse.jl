@@ -157,13 +157,14 @@ end
 
 
 # PooledArrays for string data
+using WeakRefStrings
 using PooledArrays
 
+_pointer(x::WeakRefString, n) = x.ptr + n - 1
 _pointer(x::String, n) = pointer(x, n)
 
 @inline function nonallocating_setindex!(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString) where {T}
-    # wstr = WeakRefString(_pointer(str, 1+rng.offset), rng.length)
-    wstr = str[(1:rng.length) + rng.offset] # so now it is allocating
+    wstr = WeakRefString(_pointer(str, 1+rng.offset), rng.length)
     pool_idx = searchsortedfirst(pa.pool, wstr)
     if pool_idx > length(pa.pool) || pa.pool[pool_idx] != wstr
         # allocate only here.

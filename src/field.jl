@@ -290,6 +290,10 @@ end
     StrRange(i-1, j-i+1)
 end
 
+@inline function _substring(::Type{WeakRefString}, str, i, j)
+    WeakRefString(_pointer(str, i), j-i+1)
+end
+
 export Quoted
 
 struct Quoted{T, S<:AbstractToken} <: AbstractToken{T}
@@ -497,7 +501,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     @label maybe_null
     naopts = LocalOpts(endchar(na,opts), opts.spacedelim, opts.quotechar,
                        opts.escapechar, false, opts.includenewlines)
-    @chk2 nastr, ii = tryparsenext(StringToken(String), str, i, len, naopts)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
         i=ii
         i = eatwhitespaces(str, i)
