@@ -12,13 +12,29 @@ function StringVector(arr::AbstractArray{<:AbstractString})
     s
 end
 
+const UNDEF_OFFSET = typemax(UInt32)
+function StringVector(pa::PooledArray{<:AbstractString})
+    res = StringVector()
+    for i in 1:length(pa)
+        if pa.refs[i] != 0
+            push!(res, pa.pool[pa.refs[i]])
+        else
+            push!(res.offsets, UNDEF_OFFSET)
+            if !isempty(res.lengths)
+                push!(res.lengths, 0)
+            end
+        end
+    end
+    return res
+end
+
 Base.size(a::StringVector) = (length(a.offsets),)
 
 Base.IndexStyle(::Type{<:StringVector}) = IndexLinear()
 
 @inline Base.@propagate_inbounds function Base.getindex(a::StringVector, i::Integer)
     offset = a.offsets[i]
-    if offset == -1
+    if offset == UNDEF_OFFSET
         throw(UndefRefError())
     end
     len = if length(a.lengths) == 0
@@ -96,12 +112,12 @@ end
 
 function Base.resize!(arr::StringVector, len)
     l = length(arr)
-    resize!(arr.buffer, len + 1)
+    resize!(arr.offsets, len)
     if !isempty(arr.lengths)
         resize!(arr.lengths, len)
     end
     if l < len
-        arr.offsets[l+2:len+1] = -1 # undef
+        arr.offsets[l+2:len+1] = UNDEF_OFFSET # undef
     end
     arr
 end

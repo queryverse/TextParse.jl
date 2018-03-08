@@ -602,7 +602,7 @@ function makeoutputvec(eltyp, N, pooledstrings)
       if pooledstrings
           resize!(PooledArray(PooledArrays.RefArray(UInt8[]), String[]), N)
       else
-          StringVector()
+          resize!(StringVector(), N)
       end
     elseif fieldtype(eltyp) == DataValue{StrRange}
         DataValueArray{String}(N)
