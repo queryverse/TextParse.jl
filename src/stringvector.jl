@@ -1,9 +1,9 @@
 struct StringVector <: AbstractVector{WeakRefString{UInt8}}
     buffer::Vector{UInt8}
-    offsets::Vector{UInt32}
-    lengths::Vector{UInt32}
+    offsets::Vector{UInt64}
+    lengths::Vector{UInt64}
 end
-StringVector() = StringVector(Vector{UInt8}(0), UInt32[], UInt32[])
+StringVector() = StringVector(Vector{UInt8}(0), UInt64[], UInt64[])
 function StringVector(arr::AbstractArray{<:AbstractString})
     s = StringVector()
     for x in arr
@@ -12,7 +12,7 @@ function StringVector(arr::AbstractArray{<:AbstractString})
     s
 end
 
-const UNDEF_OFFSET = typemax(UInt32)
+const UNDEF_OFFSET = typemax(UInt64)
 function StringVector(pa::PooledArray{<:AbstractString})
     res = StringVector()
     for i in 1:length(pa)
@@ -81,7 +81,14 @@ function fill_lengths!(arr::StringVector)
     offsets = arr.offsets
     # fill lengths array
     for i=1:length(offsets)-1
-        arr.lengths[i] = offsets[i+1] - ifelse(offsets[i]==UNDEF_OFFSET, offsets[i+1], offsets[i])
+        next_o = offsets[i+1]
+        if next_o == UNDEF_OFFSET
+            # fill_lengths! is being called for the first time
+            # an offset is UNDEF_OFFSET means that this is the
+            # last element in the array filled so far.
+            next_o = length(arr.buffer)
+        end
+        arr.lengths[i] = next_o - ifelse(offsets[i]==UNDEF_OFFSET, next_o, offsets[i])
     end
     if offsets[end] !== UNDEF_OFFSET
         arr.lengths[end] = length(arr.buffer) - offsets[end]
@@ -122,6 +129,9 @@ function Base.resize!(arr::StringVector, len)
     end
     if l < len
         arr.offsets[l+1:len] = UNDEF_OFFSET # undef
+        if !isempty(arr.lengths)
+            arr.lengths[l+1:len] = 0
+        end
     end
     arr
 end
