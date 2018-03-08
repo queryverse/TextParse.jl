@@ -38,7 +38,7 @@ Base.IndexStyle(::Type{<:StringVector}) = IndexLinear()
         throw(UndefRefError())
     end
     len = if length(a.lengths) == 0
-        (i == length(a) ? length(a.buffer) : a.offsets[i+1]) - offset
+        (i == length(a) ? UInt64(length(a.buffer)) : a.offsets[i+1]) - offset
     else
         a.lengths[i]
     end
@@ -86,14 +86,14 @@ function fill_lengths!(arr::StringVector)
             # fill_lengths! is being called for the first time
             # an offset is UNDEF_OFFSET means that this is the
             # last element in the array filled so far.
-            next_o = length(arr.buffer)
+            next_o = UInt64(length(arr.buffer))
         end
         arr.lengths[i] = next_o - ifelse(offsets[i]==UNDEF_OFFSET, next_o, offsets[i])
     end
     if offsets[end] !== UNDEF_OFFSET
         arr.lengths[end] = length(arr.buffer) - offsets[end]
     else
-        arr.lengths[end] = 0
+        arr.lengths[end] = UInt64(0)
     end
 end
 
