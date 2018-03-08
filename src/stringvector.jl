@@ -1,9 +1,9 @@
 struct StringVector <: AbstractVector{WeakRefString{UInt8}}
     buffer::Vector{UInt8}
     offsets::Vector{UInt64}
-    lengths::Vector{UInt64}
+    lengths::Vector{UInt32}
 end
-StringVector() = StringVector(Vector{UInt8}(0), UInt64[], UInt64[])
+StringVector() = StringVector(Vector{UInt8}(0), UInt64[], UInt32[])
 function StringVector(arr::AbstractArray{<:AbstractString})
     s = StringVector()
     for x in arr
@@ -38,7 +38,7 @@ Base.IndexStyle(::Type{<:StringVector}) = IndexLinear()
         throw(UndefRefError())
     end
     len = if length(a.lengths) == 0
-        (i == length(a) ? UInt64(length(a.buffer)) : a.offsets[i+1]) - offset
+        UInt32((i == length(a) ? UInt64(length(a.buffer)) : a.offsets[i+1]) - offset)
     else
         a.lengths[i]
     end
@@ -93,7 +93,7 @@ function fill_lengths!(arr::StringVector)
     if offsets[end] !== UNDEF_OFFSET
         arr.lengths[end] = length(arr.buffer) - offsets[end]
     else
-        arr.lengths[end] = UInt64(0)
+        arr.lengths[end] = 0
     end
 end
 
