@@ -1,4 +1,4 @@
-struct StringVector <: AbstractVector{WeakRefString}
+struct StringVector <: AbstractVector{WeakRefString{UInt8}}
     buffer::Vector{UInt8}
     offsets::Vector{UInt32}
     lengths::Vector{UInt32}
