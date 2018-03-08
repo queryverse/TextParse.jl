@@ -371,7 +371,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
             @assert isa(failcol, PooledArray)
             # promote to a dense array
-            newcol = Array(failcol)
+            newcol = StringVector(failcol)
             colsvec[err.colno] = newcol
             colspool[canonnames[err.colno]] = newcol
 
@@ -433,7 +433,8 @@ end
 function promote_column(col, rowno, T, inner=false)
     if typeof(col) <: DataValueArray{Union{}}
         if T <: StringLike
-            arr = Array{String, 1}(length(col))
+            arr = StringVector()
+            resize!(arr, length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
