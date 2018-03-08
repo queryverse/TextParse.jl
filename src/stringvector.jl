@@ -4,8 +4,12 @@ struct StringVector <: AbstractVector{WeakRefString}
     lengths::Vector{UInt32}
 end
 StringVector() = StringVector(Vector{UInt8}(0), UInt32[], UInt32[])
-function StringVector(arr::PooledArray{String})
-    StringVector
+function StringVector(arr::AbstractArray{<:AbstractString})
+    s = StringVector()
+    for x in arr
+        push!(s, x)
+    end
+    s
 end
 
 Base.size(a::StringVector) = (length(a.offsets),)
