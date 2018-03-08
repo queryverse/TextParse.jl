@@ -81,9 +81,13 @@ function fill_lengths!(arr::StringVector)
     offsets = arr.offsets
     # fill lengths array
     for i=1:length(offsets)-1
-        arr.lengths[i] = offsets[i+1] - offsets[i]
+        arr.lengths[i] = offsets[i+1] - ifelse(offsets[i]==UNDEF_OFFSET, offsets[i+1], offsets[i])
     end
-    arr.lengths[end] = length(arr.buffer) - offsets[end]
+    if offsets[end] !== UNDEF_OFFSET
+        arr.lengths[end] = length(arr.buffer) - offsets[end]
+    else
+        arr.lengths[end] = 0
+    end
 end
 
 function _setindex!(arr::StringVector, val, idx)
@@ -117,7 +121,7 @@ function Base.resize!(arr::StringVector, len)
         resize!(arr.lengths, len)
     end
     if l < len
-        arr.offsets[l+2:len+1] = UNDEF_OFFSET # undef
+        arr.offsets[l+1:len] = UNDEF_OFFSET # undef
     end
     arr
 end

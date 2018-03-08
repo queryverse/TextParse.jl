@@ -575,9 +575,6 @@ end
 
 function resizecols(colspool, nrecs)
     for (h, c) in colspool
-        if c isa StringVector
-            continue
-        end
         l = length(c)
         resize!(c, nrecs)
         if eltype(c) <: AbstractString
