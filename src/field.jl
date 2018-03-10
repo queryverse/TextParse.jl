@@ -154,13 +154,13 @@ end
 
     c != '.' && @goto parse_e
     @label dec
-    @chk2 y, i = tryparsenext_base10(Int, str, ii, len) done
+    @chk2 y, i = tryparsenext_base10(Int, str, ii, len) parse_e
     f = y / 10.0^(i-ii)
 
+    @label parse_e
     i > len && @goto done
     c, ii = next(str, i)
 
-    @label parse_e
     if c == 'e' || c == 'E'
         @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
         return R(sign*(x+f) * 10.0^exp), i
