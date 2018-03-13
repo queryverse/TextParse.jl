@@ -38,7 +38,8 @@ Base.IndexStyle(::Type{<:StringVector}) = IndexLinear()
         throw(UndefRefError())
     end
     len = if length(a.lengths) == 0
-        UInt32((i == length(a) ? UInt64(length(a.buffer)) : a.offsets[i+1]) - offset)
+        # @show i, length(a), length(a.buffer), a.offsets[i+1], offset
+        UInt32((i == length(a) ? length(a.buffer) : a.offsets[i+1]) - offset)
     else
         a.lengths[i]
     end
@@ -97,15 +98,15 @@ function fill_lengths!(arr::StringVector)
     end
 end
 
-function _setindex!(arr::StringVector, val, idx)
+function _setindex!(arr::StringVector, val::AbstractString, idx::Real)
     buffer = arr.buffer
     l = length(arr.buffer)
     if idx == length(arr) && isempty(arr.lengths) # set last element
-        resize!(buffer, arr.offsets[idx] + endof(val))
-        unsafe_copy!(pointer(buffer, l+1), _pointer(val,1), endof(val))
-        arr.offsets[idx] = arr.offsets[idx-1] + endof(val)
+        resize!(buffer, arr.offsets[idx] + sizeof(val))
+        unsafe_copy!(pointer(buffer, l+1), pointer(val,1), sizeof(val))
+        arr.offsets[idx] = idx > 1 ? arr.offsets[idx-1] + sizeof(val) : sizeof(val)
         if !isempty(arr.lengths)
-            arr.lengths[idx] = endof(val)
+            arr.lengths[idx] = sizeof(val)
         end
         val
     else
@@ -113,12 +114,22 @@ function _setindex!(arr::StringVector, val, idx)
         if isempty(arr.lengths)
             fill_lengths!(arr)
         end
-        resize!(buffer, l + endof(val))
-        unsafe_copy!(pointer(buffer, l+1), _pointer(val,1), endof(val))
-        arr.lengths[idx] = endof(val)
+        resize!(buffer, l + sizeof(val))
+        unsafe_copy!(pointer(buffer, l+1), pointer(val,1), sizeof(val))
+        arr.lengths[idx] = sizeof(val)
         arr.offsets[idx] = l
         val
     end
+end
+
+function _setindex!(arr::StringVector, val::Union{StringVector,AbstractVector{<:AbstractString}}, idx::AbstractVector)
+    if length(val) != length(idx)
+        throw(ArgumentError("length of index range must match length of right hand side."))
+    end
+    for (v, i) in zip(val, idx)
+        _setindex!(arr, v, i)
+    end
+    return val
 end
 
 function Base.resize!(arr::StringVector, len)
@@ -136,13 +147,13 @@ function Base.resize!(arr::StringVector, len)
     arr
 end
 
-function Base.push!(arr::StringVector, val)
+function Base.push!(arr::StringVector, val::AbstractString)
     l = length(arr.buffer)
-    resize!(arr.buffer, l + endof(val))
-    unsafe_copy!(pointer(arr.buffer, l+1), _pointer(val,1), endof(val))
+    resize!(arr.buffer, l + sizeof(val))
+    unsafe_copy!(pointer(arr.buffer, l + 1), pointer(val,1), sizeof(val))
     push!(arr.offsets, l)
     if !isempty(arr.lengths)
-        push!(arr.lengths, endof(val))
+        push!(arr.lengths, sizeof(val))
     end
     arr
 end

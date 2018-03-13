@@ -4,6 +4,9 @@ import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Base.Test
 
+# Test StringVector
+include("stringvector.jl")
+
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
 

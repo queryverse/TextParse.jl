@@ -283,7 +283,7 @@ end
 fromtype(::Type{StrRange}) = StringToken(StrRange)
 
 @inline function alloc_string(str, r::StrRange)
-    unsafe_string(_pointer(str, 1+r.offset), r.length)
+    unsafe_string(pointer(str, 1+r.offset), r.length)
 end
 
 @inline function _substring(::Type{StrRange}, str, i, j)
@@ -291,7 +291,7 @@ end
 end
 
 @inline function _substring(::Type{WeakRefString}, str, i, j)
-    WeakRefString(_pointer(str, i), j-i+1)
+    WeakRefString(pointer(str, i), j-i+1)
 end
 
 export Quoted
