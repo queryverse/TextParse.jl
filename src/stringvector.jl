@@ -57,7 +57,7 @@ end
 
 Base.copy(a::StringVector) = StringVector(copy(a.buffer), copy(a.offsets), copy(a.lengths))
 
-@inline function Base.setindex!(arr::StringVector, val::WeakRefString, idx)
+@inline function Base.setindex!(arr::StringVector, val::WeakRefString, idx::Real)
     p = pointer(arr.buffer)
     if val.ptr <= p + length(arr.buffer)-1 && val.ptr >= p
         # this means we know this guy.
@@ -72,7 +72,7 @@ end
     _setindex!(arr, val, idx)
 end
 
-function _setindex!(arr::StringVector, val::AbstractString, idx::Real)
+function _setindex!(arr::StringVector, val::AbstractString, idx)
     buffer = arr.buffer
     l = length(arr.buffer)
     resize!(buffer, l + sizeof(val))
