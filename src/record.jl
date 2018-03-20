@@ -97,7 +97,7 @@ end
 end
 
 @inline Base.@propagate_inbounds function setcell!(col::StringVector, i, val::StrRange, str)
-    col[i] = WeakRefString(pointer(str, val.offset+1), val.length)
+    col[i] = UnsafeString(pointer(str, val.offset + 1), val.length)
     PARSE_SUCCESS
 end
 

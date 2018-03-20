@@ -13,7 +13,7 @@ using Base.Test
             @test sort(sa) == sort(sv)
             @test copy(sv) == sv
 
-            @testset "setindex with WeakRefString" begin
+            @testset "setindex with UnsafeString" begin
                 # important to start with end because of special branch when
                 # lengths are empty and setting last element
                 tmp = sv[end]
