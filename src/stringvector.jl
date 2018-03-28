@@ -8,7 +8,15 @@ Base.pointer(s::UnsafeString) = s.ptr
 Base.pointer(s::UnsafeString, i::Integer) = s.ptr + i - 1
 
 # Iteration. Largely indentical to Julia 0.6's String
+function Base.start(s::UnsafeString)
+    if s.ptr == C_NULL
+        throw(ArgumentError("pointer has been zeroed. The zeroing most likely happened because the string was moved from a process to another."))
+    end
+    return 1
+end
+
 Base.sizeof(s::UnsafeString) = s.len
+
 function Base.endof(s::UnsafeString)
     p = pointer(s)
     i = sizeof(s)
