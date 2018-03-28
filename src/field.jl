@@ -173,6 +173,35 @@ end
     return R(), i
 end
 
+@inline function tryparsenext(::Numeric{Bool}, str, i, len)
+    i > len && @goto error
+    R = Nullable{Bool}
+    p = pointer(str, i)
+    if i + 3 <= len
+        if ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+                p, "true", 4) == 0 ||
+           ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+                p, "TRUE", 4) == 0 ||
+           ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+                p, "True", 4) == 0
+            return R(true), i + 4
+        end
+    end
+    if i + 4 <= len
+        if ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+                p, "false", 5) == 0 ||
+           ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+                p, "FALSE", 5) == 0 ||
+           ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+                p, "False", 5) == 0
+            return R(false), i + 5
+        end
+    end
+
+    @label error
+    return R(), i
+end
+
 struct Percentage <: AbstractToken{Float64}
 end
 
