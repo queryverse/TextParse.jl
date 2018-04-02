@@ -166,6 +166,11 @@ function _csvread_internal(str::AbstractString, delim=',';
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
     lineno = 0
 
+    c, i = next(str, pos)
+    if c == '\ufeff'
+        pos = i
+    end
+
     pos, lines = eatnewlines(str, pos)
     lineno += lines
     while lineno < skiplines_begin
@@ -573,6 +578,7 @@ function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspo
             resizecols(colspool, nrecs)
         end
     end
+    return rowno # finished before starting
 end
 
 function resizecols(colspool, nrecs)
