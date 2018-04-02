@@ -63,7 +63,7 @@ function StringVector(pa::PooledArray{<:AbstractString})
     res = StringVector()
     for i in 1:length(pa)
         if pa.refs[i] != 0
-            push!(res, pa.pool[pa.refs[i]])
+            push!(res, pa.revpool[pa.refs[i]])
         else
             push!(res.offsets, UNDEF_OFFSET)
             push!(res.lengths, 0)

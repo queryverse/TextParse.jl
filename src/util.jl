@@ -161,8 +161,9 @@ using PooledArrays
 
 @inline function nonallocating_setindex!(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString) where {T}
     wstr = UnsafeString(pointer(str, 1 + rng.offset), rng.length)
-    pool_idx = searchsortedfirst(pa.pool, wstr)
-    if pool_idx > length(pa.pool) || pa.pool[pool_idx] != wstr
+    z = zero(valtype(pa.pool))
+    pool_idx = get(pa.pool, wstr, z)
+    if pool_idx == z
         # allocate only here.
         val = convert(T,alloc_string(str, rng))
         pool_idx = PooledArrays.unsafe_pool_push!(pa, val)
