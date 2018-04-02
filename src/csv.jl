@@ -167,9 +167,11 @@ function _csvread_internal(str::AbstractString, delim=',';
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
     lineno = 0
 
-    c, i = next(str, pos)
-    if c == '\ufeff'
-        pos = i
+    if pos <= len
+        c, i = next(str, pos)
+        if c == '\ufeff'
+            pos = i
+        end
     end
 
     pos, lines = eatnewlines(str, pos)
