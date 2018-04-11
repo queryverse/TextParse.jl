@@ -4,9 +4,6 @@ import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Base.Test
 
-# Test StringVector
-include("stringvector.jl")
-
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
 
@@ -44,13 +41,14 @@ import TextParse: fromtype, Percentage
 end
 
 
-import TextParse: StringToken, UnsafeString
+import TextParse: StringToken
+using WeakRefStrings
 @testset "String parsing" begin
 
     # default options
     @test tryparsenext(StringToken(String), "") |> unwrap == ("", 1)
     x = "x"
-    @test tryparsenext(StringToken(UnsafeString), UnsafeString(pointer(x), 1)) |> unwrap == ("x", 2)
+    @test tryparsenext(StringToken(WeakRefString), WeakRefString(pointer(x), 1)) |> unwrap == ("x", 2)
     @test tryparsenext(StringToken(String), "x") |> unwrap == ("x", 2)
     @test tryparsenext(StringToken(String), "x ") |> unwrap == ("x ", 3)
     @test tryparsenext(StringToken(String), " x") |> unwrap == (" x", 3)

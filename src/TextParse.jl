@@ -2,12 +2,11 @@ __precompile__()
 
 module TextParse
 
-using DataValues, CodecZlib
+using DataValues, CodecZlib, WeakRefStrings
 using Base.Test
 
 include("lib/compat.jl")
 include("util.jl")
-include("stringvector.jl")
 include("field.jl")
 include("record.jl")
 

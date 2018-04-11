@@ -3,4 +3,5 @@ Compat 0.17
 DataValues
 PooledArrays 0.0.2
 DataStructures
+WeakRefStrings
 CodecZlib

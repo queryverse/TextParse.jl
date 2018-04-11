@@ -160,7 +160,8 @@ end
 using PooledArrays
 
 @inline function nonallocating_setindex!(pa::PooledArray{T}, i, rng::StrRange, str::AbstractString) where {T}
-    wstr = UnsafeString(pointer(str, 1 + rng.offset), rng.length)
+    wstr = WeakRefString(convert(Ptr{UInt8}, pointer(str, 1 + rng.offset)),
+                         rng.length)
     z = zero(valtype(pa.pool))
     pool_idx = get(pa.pool, wstr, z)
     if pool_idx == z
