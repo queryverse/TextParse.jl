@@ -143,7 +143,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  quotechar='"',
                  escapechar='"',
                  pooledstrings=true,
-                 unsafestrings=false,
+                 strtype=String,
                  noresize=false,
                  rowno::Int=1,
                  prevheaders=nothing,
@@ -246,7 +246,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     if isempty(colspool)
         # this is the first file, use nrows
-        cols = makeoutputvecs(rec, nrows, pooledstrings, unsafestrings)
+        cols = makeoutputvecs(rec, nrows, pooledstrings, strtype)
         for (c, h) in zip(cols, canonnames)
             colspool[h] = c
         end
@@ -261,13 +261,13 @@ function _csvread_internal(str::AbstractString, delim=',';
                     try
                         return colspool[c] = promote_column(colspool[c],
                                                             rowno-1,
-                                                            fieldtype(f), unsafestrings)
+                                                            fieldtype(f), strtype)
                     catch err
                         error("Could not convert column $c of eltype $(eltype(colspool[c])) to eltype $(fieldtype(f))")
                     end
                 end
             else
-                return colspool[c] = makeoutputvec(f, nrows, pooledstrings, unsafestrings)
+                return colspool[c] = makeoutputvec(f, nrows, pooledstrings, strtype)
             end
         end
         # promote missing columns to nullable
@@ -276,7 +276,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             if !(eltype(colspool[k]) <: DataValue) && !(eltype(colspool[k]) <: StringLike)
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
-                                             DataValue{eltype(colspool[k])}, unsafestrings)
+                                             DataValue{eltype(colspool[k])}, strtype)
             end
         end
         cols = (_cols...)
@@ -342,7 +342,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
-                c = promote_field(s, f, col, err, nastrings, unsafestrings)
+                c = promote_field(s, f, col, err, nastrings, strtype)
                 colspool[name] = c[2]
                 c
             end
@@ -379,11 +379,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
             @assert isa(failcol, PooledArray)
             # promote to a dense array
-            if unsafestrings
-                newcol = StringVector(failcol)
-            else
-                newcol = convert(Array{String}, failcol)
-            end
+            newcol = StringVector{strtype}(failcol)
             colsvec[err.colno] = newcol
             colspool[canonnames[err.colno]] = newcol
 
@@ -429,14 +425,14 @@ function _csvread_internal(str::AbstractString, delim=',';
     cols, canonnames, parsers, finalrows
 end
 
-function promote_field(failed_str, field, col, err, nastrings, unsafestrings)
+function promote_field(failed_str, field, col, err, nastrings, strtype)
     newtoken = guesstoken(failed_str, field.inner, nastrings)
     if newtoken == field.inner
         # no need to change
         return field, col
     end
     newcol = try
-        promote_column(col,  err.rowno-1, fieldtype(newtoken), unsafestrings)
+        promote_column(col,  err.rowno-1, fieldtype(newtoken), strtype)
     catch err2
         Base.showerror(STDERR, err2)
         rethrow(err)
@@ -444,15 +440,10 @@ function promote_field(failed_str, field, col, err, nastrings, unsafestrings)
     swapinner(field, newtoken), newcol
 end
 
-function promote_column(col, rowno, T, unsafestrings, inner=false)
+function promote_column(col, rowno, T, strtype, inner=false)
     if typeof(col) <: DataValueArray{Union{}}
         if T <: StringLike
-            if unsafestrings
-                arr = StringVector()
-                resize!(arr, length(col))
-            else
-                arr = Array{String,1}(length(col))
-            end
+            arr = StringVector{strtype}(length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
@@ -467,10 +458,10 @@ function promote_column(col, rowno, T, unsafestrings, inner=false)
             isnullarray = Array{Bool}(length(col))
             isnullarray[1:rowno] = false
             isnullarray[(rowno+1):end] = true
-            DataValueArray(promote_column(col, rowno, eltype(T), unsafestrings), isnullarray)
+            DataValueArray(promote_column(col, rowno, eltype(T), strtype), isnullarray)
         else
             # Both input and output are nullable arrays
-            vals = promote_column(col.values, rowno, eltype(T), unsafestrings)
+            vals = promote_column(col.values, rowno, eltype(T), strtype)
             DataValueArray(vals, col.isnull)
         end
     else
@@ -605,11 +596,11 @@ function resizecols(colspool, nrecs)
     end
 end
 
-function makeoutputvecs(rec, N, pooledstrings, unsafestrings)
-    map(f->makeoutputvec(f, N, pooledstrings, unsafestrings), rec.fields)
+function makeoutputvecs(rec, N, pooledstrings, strtype)
+    map(f->makeoutputvec(f, N, pooledstrings, strtype), rec.fields)
 end
 
-function makeoutputvec(eltyp, N, pooledstrings, unsafestrings)
+function makeoutputvec(eltyp, N, pooledstrings, strtype)
     if fieldtype(eltyp) == DataValue{Union{}} # we weren't able to detect the type,
                                          # all columns were blank
         DataValueArray{Union{}}(N)
@@ -617,10 +608,8 @@ function makeoutputvec(eltyp, N, pooledstrings, unsafestrings)
       # By default we put strings in a PooledArray
       if pooledstrings
           resize!(PooledArray(PooledArrays.RefArray(UInt8[]), Dict{String, UInt8}()), N)
-      elseif unsafestrings
-          resize!(StringVector(), N)
       else
-          Array{String, 1}(N)
+          StringVector{strtype}(N)
       end
     elseif fieldtype(eltyp) == DataValue{StrRange}
         DataValueArray{String}(N)
