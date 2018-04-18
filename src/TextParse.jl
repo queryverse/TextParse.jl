@@ -2,7 +2,7 @@ __precompile__()
 
 module TextParse
 
-using DataValues, CodecZlib
+using DataValues, CodecZlib, WeakRefStrings
 using Base.Test
 
 include("lib/compat.jl")
