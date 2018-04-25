@@ -42,11 +42,13 @@ end
 
 
 import TextParse: StringToken
+using WeakRefStrings
 @testset "String parsing" begin
 
     # default options
     @test tryparsenext(StringToken(String), "") |> unwrap == ("", 1)
     x = "x"
+    @test tryparsenext(StringToken(WeakRefString), WeakRefString(pointer(x), 1)) |> unwrap == ("x", 2)
     @test tryparsenext(StringToken(String), "x") |> unwrap == ("x", 2)
     @test tryparsenext(StringToken(String), "x ") |> unwrap == ("x ", 3)
     @test tryparsenext(StringToken(String), " x") |> unwrap == (" x", 3)
@@ -475,7 +477,7 @@ using PooledArrays
     xs = [randstring(10) for i=1:513]
     col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
     @test !isa(col, PooledArray)
-    @test isa(col, Array)
+    @test isa(col, StringArray)
     @test xs == col
 
     # test non-promotion
