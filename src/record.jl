@@ -37,30 +37,62 @@ const PARSE_ERROR   = 0x01
 const POOL_CROWDED  = 0x02
 const POOL_OVERFLOW = 0x03
 
-@generated function tryparsesetindex(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int, opts) where {N,To}
+function gen_1parsesetindex(j, fieldexpr, colexpr)
+    val_j = Symbol(:val, j)
     quote
-        R = Result{Int, Tuple{Int,Int,Int,UInt8}}
+        err_field = $j
+        @chk2 $val_j, ii = tryparsenext($fieldexpr, str, i, len, opts)
+        err = setcell!($colexpr, row, $val_j, str)
+        if err != PARSE_SUCCESS
+            err_code = err
+            @goto error
+        end
+        i = ii
+    end
+end
+
+@generated function tryparsesetindex(r::RecN{N,To}, str::AbstractString, i::Int, len::Int, columns::Tuple, row::Int, opts) where {N,To}
+    fldtypes = Base.fieldtype(r, 1).parameters
+    coltypes = columns.parameters
+    fieldparsers = []
+    j = 1
+    while j <= N
+        ft = fldtypes[j]
+        ct = coltypes[j]
+        rl = 1
+        for k = j+1:N
+            if fldtypes[k] == ft && coltypes[k] == ct
+                rl += 1
+            else
+                break
+            end
+        end
+        if rl > 2
+            body = gen_1parsesetindex(:jj, :(r.fields[jj]::($ft)), :(columns[jj]::($ct)))
+            push!(fieldparsers,
+                  quote
+                  for jj = $j:$(j+rl-1); $body; end
+                  end)
+            j += rl
+        else
+            push!(fieldparsers, gen_1parsesetindex(j, :(r.fields[$j]), :(columns[$j])))
+            j += 1
+        end
+    end
+    R = Result{Int, Tuple{Int,Int,Int,UInt8}}
+    quote
         err_field = 1
         ii = i
         err_code = PARSE_ERROR
         i > len && @goto error
 
-        Base.@nexprs $N j->begin
-            err_field = j
-            @chk2 val_j, ii = tryparsenext(r.fields[j], str, i, len, opts)
-            err = setcell!(columns[j], row, val_j, str)
-            if err != PARSE_SUCCESS
-                err_code = err
-                @goto error
-            end
-            i = ii
-        end
+        $(fieldparsers...)
 
         @label done
-        return R(true, i)
+        return $R(true, i)
 
         @label error
-        R(false, (ii, i, err_field, err_code)) # error char, start of error field, error field
+        $R(false, (ii, i, err_field, err_code)) # error char, start of error field, error field
     end
 end
 
@@ -80,7 +112,7 @@ end
 
 const MAX_POOL_FRACTION = 0.05
 const ROWS_BEFORE_CROWDING = 510
-@inline function setcell!(col::PooledArray{String,R}, i, val::StrRange, str) where {R}
+@noinline function setcell!(col::PooledArray{String,R}, i, val::StrRange, str) where {R}
     if i > ROWS_BEFORE_CROWDING && length(col.pool) > i * MAX_POOL_FRACTION
         return POOL_CROWDED
     elseif length(col.pool) >= typemax(R)
