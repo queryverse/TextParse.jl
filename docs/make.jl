@@ -10,6 +10,7 @@ makedocs(
 )
 
 deploydocs(
+    julia = "nightly",
     repo = "github.com/JuliaComputing/TextParse.jl.git",
     target = "build",
     deps = nothing,
