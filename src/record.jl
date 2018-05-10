@@ -34,8 +34,6 @@ end
 
 const PARSE_SUCCESS = 0x00
 const PARSE_ERROR   = 0x01
-const POOL_CROWDED  = 0x02
-const POOL_OVERFLOW = 0x03
 
 function gen_1parsesetindex(j, fieldexpr, colexpr)
     val_j = Symbol(:val, j)
@@ -108,19 +106,6 @@ end
 @inline function setcell!(col::DataValueArray, i, val::Nullable, str)
     col[i] = DataValue(val)
     PARSE_SUCCESS
-end
-
-const MAX_POOL_FRACTION = 0.05
-const ROWS_BEFORE_CROWDING = 510
-@noinline function setcell!(col::PooledArray{String,R}, i, val::StrRange, str) where {R}
-    if i > ROWS_BEFORE_CROWDING && length(col.pool) > i * MAX_POOL_FRACTION
-        return POOL_CROWDED
-    elseif length(col.pool) >= typemax(R)
-        return POOL_OVERFLOW
-    else
-        nonallocating_setindex!(col, i, val, str)
-        return PARSE_SUCCESS
-    end
 end
 
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)

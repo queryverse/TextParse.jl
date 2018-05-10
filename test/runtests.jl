@@ -456,38 +456,6 @@ end
     @test _csvread(s, spacedelim=true) == ((["a,b", "e"],[1,3]), ["x,y","z"])
 end
 
-using PooledArrays
-
-@testset "pooled array promotion" begin
-    # test default behavior
-    xs = [randstring(10) for i=1:100]
-    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
-    @test isa(col, PooledArray)
-    @test eltype(col.refs) == UInt8
-    @test xs == col
-
-    # test promotion to a widened type
-    xs = [randstring(10) for i=1:300]
-    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
-    @test isa(col, PooledArray)
-    @test eltype(col.refs) == UInt16
-    @test xs == col
-
-    # test promotion to a dense array
-    xs = [randstring(10) for i=1:513]
-    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
-    @test !isa(col, PooledArray)
-    @test isa(col, StringArray)
-    @test xs == col
-
-    # test non-promotion
-    xs = [rand(["X", "Y"]) for i=1:500]
-    col = _csvread(join(xs, "\n"), header_exists=false)[1][1]
-    @test isa(col, PooledArray)
-    @test eltype(col.refs) == UInt8
-    @test xs == col
-end
-
 import TextParse: eatwhitespaces
 @testset "custom parser" begin
     const floatparser = Numeric(Float64)

@@ -47,7 +47,7 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
-1. A tuple of columns each either a `Vector`, `DataValueArray` or `PooledArray`
+1. A tuple of columns each either a `Vector`, `DataValueArray` or `StringArray`
 2. column names if `header_exists=true`, empty array otherwise
 
 # Arguments:
@@ -57,7 +57,6 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `spacedelim`: (Bool) parse space-delimited files. `delim` has no effect if true.
 - `quotechar`: character used to quote strings, defaults to `"`
 - `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
-- `pooledstrings`: whether to try and create PooledArray of strings
 - `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
 - `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
@@ -142,11 +141,11 @@ function _csvread_internal(str::AbstractString, delim=',';
                  spacedelim=false,
                  quotechar='"',
                  escapechar='"',
-                 pooledstrings=true,
                  stringtype=String,
                  noresize=false,
                  rowno::Int=1,
                  prevheaders=nothing,
+                 pooledstrings=nothing,
                  skiplines_begin=0,
                  samecols=nothing,
                  header_exists=true,
@@ -161,6 +160,9 @@ function _csvread_internal(str::AbstractString, delim=',';
                  filename=nothing,
                  type_detect_rows=20)
 
+    if pooledstrings === true
+        warn("pooledstrings argument has been removed")
+    end
     opts = LocalOpts(delim, spacedelim, quotechar, escapechar, false, false)
     len = endof(str)
     pos = start(str)
@@ -246,7 +248,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     if isempty(colspool)
         # this is the first file, use nrows
-        cols = makeoutputvecs(rec, nrows, pooledstrings, stringtype)
+        cols = makeoutputvecs(rec, nrows, stringtype)
         for (c, h) in zip(cols, canonnames)
             colspool[h] = c
         end
@@ -267,7 +269,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                     end
                 end
             else
-                return colspool[c] = makeoutputvec(f, nrows, pooledstrings, stringtype)
+                return colspool[c] = makeoutputvec(f, nrows, stringtype)
             end
         end
         # promote missing columns to nullable
@@ -368,51 +370,6 @@ function _csvread_internal(str::AbstractString, delim=',';
             pos = first(rng)
             @goto retry
 
-        elseif err.err_code == POOL_CROWDED
-
-            colsvec = Any[cols...]
-            failcol = cols[err.colno]
-
-            if debug[]
-                println(STDERR, "Pool too crowded. $(length(failcol.pool)) unique out of $(length(failcol)). Promoting to array of string")
-            end
-
-            @assert isa(failcol, PooledArray)
-            # promote to a dense array
-            newcol = StringVector{stringtype}(failcol)
-            colsvec[err.colno] = newcol
-            colspool[canonnames[err.colno]] = newcol
-
-            rng = getlineat(str, err.fieldpos)
-
-            pos = first(rng)
-            rowno = err.rowno
-            lineno = err.lineno
-            cols = (colsvec...)
-            @goto retry
-
-        elseif err.err_code == POOL_OVERFLOW
-            # promote refs to a wider integer type
-            colsvec = Any[cols...]
-            failcol = cols[err.colno]
-            if debug[]
-                println(STDERR, "Pool overflow.")
-            end
-            @assert isa(failcol, PooledArray)
-            T = _widen(eltype(failcol.refs))
-            newrefs = convert(Array{T}, failcol.refs)
-            newcol = PooledArray(PooledArrays.RefArray(newrefs),
-                                 convert(Dict{eltype(failcol), T}, failcol.pool),
-                                 convert(Dict{T, eltype(failcol)}, failcol.revpool))
-            colsvec[err.colno] = newcol
-            colspool[canonnames[err.colno]] = newcol
-            rng = getlineat(str, err.fieldpos)
-
-            cols = (colsvec...)
-            pos = first(rng)
-            rowno = err.rowno
-            lineno = err.lineno
-            @goto retry
         end
 
     end
@@ -465,7 +422,6 @@ function promote_column(col, rowno, T, stringtype, inner=false)
             DataValueArray(vals, col.isnull)
         end
     else
-        @assert !isa(col, PooledArray) # Pooledarray of strings should never fail
         newcol = Array{T, 1}(length(col))
         copy!(newcol, 1, col, 1, rowno)
         newcol
@@ -596,21 +552,16 @@ function resizecols(colspool, nrecs)
     end
 end
 
-function makeoutputvecs(rec, N, pooledstrings, stringtype)
-    map(f->makeoutputvec(f, N, pooledstrings, stringtype), rec.fields)
+function makeoutputvecs(rec, N, stringtype)
+    map(f->makeoutputvec(f, N, stringtype), rec.fields)
 end
 
-function makeoutputvec(eltyp, N, pooledstrings, stringtype)
+function makeoutputvec(eltyp, N, stringtype)
     if fieldtype(eltyp) == DataValue{Union{}} # we weren't able to detect the type,
                                          # all columns were blank
         DataValueArray{Union{}}(N)
     elseif fieldtype(eltyp) == StrRange
-      # By default we put strings in a PooledArray
-      if pooledstrings
-          resize!(PooledArray(PooledArrays.RefArray(UInt8[]), Dict{String, UInt8}()), N)
-      else
-          StringVector{stringtype}(N)
-      end
+         StringVector{stringtype}(N)
     elseif fieldtype(eltyp) == DataValue{StrRange}
         DataValueArray{String}(N)
     elseif fieldtype(eltyp) <: DataValue
