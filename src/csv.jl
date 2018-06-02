@@ -206,6 +206,11 @@ function _csvread_internal(str::AbstractString, delim=',';
         end
     end
 
+    if length(unique(canonnames)) != length(canonnames)
+        error("""File has multiple column headers with the same name, specify `colnames` by hand
+                 along with `header_exists=false`""")
+    end
+
     # seed guesses using those from previous file
     guess, pos1 = guesscolparsers(str, canonnames, opts,
                                   pos, type_detect_rows, colparsers,
