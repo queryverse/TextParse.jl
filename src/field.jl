@@ -4,7 +4,7 @@ export CustomParser, Quoted
 
 using Compat
 
-@compat abstract type AbstractToken{T} end
+abstract type AbstractToken{T} end
 fieldtype(::AbstractToken{T}) where {T} = T
 fieldtype(::Type{AbstractToken{T}}) where {T} = T
 fieldtype(::Type{T}) where {T<:AbstractToken} = fieldtype(supertype(T))
@@ -201,7 +201,7 @@ It is used internally by `csvparse` for avoiding allocating strings.
 struct StringToken{T} <: AbstractToken{T}
 end
 
-function StringToken{T}(t::Type{T})
+function StringToken(t::Type{T}) where T
     StringToken{T}()
 end
 show(io::IO, c::StringToken) = print(io, "<string>")
@@ -269,13 +269,6 @@ end
     str[i:j]
 end
 
-if VERSION <= v"0.6.0-dev"
-    # from lib/Str.jl
-    @inline function _substring(::Type{Str}, str, i, j)
-        Str(pointer(Vector{UInt8}(str))+(i-1), j-i+1)
-    end
-end
-
 @inline function _substring(::Type{T}, str, i, j) where {T<:SubString}
     T(str, i, j)
 end
@@ -324,13 +317,13 @@ end
 - `quotechar`: character to use to quote (default decided by `LocalOpts`)
 - `escapechar`: character that escapes the quote char (default set by `LocalOpts`)
 """
-function Quoted{S<:AbstractToken}(inner::S;
+function Quoted(inner::S;
     required=false,
     stripwhitespaces=fieldtype(S)<:Number,
     includequotes=false,
     includenewlines=true,
     quotechar=Nullable{Char}(),   # This is to allow file-wide config
-    escapechar=Nullable{Char}())
+    escapechar=Nullable{Char}()) where S<:AbstractToken
 
     T = fieldtype(S)
     Quoted{T,S}(inner, required, stripwhitespaces, includequotes,
@@ -408,8 +401,8 @@ end
 Parse a date time string of format `fmt` into type `T` which is
 either `Date`, `Time` or `DateTime`.
 """
-DateTimeToken{S<:DateFormat}(T::Type, df::S) = DateTimeToken{T, S}(df)
-DateTimeToken{S<:DateFormat}(df::S) = DateTimeToken{DateTime, S}(df)
+DateTimeToken(T::Type, df::S) where {S<:DateFormat} = DateTimeToken{T, S}(df)
+DateTimeToken(df::S) where {S<:DateFormat} = DateTimeToken{DateTime, S}(df)
 fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
 fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
@@ -457,11 +450,11 @@ Parses a Nullable item.
 - `emptyisna`: should an empty item be considered NA? defaults to true
 - `nastrings`: strings that are to be considered NA. Defaults to `$NA_STRINGS`
 """
-function NAToken{S}(
+function NAToken(
     inner::S,
   ; emptyisna=true
   , endchar=Nullable{Char}()
-  , nastrings=NA_STRINGS)
+  , nastrings=NA_STRINGS) where S
 
     T = fieldtype(inner)
     NAToken{DataValue{T}, S}(inner, emptyisna, endchar, nastrings)
@@ -521,7 +514,7 @@ fromtype(::Type{N}) where {N<:DataValue} = NAToken(fromtype(eltype(N)))
 
 ### Field parsing
 
-@compat abstract type AbstractField{T} <: AbstractToken{T} end # A rocord is a collection of abstract fields
+abstract type AbstractField{T} <: AbstractToken{T} end # A rocord is a collection of abstract fields
 
 struct Field{T,S<:AbstractToken} <: AbstractField{T}
     inner::S
@@ -530,7 +523,7 @@ struct Field{T,S<:AbstractToken} <: AbstractField{T}
     eoldelim::Bool
 end
 
-function Field{S}(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true, eoldelim=false)
+function Field(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true, eoldelim=false) where S
     T = fieldtype(inner)
     Field{T,S}(inner, ignore_init_whitespace, ignore_end_whitespace, eoldelim)
 end

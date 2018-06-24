@@ -9,7 +9,7 @@ A token used in parsing or formatting a date time string. Each subtype must
 define the tryparsenext and format methods.
 
 """
-@compat abstract type AbstractDateToken end
+abstract type AbstractDateToken end
 
 """
     format(io::IO, tok::AbstractDateToken, dt::TimeType, locale)
@@ -181,7 +181,7 @@ end
 
 ### DateFormat construction
 
-@compat abstract type DayOfWeekToken end # special addition to Period types
+abstract type DayOfWeekToken end # special addition to Period types
 
 # Map conversion specifiers or character codes to tokens.
 # Note: Allow addition of new character codes added by packages

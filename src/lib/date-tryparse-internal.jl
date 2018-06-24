@@ -152,6 +152,6 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
                 throw(ArgumentError("Unable to parse date time. Expected directive $d at char $pos"))
             end
         end
-        return Nullable{$R}($(Expr(:tuple, value_names...)), $(VERSION < v"0.6.0-dev")), pos, num_parsed
+        return Nullable{$R}($(Expr(:tuple, value_names...)), $(false)), pos, num_parsed
     end
 end

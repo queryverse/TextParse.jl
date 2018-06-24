@@ -2,18 +2,14 @@ struct Record{Tf<:Tuple, To}
     fields::Tf
 end
 
-function Record{T<:Tuple}(t::T)
+function Record(t::T) where T<:Tuple
     To = Tuple{map(fieldtype, t)...}
     #Tov = Tuple{map(s->Vector{s},map(fieldtype, t))...}
     Record{T, To}(t)
 end
 
 # for dispatch on N
-if VERSION >= v"0.6.0-dev.2123" # new type system, julia PR #18457
-    include_string("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
-else
-    include_string("typealias RecN{N,U} Record{NTuple{N}, U}")
-end
+include_string("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
 
 @generated function tryparsenext(r::RecN{N, To}, str, i, len, opts=default_opts) where {N, To}
     quote
@@ -147,7 +143,7 @@ struct Repeated{F, T, N}
     field::F
 end
 
-Repeated{F}(f::F, n) = Repeated{F, fieldtype(f), n}(f)
+Repeated(f::F, n) where {F} = Repeated{F, fieldtype(f), n}(f)
 
 fieldtype(::Repeated{F,T,N}) where {F,T,N} = NTuple{N,T}
 
