@@ -2,8 +2,8 @@ using Compat
 
 struct IRef{T}
     value::T
-    @compat (::Type{IRef{T}}){T}() = new{T}()
-    @compat (::Type{IRef{T}}){T}(value) = new{T}(value)
+    IRef{T}() where {T} = new{T}()
+    IRef{T}(value) where {T} = new{T}(value)
 end
 
 function Base.show(io::IO, r::IRef)
@@ -18,7 +18,7 @@ struct Result{T,S}
     issuccess::Bool
     value::IRef{T}
     error::IRef{S}
-    function (::Type{Result{T,S}}){T,S}(issuccess, val)
+    function Result{T,S}(issuccess, val) where {T,S}
         issuccess ?
             new{T,S}(issuccess, IRef{T}(val), IRef{S}()) :
             new{T,S}(issuccess, IRef{T}(), IRef{S}(val))
