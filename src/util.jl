@@ -35,7 +35,7 @@ end
     i > len && @goto error
     @inbounds c,ii = iterate(str,i)
     '0' <= c <= '9' || @goto error
-    return R(c-'0'), ii
+    return R(convert(T, c-'0')), ii
 
     @label error
     return R(), i
@@ -50,7 +50,7 @@ end
         r = r*ten + d
     end
     @label done
-    return R(r), i
+    return R(convert(T, r)), i
 
     @label error
     return R(), i

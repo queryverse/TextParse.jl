@@ -126,7 +126,7 @@ function tryparsenext(::Numeric{T}, str, i, len) where {T<:Signed}
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
 
     @label done
-    return R(sign*x), i
+    return R(convert(T, sign*x)), i
 
     @label error
     return R(), i
@@ -163,11 +163,11 @@ end
 
     if c == 'e' || c == 'E'
         @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
-        return R(sign*(x+f) * 10.0^exp), i
+        return R(convert(F, sign*(x+f) * 10.0^exp)), i
     end
 
     @label done
-    return R(sign*(x+f)), i
+    return R(convert(F, sign*(x+f))), i
 
     @label error
     return R(), i
@@ -481,7 +481,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     @chk2 x,ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
 
     @label done
-    return R(x), ii
+    return R(convert(T, x)), ii
 
     @label maybe_null
     naopts = LocalOpts(endchar(na,opts), opts.spacedelim, opts.quotechar,
@@ -603,6 +603,6 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     return R(), i
 
     @label done
-    return R(res), i
+    return R(convert(T, res)), i
 end
 
