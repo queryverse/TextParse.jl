@@ -95,10 +95,6 @@ end
     PARSE_SUCCESS
 end
 
-@inline function setcell!(col::Array{Union{}}, i, val, str)
-    PARSE_SUCCESS
-end
-
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
     col[i] = alloc_string(str, val)
     PARSE_SUCCESS

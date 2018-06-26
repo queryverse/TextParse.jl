@@ -112,7 +112,7 @@ function guesstoken(x, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS
             end
         else
             # fast-path
-            if length(filter(isnumber, x)) < 4
+            if length(filter(isnumeric, x)) < 4
                 return StringToken(StrRange)
             end
 

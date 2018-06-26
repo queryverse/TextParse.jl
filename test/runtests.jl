@@ -477,7 +477,7 @@ end
 
 import TextParse: eatwhitespaces
 @testset "custom parser" begin
-    const floatparser = Numeric(Float64)
+    floatparser = Numeric(Float64)
     percentparser = CustomParser(Float64) do str, i, len, opts
         num, ii = tryparsenext(floatparser, str, i, len, opts)
         if isnull(num)

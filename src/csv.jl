@@ -1,4 +1,5 @@
 using DataStructures
+using Mmap
 
 ismissingtype(T) = Missing <: T
 ismissingeltype(T) = missingtype(eltype(T))
@@ -20,7 +21,7 @@ function getbyheader(opts, header, i::AbstractString)
     if !(i in header)
         throw(ArgumentError("Unknown column $i"))
     end
-    getbyheader(opts, header, findfirst(header, i))
+    getbyheader(opts, header, something(findfirst(isequal(i), header)), length(header)+1)
 end
 
 function optionsiter(opts::AbstractDict, header)
@@ -429,7 +430,7 @@ function promote_column(col, rowno, T, stringtype, inner=false)
         return arr
     else
         newcol = Array{T, 1}(undef, length(col))
-        copy!(newcol, 1, col, 1, rowno)
+        copyto!(newcol, 1, col, 1, rowno)
         newcol
     end
 end
@@ -551,9 +552,9 @@ function resizecols(colspool, nrecs)
         resize!(c, nrecs)
         if eltype(c) <: AbstractString
             # fill with blanks
-            c[l+1:nrecs] = ""
+            c[l+1:nrecs] .= ""
         elseif eltype(c) <: StrRange
-            c[l+1:nrecs] = StrRange(1,0)
+            c[l+1:nrecs] .= StrRange(1,0)
         end
     end
 end
