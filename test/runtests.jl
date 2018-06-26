@@ -485,7 +485,7 @@ import TextParse: eatwhitespaces
         else
             # parse away the % char
             ii = eatwhitespaces(str, ii, len)
-            c, k = next(str, ii)
+            c, k = iterate(str, ii)
             if c != '%'
                 return Nullable{Float64}(), ii # failed to parse %
             else

@@ -33,7 +33,7 @@ end
 @inline function tryparsenext_base10_digit(T,str,i, len)
     R = Nullable{T}
     i > len && @goto error
-    @inbounds c,ii = next(str,i)
+    @inbounds c,ii = iterate(str,i)
     '0' <= c <= '9' || @goto error
     return R(c-'0'), ii
 
@@ -59,7 +59,7 @@ end
 @inline function tryparsenext_sign(str, i, len)
     R = Nullable{Int}
     i > len && return R(), i
-    c, ii = next(str, i)
+    c, ii = iterate(str, i)
     if c == '-'
         return R(-1), ii
     elseif c == '+'
@@ -79,7 +79,7 @@ end
 
 @inline function eatwhitespaces(str, i=1, l=lastindex(str))
     while i <= l
-        c, ii = next(str, i)
+        c, ii = iterate(str, i)
         if isspace(c)
             i=ii
         else
@@ -93,11 +93,11 @@ end
 function eatnewlines(str, i=1, l=lastindex(str))
     count = 0
     while i<=l
-        c, ii = next(str, i)
+        c, ii = iterate(str, i)
         if c == '\r'
             i=ii
             if i <= l
-                @inbounds c, ii = next(str, i)
+                @inbounds c, ii = iterate(str, i)
                 if c == '\n'
                     i=ii
                 end
@@ -106,7 +106,7 @@ function eatnewlines(str, i=1, l=lastindex(str))
         elseif c == '\n'
             i=ii
             if i <= l
-                @inbounds c, ii = next(str, i)
+                @inbounds c, ii = iterate(str, i)
                 if c == '\r'
                     i=ii
                 end
@@ -127,7 +127,7 @@ end
 
 function getlineend(str, i=1, l=lastindex(str))
     while i<=l
-        c, ii = next(str, i)
+        c, ii = iterate(str, i)
         isnewline(c) && break
         i = ii
     end
@@ -168,11 +168,11 @@ function getlineat(str, i)
         ii = prevind(str, line_start)
     end
 
-    c, ii = next(str, line_start)
+    c, ii = iterate(str, line_start)
     line_end = line_start
     while !isnewline(c) && ii <= l
         line_end = ii
-        c, ii = next(str, ii)
+        c, ii = iterate(str, ii)
     end
 
     line_start:line_end

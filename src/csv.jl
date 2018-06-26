@@ -175,7 +175,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     lineno = 0
 
     if pos <= len
-        c, i = next(str, pos)
+        c, i = iterate(str, pos)
         if c == '\ufeff'
             pos = i
         end
@@ -185,7 +185,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     lineno += lines
     while lineno < skiplines_begin
         pos = getlineend(str, pos)
-        _, pos = next(str, pos)
+        _, pos = iterate(str, pos)
         pos, lines = eatnewlines(str, pos)
         lineno += lines
     end
@@ -637,7 +637,7 @@ function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(st
         @chk2 x, i = tryparsenext(f, str, i, l, opts)
         push!(strs, x)
     end
-    c, i = next(str, prevind(str, i))
+    c, i = iterate(str, prevind(str, i))
     if c == opts.endchar
         # edge case where there's a delim at the end of the string
         push!(strs, "")
