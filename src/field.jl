@@ -2,7 +2,7 @@ import Base.show
 
 export CustomParser, Quoted
 
-using Compat
+using Compat, Nullables
 
 abstract type AbstractToken{T} end
 fieldtype(::AbstractToken{T}) where {T} = T
@@ -43,7 +43,7 @@ end
 const default_opts = LocalOpts(',', false, '"', '"', false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
-    tryparsenext(tok, str, start(str), endof(str), opts)
+    tryparsenext(tok, str, start(str), lastindex(str), opts)
 end
 
 # fallback for tryparsenext methods which don't care about local opts
@@ -64,9 +64,9 @@ end
 
 
 # needed for promoting guessses
-struct Unknown <: AbstractToken{Union{}} end
-fromtype(::Type{Union{}}) = Unknown()
-const nullableNA = Nullable{DataValue{Union{}}}(DataValue{Union{}}())
+struct Unknown <: AbstractToken{Missing} end
+fromtype(::Type{Missing}) = Unknown()
+const nullableNA = Nullable{Missing}(missing)
 function tryparsenext(::Unknown, str, i, len, opts)
     nullableNA, i
 end
@@ -407,14 +407,6 @@ fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
 fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
 
-function fromtype(nd::Union{Nullable{DateFormat}, DataValue{DateFormat}})
-    if !isnull(nd)
-        NAToken(DateTimeToken(DateTime, get(nd)))
-    else
-        fromtype(DataValue{DateTime})
-    end
-end
-
 function tryparsenext(dt::DateTimeToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
     nt, i = tryparsenext_internal(T, str, i, len, dt.format, opts.endchar)
@@ -457,7 +449,7 @@ function NAToken(
   , nastrings=NA_STRINGS) where S
 
     T = fieldtype(inner)
-    NAToken{DataValue{T}, S}(inner, emptyisna, endchar, nastrings)
+    NAToken{UnionMissing{T}, S}(inner, emptyisna, endchar, nastrings)
 end
 
 function show(io::IO, na::NAToken)
@@ -489,7 +481,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     @chk2 x,ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
 
     @label done
-    return R(T(x)), ii
+    return R(x), ii
 
     @label maybe_null
     naopts = LocalOpts(endchar(na,opts), opts.spacedelim, opts.quotechar,
@@ -503,14 +495,13 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     return R(), i
 
     @label null
-    return R(T()), i
+    return R(missing), i
 
     @label error
     return R(), i
 end
 
-fromtype(::Type{N}) where {N<:Nullable}  = NAToken(fromtype(eltype(N)))
-fromtype(::Type{N}) where {N<:DataValue} = NAToken(fromtype(eltype(N)))
+fromtype(::Type{Union{Missing,T}}) where T = NAToken(fromtype(T))
 
 ### Field parsing
 
@@ -612,10 +603,6 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     return R(), i
 
     @label done
-    if R <: Nullable{DataValue{Union{}}}
-        # optimization to remove allocation
-        return nullableNA, i
-    end
     return R(res), i
 end
 

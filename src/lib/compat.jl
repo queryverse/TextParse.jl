@@ -5,9 +5,10 @@ else
 end
 
 const Str = String
-import Base.Dates: CONVERSION_SPECIFIERS, TimeType, DatePart, tryparsenext, character_codes, genvar, CONVERSION_TRANSLATIONS, CONVERSION_DEFAULTS, _directives, DateLocale
+import Dates
+import Dates: CONVERSION_SPECIFIERS, TimeType, DatePart, tryparsenext, character_codes, genvar, CONVERSION_TRANSLATIONS, CONVERSION_DEFAULTS, _directives, DateLocale
 include("date-tryparse-internal.jl")
-const ISODateFormat = Base.Dates.ISODateFormat
-const ISODateTimeFormat = Base.Dates.ISODateTimeFormat
-const RFC1123Format = Base.Dates.RFC1123Format
+const ISODateFormat = Dates.ISODateFormat
+const ISODateTimeFormat = Dates.ISODateTimeFormat
+const RFC1123Format = Dates.RFC1123Format
 

@@ -23,7 +23,7 @@ macro chk2(expr,label=:error)
         x = $(esc(rhs))
         $(esc(state)) = x[2] # bubble error location
         if isnull(x[1])
-            @goto $label
+            $(esc(:(@goto $label)))
         else
             $(esc(res)) = x[1].value
         end
@@ -77,7 +77,7 @@ end
     c == '\n' || c == '\r'
 end
 
-@inline function eatwhitespaces(str, i=1, l=endof(str))
+@inline function eatwhitespaces(str, i=1, l=lastindex(str))
     while i <= l
         c, ii = next(str, i)
         if isspace(c)
@@ -90,7 +90,7 @@ end
 end
 
 
-function eatnewlines(str, i=1, l=endof(str))
+function eatnewlines(str, i=1, l=lastindex(str))
     count = 0
     while i<=l
         c, ii = next(str, i)
@@ -125,7 +125,7 @@ function stripquotes(x)
         strip(x, x[1]) : x
 end
 
-function getlineend(str, i=1, l=endof(str))
+function getlineend(str, i=1, l=lastindex(str))
     while i<=l
         c, ii = next(str, i)
         isnewline(c) && break
@@ -156,9 +156,13 @@ struct StrRange
 end
 
 function getlineat(str, i)
-    ii = prevind(str, i)
+    l = lastindex(str)
+    if i <= l
+        ii = prevind(str, i)
+    else
+        ii = l
+    end
     line_start = i
-    l = endof(str)
     while ii > 0 && !isnewline(str[ii])
         line_start = ii
         ii = prevind(str, line_start)

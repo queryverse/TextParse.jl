@@ -95,12 +95,7 @@ end
     PARSE_SUCCESS
 end
 
-@inline function setcell!(col::DataValueArray{Union{}}, i, val, str)
-    PARSE_SUCCESS
-end
-
-@inline function setcell!(col::DataValueArray, i, val::Nullable, str)
-    col[i] = DataValue(val)
+@inline function setcell!(col::Array{Union{}}, i, val, str)
     PARSE_SUCCESS
 end
 

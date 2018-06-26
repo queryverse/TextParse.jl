@@ -1,12 +1,17 @@
 using DataStructures
 
+ismissingtype(T) = Missing <: T
+ismissingeltype(T) = missingtype(eltype(T))
+
+const UnionMissing{T} = Union{Missing, T}
+
 export csvread
 const current_record = Ref{Any}()
 const debug = Ref{Bool}(false)
 
 const StringLike = Union{AbstractString, StrRange}
 
-optionsiter(opts::Associative) = opts
+optionsiter(opts::AbstractDict) = opts
 optionsiter(opts::AbstractVector) = enumerate(opts)
 
 getbyheader(opts, header, i::Int) = opts[i]
@@ -18,7 +23,7 @@ function getbyheader(opts, header, i::AbstractString)
     getbyheader(opts, header, findfirst(header, i))
 end
 
-function optionsiter(opts::Associative, header)
+function optionsiter(opts::AbstractDict, header)
     isempty(header) && return opts
     iter = Dict{Int,Any}()
     for (k, v) in opts
@@ -47,7 +52,7 @@ tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
 
 Read CSV from `file`. Returns a tuple of 2 elements:
-1. A tuple of columns each either a `Vector`, `DataValueArray` or `StringArray`
+1. A tuple of columns each either a `Vector`, or `StringArray`
 2. column names if `header_exists=true`, empty array otherwise
 
 # Arguments:
@@ -133,7 +138,7 @@ function csvread(files::AbstractVector{T},
     end
 
     resizecols(colspool, nrows)
-    (values(colspool)...), collect(keys(colspool)), count
+    (values(colspool)...,), collect(keys(colspool)), count
 end
 
 # read CSV in a string
@@ -164,8 +169,8 @@ function _csvread_internal(str::AbstractString, delim=',';
         warn("pooledstrings argument has been removed")
     end
     opts = LocalOpts(delim, spacedelim, quotechar, escapechar, false, false)
-    len = endof(str)
-    pos = start(str)
+    len = lastindex(str)
+    pos = firstindex(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
     lineno = 0
 
@@ -280,13 +285,13 @@ function _csvread_internal(str::AbstractString, delim=',';
         # promote missing columns to nullable
         missingcols = setdiff(collect(keys(colspool)), canonnames)
         for k in missingcols
-            if !(eltype(colspool[k]) <: DataValue) && !(eltype(colspool[k]) <: StringLike)
+            if !ismissingtype(eltype(colspool[k])) && !(eltype(colspool[k]) <: StringLike)
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
-                                             DataValue{eltype(colspool[k])}, stringtype)
+                                             UnionMissing{eltype(colspool[k])}, stringtype)
             end
         end
-        cols = (_cols...)
+        cols = (_cols...,)
     end
 
     if any(c->length(c) != nrows, cols)
@@ -297,7 +302,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     @label retry
     try
         finalrows = parsefill!(str, opts, rec, nrows, cols, colspool,
-                               pos, lineno, rowno, endof(str))
+                               pos, lineno, rowno, lastindex(str))
         if !noresize
             resizecols(colspool, finalrows)
         end
@@ -315,13 +320,13 @@ function _csvread_internal(str::AbstractString, delim=',';
             f, l = first(rng), last(rng)
             field = rec.fields[err.colno]
 
-            if l !== endof(str) && err.pos >= l && !field.eoldelim
+            if l !== lastindex(str) && err.pos >= l && !field.eoldelim
                 if fieldtype(field) <: AbstractString || fieldtype(field) <: StrRange
                     # retry assuming newlines can be part of the field
                     wopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar, opts.escapechar, opts.includequotes, true)
                     fieldsvec = Any[rec.fields...]
                     fieldsvec[err.colno] = swapinner(field, WrapLocalOpts(wopts, field.inner))
-                    rec = Record((fieldsvec...))
+                    rec = Record((fieldsvec...,))
                     pos = first(rng)
                     rowno = err.rowno
                     lineno = err.lineno
@@ -368,8 +373,8 @@ function _csvread_internal(str::AbstractString, delim=',';
             colsvec = Any[cols...]
             colsvec[err.colno:end] = newcols
 
-            rec = Record((fieldsvec...))
-            cols = (colsvec...)
+            rec = Record((fieldsvec...,))
+            cols = (colsvec...,)
             rowno = err.rowno
             lineno = err.lineno
             pos = first(rng)
@@ -403,29 +408,25 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype)
 end
 
 function promote_column(col, rowno, T, stringtype, inner=false)
-    if typeof(col) <: DataValueArray{Union{}}
+    if typeof(col) <: Array{Missing}
         if T <: StringLike
             arr = StringVector{stringtype}(length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
             return arr
-        elseif T <: DataValue
-            DataValueArray(Array{eltype(T)}(length(col)), ones(Bool, length(col)))
+        elseif ismissingtype(T)
+            fill!(Array{UnionMissing{eltype(T)}}(length(col)), missing) # defaults to fill missing
         else
             error("empty to non-nullable")
         end
-    elseif T <: DataValue
-        if !isa(col, DataValueArray)
-            isnullarray = Array{Bool}(length(col))
-            isnullarray[1:rowno] = false
-            isnullarray[(rowno+1):end] = true
-            DataValueArray(promote_column(col, rowno, eltype(T), stringtype), isnullarray)
-        else
-            # Both input and output are nullable arrays
-            vals = promote_column(col.values, rowno, eltype(T), stringtype)
-            DataValueArray(vals, col.isnull)
+    elseif ismissingtype(T)
+        arr = convert(Array{UnionMissing{eltype(col)}}, col)
+        for i=rowno+1:length(arr)
+            # if we convert an Array{Int} to be missing-friendly, we will not have missing in here by default
+            arr[i] = missing
         end
+        return arr
     else
         newcol = Array{T, 1}(length(col))
         copy!(newcol, 1, col, 1, rowno)
@@ -436,7 +437,7 @@ end
 function readcolnames(str, opts, pos, colnames)
     colnames_inferred = String[]
 
-    len = endof(str)
+    len = lastindex(str)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
@@ -460,7 +461,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     givenkeys = !isempty(colparsers) ? first.(collect(optionsiter(colparsers, header))) : []
     for i=1:nrows
         pos, _ = eatnewlines(str, pos)
-        if pos > endof(str)
+        if pos > lastindex(str)
             break
         end
 
@@ -512,7 +513,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 end
 
 function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
-                    pos, lineno, rowno, l=endof(str)) where {N}
+                    pos, lineno, rowno, l=lastindex(str)) where {N}
     pos, lines = eatnewlines(str, pos)
     lineno += lines
     pos <= l && while true
@@ -562,15 +563,13 @@ function makeoutputvecs(rec, N, stringtype)
 end
 
 function makeoutputvec(eltyp, N, stringtype)
-    if fieldtype(eltyp) == DataValue{Union{}} # we weren't able to detect the type,
-                                         # all columns were blank
-        DataValueArray{Union{}}(N)
+    if fieldtype(eltyp) == Missing # we weren't able to detect the type,
+                                   # all cells were blank
+        Array{Missing}(N)
     elseif fieldtype(eltyp) == StrRange
-         StringVector{stringtype}(N)
-    elseif fieldtype(eltyp) == DataValue{StrRange}
-        DataValueArray{String}(N)
-    elseif fieldtype(eltyp) <: DataValue
-        DataValueArray{fieldtype(eltyp)|>eltype}(N)
+        StringVector{stringtype}(N)
+    elseif ismissingtype(fieldtype(eltyp)) && fieldtype(eltyp) <: StrRange
+        StringVector{Union{Missing, String}}(N)
     else
         Array{fieldtype(eltyp)}(N)
     end
@@ -625,7 +624,7 @@ function showerrorchar(str, pos, maxchar)
     substr * "\n" * pointer
 end
 
-function quotedsplit(str, opts, includequotes, i=start(str), l=endof(str))
+function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(str))
     strtok = Quoted(StringToken(String), required=false,
                     includequotes=includequotes)
 
