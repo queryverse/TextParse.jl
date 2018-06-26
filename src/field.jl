@@ -43,7 +43,7 @@ end
 const default_opts = LocalOpts(',', false, '"', '"', false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
-    tryparsenext(tok, str, start(str), lastindex(str), opts)
+    tryparsenext(tok, str, firstindex(str), lastindex(str), opts)
 end
 
 # fallback for tryparsenext methods which don't care about local opts
