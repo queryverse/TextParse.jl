@@ -416,7 +416,7 @@ function promote_column(col, rowno, T, stringtype, inner=false)
             end
             return arr
         elseif ismissingtype(T)
-            fill!(Array{UnionMissing{eltype(T)}}(length(col)), missing) # defaults to fill missing
+            fill!(Array{UnionMissing{eltype(T)}}(undef, length(col)), missing) # defaults to fill missing
         else
             error("empty to non-nullable")
         end
@@ -428,7 +428,7 @@ function promote_column(col, rowno, T, stringtype, inner=false)
         end
         return arr
     else
-        newcol = Array{T, 1}(length(col))
+        newcol = Array{T, 1}(undef, length(col))
         copy!(newcol, 1, col, 1, rowno)
         newcol
     end
@@ -565,13 +565,13 @@ end
 function makeoutputvec(eltyp, N, stringtype)
     if fieldtype(eltyp) == Missing # we weren't able to detect the type,
                                    # all cells were blank
-        Array{Missing}(N)
+        Array{Missing}(undef, N)
     elseif fieldtype(eltyp) == StrRange
         StringVector{stringtype}(N)
     elseif ismissingtype(fieldtype(eltyp)) && fieldtype(eltyp) <: StrRange
         StringVector{Union{Missing, String}}(N)
     else
-        Array{fieldtype(eltyp)}(N)
+        Array{fieldtype(eltyp)}(undef, N)
     end
 end
 
