@@ -115,7 +115,7 @@ function csvread(files::AbstractVector{T},
                    colspool=colspool,
                    kwargs...)
     catch err
-        println(STDERR, "Error parsing $(files[1])")
+        println(stderr, "Error parsing $(files[1])")
         rethrow(err)
     end
 
@@ -130,7 +130,7 @@ function csvread(files::AbstractVector{T},
             _csvread_f(f, delim; rowno=nrows+1, colspool=colspool,
                        prevheaders=headers, noresize=true, prev_parsers=parsers, kwargs...)
         catch err
-            println(STDERR, "Error parsing $(f)")
+            println(stderr, "Error parsing $(f)")
             rethrow(err)
         end
         push!(count, nrows - prev)
@@ -332,7 +332,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                     lineno = err.lineno
                     @goto retry
                 end
-                println(STDERR, "Expected another field on row $(err.rowno) (line $(err.lineno))")
+                println(stderr, "Expected another field on row $(err.rowno) (line $(err.lineno))")
                 err.filename = filename
                 rethrow(err)
             end
@@ -363,7 +363,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             newcols = map(last, promoted)
 
             if field.inner == newfields[1].inner
-                println(STDERR, "Could not determine which type to promote column to.")
+                println(stderr, "Could not determine which type to promote column to.")
                 rethrow(err)
             end
 
@@ -401,7 +401,7 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype)
     newcol = try
         promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype)
     catch err2
-        Base.showerror(STDERR, err2)
+        Base.showerror(stderr, err2)
         rethrow(err)
     end
     swapinner(field, newtoken), newcol
@@ -492,10 +492,10 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
             try
                 guess[j] = guesstoken(fields[j], guess[j], nastrings)
             catch err
-                println(STDERR, "Error while guessing a common type for column $j")
-                println(STDERR, "new value: $(fields[j]), prev guess was: $(guess[j])")
+                println(stderr, "Error while guessing a common type for column $j")
+                println(stderr, "new value: $(fields[j]), prev guess was: $(guess[j])")
                 if j > 1
-                    println(STDERR, "prev value: $(fields[j-1])")
+                    println(stderr, "prev value: $(fields[j-1])")
                 end
 
                 rethrow(err)
