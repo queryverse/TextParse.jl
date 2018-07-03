@@ -21,7 +21,7 @@ function getbyheader(opts, header, i::AbstractString)
     if !(i in header)
         throw(ArgumentError("Unknown column $i"))
     end
-    getbyheader(opts, header, something(findfirst(isequal(i), header)), length(header)+1)
+    getbyheader(opts, header, something(findfirst(isequal(i), header), length(header)+1))
 end
 
 function optionsiter(opts::AbstractDict, header)
@@ -33,6 +33,8 @@ function optionsiter(opts::AbstractDict, header)
         catch err
             if isa(err, ArgumentError)
                 continue
+            else
+                rethrow(err)
             end
         end
         iter[i] = v
