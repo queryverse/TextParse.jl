@@ -3,7 +3,7 @@ using TextParse
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Test
-using Nullables, Dates
+using Dates
 
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
@@ -72,7 +72,7 @@ using WeakRefStrings
     str =  "Owner 2 ”Vicepresident\"\""
     @test tryparsenext(Quoted(String), str) |> unwrap == (str, lastindex(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
-    @test tryparsenext(Quoted(String,quotechar=Nullable('"'), escapechar=Nullable('"')), str1) |> unwrap == (str, lastindex(str1)+1)
+    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == (str, lastindex(str1)+1)
     @test tryparsenext(Quoted(String), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
@@ -92,8 +92,8 @@ import TextParse: Quoted, NAToken, Unknown
     str1 =  "\"x”y\"\"\""
     @test tryparsenext(Quoted(StringToken(String), required=true), "x\"y\"") |> failedat == 1
 
-    @test tryparsenext(Quoted(String, escapechar=Nullable('"')), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
-    @test tryparsenext(Quoted(StringToken(String), escapechar=Nullable('\\')), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
+    @test tryparsenext(Quoted(String, escapechar='"'), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String), escapechar='\\'), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
     @test tryparsenext(Quoted(NAToken(fromtype(Int))), "1") |> unwrap == (1,2)
 
     t = tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap
@@ -480,14 +480,14 @@ import TextParse: eatwhitespaces
     floatparser = Numeric(Float64)
     percentparser = CustomParser(Float64) do str, i, len, opts
         num, ii = tryparsenext(floatparser, str, i, len, opts)
-        if isnull(num)
+        if num === nothing
             return num, ii
         else
             # parse away the % char
             ii = eatwhitespaces(str, ii, len)
             c, k = iterate(str, ii)
             if c != '%'
-                return Nullable{Float64}(), ii # failed to parse %
+                return nothing, ii # failed to parse %
             else
                 return num, k # the point after %
             end

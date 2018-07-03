@@ -2,7 +2,6 @@ julia 0.7-alpha
 Compat 0.17
 PooledArrays 0.2.0
 Nullables
-Dates
 DataStructures
 WeakRefStrings 0.4.4
 CodecZlib

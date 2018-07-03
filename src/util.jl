@@ -2,6 +2,9 @@
 
 include("lib/result.jl")
 
+#=
+A relic from the past
+
 macro chk1(expr,label=:error)
     quote
         x = $(esc(expr))
@@ -12,6 +15,7 @@ macro chk1(expr,label=:error)
         end
     end
 end
+=#
 
 macro chk2(expr,label=:error)
     @assert expr.head == :(=)
@@ -22,27 +26,27 @@ macro chk2(expr,label=:error)
     quote
         x = $(esc(rhs))
         $(esc(state)) = x[2] # bubble error location
-        if isnull(x[1])
+        if x[1] === nothing
             $(esc(:(@goto $label)))
         else
-            $(esc(res)) = x[1].value
+            $(esc(res)) = something(x[1])
         end
     end
 end
 
 @inline function tryparsenext_base10_digit(T,str,i, len)
-    R = Nullable{T}
+    R = Some{T}
     i > len && @goto error
     @inbounds c,ii = iterate(str,i)
     '0' <= c <= '9' || @goto error
     return R(convert(T, c-'0')), ii
 
     @label error
-    return R(), i
+    return nothing, i
 end
 
 @inline function tryparsenext_base10(T, str,i,len)
-    R = Nullable{T}
+    R = Some{T}
     @chk2 r, i = tryparsenext_base10_digit(T,str,i, len)
     ten = T(10)
     while true
@@ -53,12 +57,12 @@ end
     return R(convert(T, r)), i
 
     @label error
-    return R(), i
+    return nothing, i
 end
 
 @inline function tryparsenext_sign(str, i, len)
-    R = Nullable{Int}
-    i > len && return R(), i
+    R = Some{Int}
+    i > len && return nothing, i
     c, ii = iterate(str, i)
     if c == '-'
         return R(-1), ii
@@ -137,17 +141,17 @@ end
 
 ### Testing helpers
 
-unwrap(xs) = (get(xs[1]), xs[2:end]...)
-failedat(xs) = (@assert isnull(xs[1]); xs[2])
+unwrap(xs) = (something(xs[1]), xs[2:end]...)
+failedat(xs) = (@assert xs[1] === nothing; xs[2])
 
 # String speedup hacks
 
 # StrRange
 # This type is the beginning of a hack to avoid allocating 3 objects
 # instead of just 1 when using the `tryparsenext` framework.
-# The expression (Nullable{String}("xyz"), 4) asks the GC to track
+# The expression (Some{String}("xyz"), 4) asks the GC to track
 # the string, the nullable and the tuple. Instead we return
-# (Nullable{StrRange}(StrRange(0,3)), 4) which makes 0 allocations.
+# (Some{StrRange}(StrRange(0,3)), 4) which makes 0 allocations.
 # later when assigning the column inside `tryparsesetindex` we
 # create the string. See `setcell!`
 struct StrRange

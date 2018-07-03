@@ -2,7 +2,7 @@ import Base.show
 
 export CustomParser, Quoted
 
-using Compat, Nullables
+using Compat
 
 abstract type AbstractToken{T} end
 fieldtype(::AbstractToken{T}) where {T} = T
@@ -14,7 +14,7 @@ fieldtype(::Type{T}) where {T<:AbstractToken} = fieldtype(supertype(T))
 
 Parses the string `str` starting at position `i` and ending at or before position `till`. `localopts` is a [LocalOpts](@ref) object which contains contextual options for quoting and NA parsing. (see [LocalOpts](@ref) documentation)
 
-`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Nullable{T}`, null if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
+`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Union{Some{T}, Nothing}`, nothing if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
 """
 function tryparsenext end
 
@@ -66,7 +66,7 @@ end
 # needed for promoting guessses
 struct Unknown <: AbstractToken{Missing} end
 fromtype(::Type{Missing}) = Unknown()
-const nullableNA = Nullable{Missing}(missing)
+const nullableNA = Some{Missing}(missing)
 function tryparsenext(::Unknown, str, i, len, opts)
     nullableNA, i
 end
@@ -93,7 +93,7 @@ The parser function must take the following arguments:
 
 The parser function must return a tuple of two values:
 
-- `result`: A `Nullable{T}`. Set to null if parsing must fail, containing the value otherwise.
+- `result`: A `Union{Some{T}, Nothing}`. Set to nothing if parsing must fail, containing the value otherwise.
 - `nextpos`: If parsing succeeded this must be the next position after parsing finished, if it failed this must be the position at which parsing failed.
 """
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
@@ -121,15 +121,14 @@ fromtype(::Type{N}) where {N<:Number} = Numeric(N)
 ### Unsigned integers
 
 function tryparsenext(::Numeric{T}, str, i, len) where {T<:Signed}
-    R = Nullable{T}
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
 
     @label done
-    return R(convert(T, sign*x)), i
+    return Some(convert(T, sign*x)), i
 
     @label error
-    return R(), i
+    return nothing, i
 end
 
 @inline function tryparsenext(::Numeric{T}, str, i, len) where {T<:Unsigned}
@@ -137,7 +136,7 @@ end
 end
 
 @inline function tryparsenext(::Numeric{F}, str, i, len) where {F<:AbstractFloat}
-    R = Nullable{F}
+    R = Some{F}
     f = 0.0
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     x=0
@@ -170,7 +169,7 @@ end
     return R(convert(F, sign*(x+f))), i
 
     @label error
-    return R(), i
+    return nothing, i
 end
 
 struct Percentage <: AbstractToken{Float64}
@@ -179,16 +178,16 @@ end
 const floatparser = Numeric(Float64)
 function tryparsenext(::Percentage, str, i, len, opts)
     num, ii = tryparsenext(floatparser, str, i, len, opts)
-    if isnull(num)
+    if num === nothing
         return num, ii
     else
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
         c, k = iterate(str, ii)
         if c != '%'
-            return Nullable{Float64}(), ii # failed to parse %
+            return nothing, ii # failed to parse %
         else
-            return Nullable{Float64}(num.value / 100.0), k # the point after %
+            return Some{Float64}(num.value / 100.0), k # the point after %
         end
     end
 end
@@ -209,7 +208,7 @@ show(io::IO, c::StringToken) = print(io, "<string>")
 fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
 function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
-    R = Nullable{T}
+    R = Some{T}
     p = ' '
     i0 = i
     if opts.includequotes && i <= len
@@ -295,8 +294,8 @@ struct Quoted{T, S<:AbstractToken} <: AbstractToken{T}
     stripwhitespaces::Bool
     includequotes::Bool
     includenewlines::Bool
-    quotechar::Nullable{Char}
-    escapechar::Nullable{Char}
+    quotechar::Union{Char, Nothing}
+    escapechar::Union{Char, Nothing}
 end
 
 function show(io::IO, q::Quoted)
@@ -322,16 +321,16 @@ function Quoted(inner::S;
     stripwhitespaces=fieldtype(S)<:Number,
     includequotes=false,
     includenewlines=true,
-    quotechar=Nullable{Char}(),   # This is to allow file-wide config
-    escapechar=Nullable{Char}()) where S<:AbstractToken
+    quotechar=nothing,   # This is to allow file-wide config
+    escapechar=nothing) where S<:AbstractToken
 
     T = fieldtype(S)
     Quoted{T,S}(inner, required, stripwhitespaces, includequotes,
                 includenewlines, quotechar, escapechar)
 end
 
-@inline quotechar(q::Quoted, opts) = get(q.quotechar, opts.quotechar)
-@inline escapechar(q::Quoted, opts) = get(q.escapechar, opts.escapechar)
+@inline quotechar(q::Quoted, opts) = q.quotechar === nothing ? opts.quotechar : q.quotechar
+@inline escapechar(q::Quoted, opts) = q.escapechar === nothing ? opts.escapechar : q.escapechar
 
 Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
 
@@ -384,10 +383,10 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
 
 
     @label done
-    return Nullable{T}(x), i
+    return Some{T}(x), i
 
     @label error
-    return Nullable{T}(), i
+    return nothing, i
 end
 
 ## Date and Time
@@ -408,16 +407,16 @@ fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
 
 function tryparsenext(dt::DateTimeToken{T}, str, i, len, opts) where {T}
-    R = Nullable{T}
+    R = Some{T}
     nt, i = tryparsenext_internal(T, str, i, len, dt.format, opts.endchar)
-    if isnull(nt)
-        return R(), i
+    if nt === nothing
+        return nothing, i
     else
         return R(T(nt.value...)), i
     end
 end
 
-### Nullable
+### Missing
 
 const nastrings_upcase = ["NA", "NULL", "N/A","#N/A", "#N/A N/A", "#NA",
                           "-1.#IND", "-1.#QNAN", "-NaN", "-nan",
@@ -428,7 +427,7 @@ const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)
 struct NAToken{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
     emptyisna::Bool
-    endchar::Nullable{Char}
+    endchar::Union{Char, Nothing}
     nastrings::Vector{String}
 end
 
@@ -445,7 +444,7 @@ Parses a Nullable item.
 function NAToken(
     inner::S,
   ; emptyisna=true
-  , endchar=Nullable{Char}()
+  , endchar=nothing
   , nastrings=NA_STRINGS) where S
 
     T = fieldtype(inner)
@@ -457,10 +456,10 @@ function show(io::IO, na::NAToken)
     print(io, "?")
 end
 
-endchar(na::NAToken, opts) = get(na.endchar, opts.endchar)
+endchar(na::NAToken, opts) = na.endchar === nothing ? opts.endchar : na.endchar
 
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
-    R = Nullable{T}
+    R = Some{T}
     i = eatwhitespaces(str, i)
     if i > len
         if na.emptyisna
@@ -492,13 +491,13 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
         i = eatwhitespaces(str, i)
         @goto null
     end
-    return R(), i
+    return nothing, i
 
     @label null
     return R(missing), i
 
     @label error
-    return R(), i
+    return nothing, i
 end
 
 fromtype(::Type{Union{Missing,T}}) where T = NAToken(fromtype(T))
@@ -541,7 +540,7 @@ function swapinner(f::Field, inner::AbstractToken;
 end
 
 function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
-    R = Nullable{T}
+    R = Some{T}
     i > len && @goto error
     if f.ignore_init_whitespace
         while i <= len
@@ -600,7 +599,7 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     end
 
     @label error
-    return R(), i
+    return nothing, i
 
     @label done
     return R(convert(T, res)), i
