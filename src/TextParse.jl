@@ -1,5 +1,3 @@
-__precompile__()
-
 module TextParse
 
 using CodecZlib, WeakRefStrings, Dates
