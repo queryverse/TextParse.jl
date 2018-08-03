@@ -262,8 +262,8 @@ function _csvread_internal(str::AbstractString, delim=',';
     if isempty(colspool)
         # this is the first file, use nrows
         cols = makeoutputvecs(rec, nrows, stringtype)
-        for (c, h) in zip(cols, canonnames)
-            colspool[h] = c
+        for (c2, h) in zip(cols, canonnames)
+            colspool[h] = c2
         end
     else
         _cols = map(1:length(rec.fields)) do i
@@ -462,7 +462,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     prevfields = String[]
 
     givenkeys = !isempty(colparsers) ? first.(collect(optionsiter(colparsers, header))) : []
-    for i=1:nrows
+    for i2=1:nrows
         pos, _ = eatnewlines(str, pos)
         if pos > lastindex(str)
             break
@@ -472,14 +472,14 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
         fields = quotedsplit(str, opts, true, pos, lineend)
 
-        if i == 1
-            guess = Any[Unknown() for i=1:length(fields)] # idk
+        if i2 == 1
+            guess = Any[Unknown() for i3=1:length(fields)] # idk
             if prevs !== nothing && !isempty(header)
                 # sometimes length(fields) can be != length(header).
                 # this sucks!
-                for i in 1:length(header)
-                    i > length(fields) && break
-                    guess[i] = get(prevs, header[i], Unknown())
+                for i4 in 1:length(header)
+                    i4 > length(fields) && break
+                    guess[i4] = get(prevs, header[i4], Unknown())
                 end
             end
         end
@@ -490,7 +490,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
                 continue # user specified this
             end
             if length(fields) != length(guess)
-                error("previous rows had $(length(guess)) fields but row $i has $(length(fields))")
+                error("previous rows had $(length(guess)) fields but row $i2 has $(length(fields))")
             end
             try
                 guess[j] = guesstoken(fields[j], guess[j], nastrings)
