@@ -117,8 +117,9 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
         else
             quote
                 pos > len && @goto done
-                nullable_delim, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
-                isnull(nullable_delim) && @goto error
+                nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
+                nothingable_tuple===nothing && @goto error
+                nullable_delim, next_pos = nothingable_tuple                
                 pos = next_pos
                 directive_index += 1
             end
