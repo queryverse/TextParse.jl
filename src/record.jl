@@ -9,7 +9,7 @@ function Record(t::T) where T<:Tuple
 end
 
 # for dispatch on N
-include_string("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
+include_string(TextParse, "const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
 
 @generated function tryparsenext(r::RecN{N, To}, str, i, len, opts=default_opts) where {N, To}
     quote
