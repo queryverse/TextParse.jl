@@ -1,3 +1,4 @@
+using Nullables
 
 """
     tryparsenext_internal(::Type{<:TimeType}, str, pos, len, df::DateFormat, raise=false)
@@ -23,7 +24,7 @@ Returns a 2-element tuple `(values, pos)`:
 
     output_tokens = CONVERSION_TRANSLATIONS[T]
     output_names = Symbol[genvar(t) for t in output_tokens]
-    output_defaults = ([CONVERSION_DEFAULTS[t] for t in output_tokens]...)
+    output_defaults = ([CONVERSION_DEFAULTS[t] for t in output_tokens]...,)
     R = typeof(output_defaults)
 
     # Pre-assign output variables to defaults. Ensures that all output variables are
@@ -39,10 +40,9 @@ Returns a 2-element tuple `(values, pos)`:
     # Unpacks the value tuple returned by `tryparsenext_core` into separate variables.
     value_tuple = Expr(:tuple, value_names...)
 
-    assign_value_till = Expr[begin
-        quote
+    assign_value_till = Expr[
+    quote
         ($i <= num_parsed) && ($name = unsafe_val[$i])
-        end
     end for (i,name) in enumerate(value_names)]
 
     quote
@@ -87,7 +87,7 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
 
     tokens = Type[CONVERSION_SPECIFIERS[letter] for letter in letters]
     value_names = Symbol[genvar(t) for t in tokens]
-    value_defaults = ([CONVERSION_DEFAULTS[t] for t in tokens]...)
+    value_defaults = ([CONVERSION_DEFAULTS[t] for t in tokens]...,)
     R = typeof(value_defaults)
 
     # Pre-assign variables to defaults. Allows us to use `@goto done` without worrying about
@@ -101,28 +101,27 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
 
     vi = 1
     parsers = Expr[
-        begin
-            if directives[i] <: DatePart
-                name = value_names[vi]
-                nullable = Symbol(:nullable_, name)
-                vi += 1
-                quote
-                    pos > len && @goto done
-                    $nullable, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
-                    isnull($nullable) && @goto error
-                    $name = unsafe_get($nullable)
-                    pos = next_pos
-                    num_parsed += 1
-                    directive_index += 1
-                end
-            else
-                quote
-                    pos > len && @goto done
-                    nullable_delim, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
-                    isnull(nullable_delim) && @goto error
-                    pos = next_pos
-                    directive_index += 1
-                end
+        if directives[i] <: DatePart
+            name = value_names[vi]
+            nullable = Symbol(:nullable_, name)
+            vi += 1
+            quote
+                pos > len && @goto done
+                $nullable, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
+                $nullable===nothing && @goto error
+                $name = $nullable
+                pos = next_pos
+                num_parsed += 1
+                directive_index += 1
+            end
+        else
+            quote
+                pos > len && @goto done
+                nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
+                nothingable_tuple===nothing && @goto error
+                nullable_delim, next_pos = nothingable_tuple                
+                pos = next_pos
+                directive_index += 1
             end
         end
         for i in 1:length(directives)

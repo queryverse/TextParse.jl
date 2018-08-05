@@ -9,11 +9,11 @@ function Record(t::T) where T<:Tuple
 end
 
 # for dispatch on N
-include_string("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
+include_string(TextParse, "const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
 
 @generated function tryparsenext(r::RecN{N, To}, str, i, len, opts=default_opts) where {N, To}
     quote
-        R = Nullable{To}
+        R = Some{To}
         i > len && @goto error
 
         Base.@nexprs $N j->begin
@@ -24,7 +24,7 @@ include_string("const RecN{N,U} = Record{T,U} where T<:NTuple{N, Any}")
         return R(Base.@ntuple $N val), i
 
         @label error
-        R(), i
+        nothing, i
     end
 end
 
@@ -95,15 +95,6 @@ end
     PARSE_SUCCESS
 end
 
-@inline function setcell!(col::DataValueArray{Union{}}, i, val, str)
-    PARSE_SUCCESS
-end
-
-@inline function setcell!(col::DataValueArray, i, val::Nullable, str)
-    col[i] = DataValue(val)
-    PARSE_SUCCESS
-end
-
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
     col[i] = alloc_string(str, val)
     PARSE_SUCCESS
@@ -128,14 +119,14 @@ function UseOne(fields::Tuple, use)
 end
 getthing(x, ::Type{Val{n}}) where {n} = x[n]
 function tryparsenext(f::UseOne{T,S,use}, str, i, len, opts=default_opts) where {T,S,use}
-    R = Nullable{T}
+    R = Some{T}
     @chk2 xs, i = tryparsenext(f.record, str, i, len, opts)
 
     @label done
     return R(getthing(xs, Val{use})), i
 
     @label error
-    return R(), i
+    return nothing, i
 end
 
 
@@ -149,7 +140,7 @@ fieldtype(::Repeated{F,T,N}) where {F,T,N} = NTuple{N,T}
 
 @generated function tryparsenext(f::Repeated{F,T,N}, str, i, len, opts=default_opts) where {F,T,N}
     quote
-        R = Nullable{NTuple{N,T}}
+        R = Some{NTuple{N,T}}
         i > len && @goto error
 
         # pefect candidate for #11902
@@ -161,6 +152,6 @@ fieldtype(::Repeated{F,T,N}) where {F,T,N} = NTuple{N,T}
         return R(Base.@ntuple $N val), i
 
         @label error
-        R(), i
+        nothing, i
     end
 end

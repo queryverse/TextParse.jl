@@ -26,14 +26,14 @@ function guessdateformat(str)
 
     for (typ, df) in dts
         x, len = try
-            tryparsenext_internal(typ, str, 1, endof(str), df)
+            tryparsenext_internal(typ, str, 1, lastindex(str), df)
         catch err
             continue
         end
-        if !isnull(x)
+        if x != nothing
             try
                 typ(get(x)...)
-                if len > endof(str)
+                if len > lastindex(str)
                     return DateTimeToken(typ, df)
                 end
             catch err; end
@@ -52,7 +52,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, prev_guess::ANY=Unknown(), nastrings=NA_STRINGS)
+function guesstoken(x, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -95,8 +95,8 @@ function guesstoken(x, prev_guess::ANY=Unknown(), nastrings=NA_STRINGS)
         if ispercent
             x = x[1:end-1]
         end
-        if !isnull(tryparse(Int, x)) || !isnull(tryparse(Float64, x))
-            T = isnull(tryparse(Int, x)) ? Float64 : Int
+        if tryparse(Int, x) !== nothing || tryparse(Float64, x) !== nothing
+            T = tryparse(Int, x) === nothing ? Float64 : Int
 
             if ispercent
                 return Percentage()
@@ -112,7 +112,7 @@ function guesstoken(x, prev_guess::ANY=Unknown(), nastrings=NA_STRINGS)
             end
         else
             # fast-path
-            if length(filter(isnumber, x)) < 4
+            if length(filter(isnumeric, x)) < 4
                 return StringToken(StrRange)
             end
 
