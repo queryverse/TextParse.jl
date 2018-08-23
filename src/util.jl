@@ -124,6 +124,19 @@ function eatnewlines(str, i=1, l=lastindex(str))
     return i, count
 end
 
+# Move past consecutive lines that start with commentstring.
+# Return a tuple of the new pos in str and the amount of comment lines moved past.
+function eatcommentlines(str, i=1, l=lastindex(str), commentstring="#") 
+    count = 0
+    while i <= l && startswith(str[i:l], commentstring)
+        i = getlineend(str, i)
+        _, i = iterate(str, i)
+        i, lines = eatnewlines(str, i)
+        count += lines
+    end
+    return i, count
+end
+
 function stripquotes(x)
     x[1] in ('\'', '"') && x[1] == x[end] ?
         strip(x, x[1]) : x
