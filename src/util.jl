@@ -124,11 +124,11 @@ function eatnewlines(str, i=1, l=lastindex(str))
     return i, count
 end
 
-# Move past consecutive lines that start with commentstring.
+# Move past consecutive lines that start with commentchar.
 # Return a tuple of the new pos in str and the amount of comment lines moved past.
-function eatcommentlines(str, i=1, l=lastindex(str), commentstring="#") 
+function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Char='#') 
     count = 0
-    while i <= l && startswith(str[i:l], commentstring)
+    while i <= l && str[i] == commentchar
         i = getlineend(str, i)
         _, i = iterate(str, i)
         i, lines = eatnewlines(str, i)

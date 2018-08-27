@@ -458,7 +458,7 @@ import TextParse: _csvread
 end
 
 import TextParse: _csvread
-@testset "commentstring" begin
+@testset "commentchar" begin
 
     # First line a comment.
     str1 = """
@@ -513,14 +513,14 @@ import TextParse: _csvread
 
     # Non-default comment.
     str6 = """
-    //test
+    %test
     x,y,z
     1,1,1
-    //2,2,2
+    %2,2,2
     2,2,2
     """
 
-    @test _csvread(str6, commentstring="//") == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
+    @test _csvread(str6, commentchar='%') == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
 end
 
 @testset "skiplines_begin" begin

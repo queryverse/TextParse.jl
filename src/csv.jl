@@ -65,7 +65,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `spacedelim`: (Bool) parse space-delimited files. `delim` has no effect if true.
 - `quotechar`: character used to quote strings, defaults to `"`
 - `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
-- `commentstring`: ignore lines that begin with commentstring
+- `commentchar`: ignore lines that begin with commentchar
 - `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
 - `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
@@ -150,7 +150,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  spacedelim=false,
                  quotechar='"',
                  escapechar='"',
-                 commentstring="#",
+                 commentchar='#',
                  stringtype=String,
                  noresize=false,
                  rowno::Int=1,
@@ -196,7 +196,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     end
 
     # Ignore commented lines before the header.
-    pos, lines = eatcommentlines(str, pos, lastindex(str), commentstring)
+    pos, lines = eatcommentlines(str, pos, lastindex(str), commentchar)
     lineno += lines
 
     if header_exists
@@ -229,7 +229,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     # seed guesses using those from previous file
     guess, pos1 = guesscolparsers(str, canonnames, opts,
                                   pos, type_detect_rows, 
-                                  colparsers, commentstring,
+                                  colparsers, commentchar,
                                   nastrings, prev_parsers)
     if isempty(canonnames)
         canonnames = Any[1:length(guess);]
@@ -313,7 +313,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     @label retry
     try
         finalrows = parsefill!(str, opts, rec, nrows, cols, colspool,
-                               pos, lineno, rowno, lastindex(str), commentstring)
+                               pos, lineno, rowno, lastindex(str), commentchar)
         if !noresize
             resizecols(colspool, finalrows)
         end
@@ -463,7 +463,7 @@ function readcolnames(str, opts, pos, colnames)
 end
 
 function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, colparsers, commentstring="#", nastrings=NA_STRINGS,
+                       nrows::Int, colparsers, commentchar='#', nastrings=NA_STRINGS,
                        prevs=nothing)
     # Field type guesses
     guess = []
@@ -474,7 +474,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
         pos, _ = eatnewlines(str, pos)
 
         # Move past commented lines before guessing.
-        pos, _ = eatcommentlines(str, pos, lastindex(str), commentstring)
+        pos, _ = eatcommentlines(str, pos, lastindex(str), commentchar)
         pos > lastindex(str) && break
 
         lineend = getlineend(str, pos)
@@ -525,7 +525,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 end
 
 function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
-                    pos, lineno, rowno, l=lastindex(str), commentstring="#") where {N}
+                    pos, lineno, rowno, l=lastindex(str), commentchar='#') where {N}
     pos, lines = eatnewlines(str, pos)
     lineno += lines
 
@@ -534,7 +534,7 @@ function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspo
         lineno += lines
 
         # Do not try to parse commented lines.
-        pos, lines = eatcommentlines(str, pos, lastindex(str), commentstring)
+        pos, lines = eatcommentlines(str, pos, lastindex(str), commentchar)
         lineno += lines
         pos > l && return rowno-1
 
