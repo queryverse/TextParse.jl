@@ -467,7 +467,7 @@ import TextParse: _csvread
     2,2,2
     """
 
-    @test _csvread(str1) == (([2], [2], [2]), String["x", "y","z"])
+    @test _csvread(str1, commentchar='#') == (([2], [2], [2]), String["x", "y","z"])
 
     # Last line a comment.
     str2 = """
@@ -476,7 +476,7 @@ import TextParse: _csvread
     #2,2,2
     """
 
-    @test _csvread(str2) == (([1], [1], [1]), String["x", "y","z"])
+    @test _csvread(str2, commentchar='#') == (([1], [1], [1]), String["x", "y","z"])
 
     # Multiple comments.
     str3 = """
@@ -489,7 +489,7 @@ import TextParse: _csvread
     #6,6,6
     """
 
-    @test _csvread(str3) == (([1, 5], [1, 5], [1, 5]), String["x", "y","z"])
+    @test _csvread(str3, commentchar='#') == (([1, 5], [1, 5], [1, 5]), String["x", "y","z"])
 
     # Comments before headers.
     str4 = """
@@ -500,7 +500,7 @@ import TextParse: _csvread
     #2,2,2
     """
 
-    @test _csvread(str4) == (([1], [1], [1]), String["x", "y","z"])
+    @test _csvread(str4, commentchar='#') == (([1], [1], [1]), String["x", "y","z"])
 
     # No comments.
     str5 = """
@@ -509,7 +509,7 @@ import TextParse: _csvread
     2,2,2
     """
 
-    @test _csvread(str5) == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
+    @test _csvread(str5, commentchar='#') == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
 
     # Non-default comment.
     str6 = """
@@ -521,6 +521,20 @@ import TextParse: _csvread
     """
 
     @test _csvread(str6, commentchar='%') == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
+
+    # Do not skip commented lines (commentchar=nothing).
+    str7 = """
+    x,y,z
+    1,1,1
+    #2,2,2
+    """
+
+    # Since we are not skipping commented lines the '#' character is considered 
+    # data. This will force parsing to treat columns with '#'s as String columns.
+    # Here, we verify this behavior.
+    result = _csvread(str7)
+    @test eltype(result[1][1]) == String
+    @test result == ((["1", "#2"], [1, 2], [1, 2]), String["x", "y","z"])
 end
 
 @testset "skiplines_begin" begin

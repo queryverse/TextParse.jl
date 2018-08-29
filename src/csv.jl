@@ -150,7 +150,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  spacedelim=false,
                  quotechar='"',
                  escapechar='"',
-                 commentchar='#',
+                 commentchar=nothing,
                  stringtype=String,
                  noresize=false,
                  rowno::Int=1,
@@ -463,7 +463,7 @@ function readcolnames(str, opts, pos, colnames)
 end
 
 function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, colparsers, commentchar='#', nastrings=NA_STRINGS,
+                       nrows::Int, colparsers, commentchar=nothing, nastrings=NA_STRINGS,
                        prevs=nothing)
     # Field type guesses
     guess = []
@@ -525,7 +525,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 end
 
 function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
-                    pos, lineno, rowno, l=lastindex(str), commentchar='#') where {N}
+                    pos, lineno, rowno, l=lastindex(str), commentchar=nothing) where {N}
     pos, lines = eatnewlines(str, pos)
     lineno += lines
 
