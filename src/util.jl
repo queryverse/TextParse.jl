@@ -127,7 +127,7 @@ end
 # Move past consecutive lines that start with commentchar.
 # Return a tuple of the new pos in str and the amount of comment lines moved past.
 function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, Nothing}=nothing) 
-    commentchar == nothing && return i, 0
+    commentchar === nothing && return i, 0
 
     count = 0
     while i <= l && str[i] == commentchar

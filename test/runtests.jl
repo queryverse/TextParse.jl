@@ -535,6 +535,17 @@ import TextParse: _csvread
     result = _csvread(str7)
     @test eltype(result[1][1]) == String
     @test result == ((["1", "#2"], [1, 2], [1, 2]), String["x", "y","z"])
+
+
+    # Quoted lines commented out.
+    str8 = """
+    a,b,c
+    "the","quick","brown"
+    #"fox","jum\nps","over"
+    "the","lazy","dog"
+    """
+
+    @test_skip _csvread(str8, commentchar='#') == ((["the","the"], ["quick", "lazy"], ["brown","dog"]), String["x", "y","z"])
 end
 
 @testset "skiplines_begin" begin
