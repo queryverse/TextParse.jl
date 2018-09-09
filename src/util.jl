@@ -35,41 +35,43 @@ macro chk2(expr,label=:error)
 end
 
 @inline function tryparsenext_base10_digit(T,str,i, len)
-    R = Some{T}
-    i > len && @goto error
-    @inbounds c,ii = iterate(str,i)
+    y = iterate(str,i)
+    y===nothing && @goto error
+    c = y[1]; ii = y[2]
     '0' <= c <= '9' || @goto error
-    return R(convert(T, c-'0')), ii
+    return convert(T, c-'0'), ii
 
     @label error
-    return nothing, i
+    return nothing
 end
 
 @inline function tryparsenext_base10(T, str,i,len)
-    R = Some{T}
-    @chk2 r, i = tryparsenext_base10_digit(T,str,i, len)
+    y = tryparsenext_base10_digit(T,str,i, len)
+    y===nothing && return nothing, i
+    r = y[1]; i = y[2]
     ten = T(10)
     while true
-        @chk2 d, i = tryparsenext_base10_digit(T,str,i,len) done
+        y2 = tryparsenext_base10_digit(T,str,i,len)
+        y2===nothing && break
+        d = y2[1]; i = y2[2]
         r = r*ten + d
     end
-    @label done
-    return R(convert(T, r)), i
-
-    @label error
-    return nothing, i
+    return Some{T}(convert(T, r)), i
 end
 
 @inline function tryparsenext_sign(str, i, len)
-    R = Some{Int}
-    i > len && return nothing, i
-    c, ii = iterate(str, i)
-    if c == '-'
-        return R(-1), ii
-    elseif c == '+'
-        return R(1), ii
+    y = iterate(str, i)
+    if y===nothing
+        return nothing, i
     else
-        return (R(1), i)
+        c = y[1]; ii = y[2]
+        if c == '-'
+            return Some{Int}(-1), ii
+        elseif c == '+'
+            return Some{Int}(1), ii
+        else
+            return Some{Int}(1), i
+        end
     end
 end
 
@@ -82,13 +84,15 @@ end
 end
 
 @inline function eatwhitespaces(str, i=1, l=lastindex(str))
-    while i <= l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         if isspace(c)
             i=ii
         else
             break
         end
+        y = iterate(str, i)
     end
     return i
 end
@@ -96,12 +100,15 @@ end
 
 function eatnewlines(str, i=1, l=lastindex(str))
     count = 0
-    while i<=l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         if c == '\r'
             i=ii
-            if i <= l
-                @inbounds c, ii = iterate(str, i)
+            y2 = iterate(str, i)
+            if y2!==nothing
+                c = y2[1]
+                ii = y2[2]
                 if c == '\n'
                     i=ii
                 end
@@ -109,8 +116,10 @@ function eatnewlines(str, i=1, l=lastindex(str))
             count += 1
         elseif c == '\n'
             i=ii
-            if i <= l
-                @inbounds c, ii = iterate(str, i)
+            y3 = iterate(str, i)
+            if y3!==nothing
+                c = y3[1]
+                ii = y3[2]
                 if c == '\r'
                     i=ii
                 end
@@ -119,6 +128,7 @@ function eatnewlines(str, i=1, l=lastindex(str))
         else
             break
         end
+        y = iterate(str, i)
     end
 
     return i, count
@@ -130,12 +140,15 @@ function stripquotes(x)
 end
 
 function getlineend(str, i=1, l=lastindex(str))
-    while i<=l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         isnewline(c) && break
         i = ii
+        y = iterate(str, i)
     end
 
+    # TODO Is this correct?
     return i-1
 end
 
@@ -172,10 +185,12 @@ function getlineat(str, i)
         ii = prevind(str, line_start)
     end
 
+    # TODO Handle nothing case
     c, ii = iterate(str, line_start)
     line_end = line_start
     while !isnewline(c) && ii <= l
         line_end = ii
+        # TODO Handle nothing case
         c, ii = iterate(str, ii)
     end
 

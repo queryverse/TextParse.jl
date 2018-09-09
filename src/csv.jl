@@ -177,8 +177,9 @@ function _csvread_internal(str::AbstractString, delim=',';
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
     lineno = 0
 
-    if pos <= len
-        c, i = iterate(str, pos)
+    y = iterate(str, pos)
+    if y!==nothing
+        c = y[1]; i = y[2]
         if c == '\ufeff'
             pos = i
         end
@@ -188,7 +189,9 @@ function _csvread_internal(str::AbstractString, delim=',';
     lineno += lines
     while lineno < skiplines_begin
         pos = getlineend(str, pos)
-        _, pos = iterate(str, pos)
+        y2 = iterate(str, pos)
+        y2===nothing && error("Internal error.")
+        pos = y2[2]
         pos, lines = eatnewlines(str, pos)
         lineno += lines
     end
@@ -640,7 +643,9 @@ function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(st
         @chk2 x, i = tryparsenext(f, str, i, l, opts)
         push!(strs, x)
     end
-    c, i = iterate(str, prevind(str, i))
+    y1 = iterate(str, prevind(str, i))
+    y1===nothing && error("Internal error.")
+    c = y1[1]; i = y1[2]
     if c == opts.endchar
         # edge case where there's a delim at the end of the string
         push!(strs, "")

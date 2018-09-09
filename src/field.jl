@@ -141,15 +141,17 @@ end
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     x=0
 
-    i > len && @goto error
-    c, ii = iterate(str, i)
+    y1 = iterate(str, i)
+    y1 === nothing && @goto error
+    c = y1[1]; ii = y1[2]
     if c == '.'
         i=ii
         @goto dec
     end
     @chk2 x, i = tryparsenext_base10(Int, str, i, len)
-    i > len && @goto done
-    @inbounds c, ii = iterate(str, i)
+    y2 = iterate(str, i)
+    y2 === nothing && @goto done
+    c = y2[1]; ii = y2[2]
 
     c != '.' && @goto parse_e
     @label dec
@@ -157,8 +159,9 @@ end
     f = y / 10.0^(i-ii)
 
     @label parse_e
-    i > len && @goto done
-    c, ii = iterate(str, i)
+    y3 = iterate(str,i)
+    y3 === nothing && @goto done
+    c = y3[1]; ii = y3[2]
 
     if c == 'e' || c == 'E'
         @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
@@ -183,11 +186,16 @@ function tryparsenext(::Percentage, str, i, len, opts)
     else
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
-        c, k = iterate(str, ii)
-        if c != '%'
+        y = iterate(str, ii)
+        if y===nothing 
             return nothing, ii # failed to parse %
         else
-            return Some{Float64}(num.value / 100.0), k # the point after %
+            c = y[1]; k = y[2]
+            if c != '%'
+                return nothing, ii # failed to parse %
+            else
+                return Some{Float64}(num.value / 100.0), k # the point after %
+            end
         end
     end
 end
@@ -211,16 +219,20 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     R = Some{T}
     p = ' '
     i0 = i
-    if opts.includequotes && i <= len
-        c, ii = iterate(str, i)
-        if c == opts.quotechar
-            i = ii # advance counter so that
-                   # the while loop doesn't react to opening quote
+    if opts.includequotes
+        y = iterate(str, i)
+        if y!==nothing
+            c = y[1]; ii = y[2]
+            if c == opts.quotechar
+                i = ii # advance counter so that
+                       # the while loop doesn't react to opening quote
+            end
         end
     end
 
-    while i <= len
-        c, ii = iterate(str, i)
+    y2 = iterate(str, i)
+    while y2!==nothing
+        c = y2[1]; ii = y2[2]
         if opts.spacedelim && (c == ' ' || c == '\t')
             break
         elseif !opts.spacedelim && c == opts.endchar
@@ -229,24 +241,28 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
                 if opts.quotechar == opts.escapechar
                     # sometimes the quotechar is the escapechar
                     # in that case we need to see the next char
-                    if ii > len
+                    y3 = iterate(str, ii)
+                    if y3===nothing
                         if opts.includequotes
                             i=ii
                         end
                         break
-                    end
-                    nxt, j = iterate(str, ii)
-                    if nxt == opts.quotechar
-                        # the current character is escaping the
-                        # next one
-                        i = j # skip next char as well
-                        p = nxt
-                        continue
+                    else
+                        nxt = y3[1]; j = y3[2]
+                        if nxt == opts.quotechar
+                            # the current character is escaping the
+                            # next one
+                            i = j # skip next char as well
+                            p = nxt
+                            y2 = iterate(str, i)
+                            continue
+                        end
                     end
                 elseif p == opts.escapechar
                     # previous char escaped this one
                     i = ii
                     p = c
+                    y2 = iterate(str, i)
                     continue
                 end
             end
@@ -259,6 +275,8 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         end
         i = ii
         p = c
+
+        y2 = iterate(str, i)
     end
 
     return R(_substring(T, str, i0, i-1)), i
@@ -335,13 +353,14 @@ end
 Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
 
 function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
-    if i > len
+    y1 = iterate(str, i)
+    if y1===nothing
         q.required && @goto error
         # check to see if inner thing is ok with an empty field
         @chk2 x, i = tryparsenext(q.inner, str, i, len, opts) error
         @goto done
     end
-    c, ii = iterate(str, i)
+    c = y1[1]; ii = y1[2]
     quotestarted = false
     if quotechar(q, opts) == c
         quotestarted = true
@@ -374,7 +393,9 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     if q.stripwhitespaces
         i = eatwhitespaces(str, i)
     end
-    c, ii = iterate(str, i)
+    y2 = iterate(str, i)
+    y2===nothing && error("Internal error.")
+    c = y2[1]; ii = y2[2]
 
     if quotestarted && !q.includequotes
         c != quotechar(q, opts) && @goto error
@@ -461,7 +482,8 @@ endchar(na::NAToken, opts) = na.endchar === nothing ? opts.endchar : na.endchar
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     R = Some{T}
     i = eatwhitespaces(str, i)
-    if i > len
+    y1 = iterate(str,i)
+    if y1===nothing
         if na.emptyisna
             @goto null
         else
@@ -469,7 +491,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
         end
     end
 
-    c, ii=iterate(str,i)
+    c = y1[1]; ii=y1[2]
     if (c == endchar(na, opts) || isnewline(c)) && na.emptyisna
        @goto null
     end
@@ -543,21 +565,25 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     R = Some{T}
     i > len && @goto error
     if f.ignore_init_whitespace
-        while i <= len
-            @inbounds c, ii = iterate(str, i)
+        y1 = iterate(str, i)
+        while y1!==nothing
+            c = y1[1]; ii = y1[2]
             !isspace(c) && break
             i = ii
+            y1 = iterate(str, i)
         end
     end
     @chk2 res, i = tryparsenext(f.inner, str, i, len, opts)
 
     if f.ignore_end_whitespace
         i0 = i
-        while i <= len
-            @inbounds c, ii = iterate(str, i)
+        y2 = iterate(str, i)
+        while y2!==nothing
+            c = y2[1]; ii = y2[2]
             !opts.spacedelim && opts.endchar == '\t' && c == '\t' && (i =ii; @goto done)
             !isspace(c) && c != '\t' && break
             i = ii
+            y2 = iterate(str, i)
         end
 
         opts.spacedelim && i > i0 && @goto done
@@ -572,15 +598,18 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
         end
     end
 
-    @inbounds c, ii = iterate(str, i)
+    y3 = iterate(str, i)
+    y3===nothing && error("Internal error.")
+    c = y3[1]; ii = y3[2]
     opts.spacedelim && (isspace(c) || c == '\t') && (i=ii; @goto done)
     !opts.spacedelim && opts.endchar == c && (i=ii; @goto done)
 
     if f.eoldelim
         if c == '\r'
             i=ii
-            if i <= len
-                @inbounds c, ii = iterate(str, i)
+            y4 = iterate(str, i)
+            if y4!==nothing
+                c = y4[1]; ii = y4[2]
                 if c == '\n'
                     i=ii
                 end
@@ -588,8 +617,9 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
             @goto done
         elseif c == '\n'
             i=ii
-            if i <= len
-                @inbounds c, ii = iterate(str, i)
+            y5 = iterate(str, i)
+            if y5!==nothing
+                c = y5[1]; ii = y5[2]
                 if c == '\r'
                     i=ii
                 end
