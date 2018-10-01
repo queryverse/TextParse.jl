@@ -66,7 +66,7 @@ end
 # needed for promoting guessses
 struct Unknown <: AbstractToken{Missing} end
 fromtype(::Type{Missing}) = Unknown()
-const nullableNA = Some{Missing}(missing)
+const nullableNA = Nullable{Missing}(missing)
 function tryparsenext(::Unknown, str, i, len, opts)
     nullableNA, i
 end
@@ -121,14 +121,15 @@ fromtype(::Type{N}) where {N<:Number} = Numeric(N)
 ### Unsigned integers
 
 function tryparsenext(::Numeric{T}, str, i, len) where {T<:Signed}
+    R = Nullable{T}
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
 
     @label done
-    return Some(convert(T, sign*x)), i
+    return R(convert(T, sign*x)), i
 
     @label error
-    return nothing, i
+    return R(), i
 end
 
 @inline function tryparsenext(::Numeric{T}, str, i, len) where {T<:Unsigned}
@@ -136,7 +137,7 @@ end
 end
 
 @inline function tryparsenext(::Numeric{F}, str, i, len) where {F<:AbstractFloat}
-    R = Some{F}
+    R = Nullable{F}
     f = 0.0
     @chk2 sign, i = tryparsenext_sign(str, i, len)
     x=0
@@ -172,7 +173,7 @@ end
     return R(convert(F, sign*(x+f))), i
 
     @label error
-    return nothing, i
+    return R(), i
 end
 
 struct Percentage <: AbstractToken{Float64}
@@ -181,20 +182,20 @@ end
 const floatparser = Numeric(Float64)
 function tryparsenext(::Percentage, str, i, len, opts)
     num, ii = tryparsenext(floatparser, str, i, len, opts)
-    if num === nothing
+    if isnull(num)
         return num, ii
     else
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
         y = iterate(str, ii)
         if y===nothing 
-            return nothing, ii # failed to parse %
+            return Nullable{Float64}(), ii # failed to parse %
         else
             c = y[1]; k = y[2]
             if c != '%'
-                return nothing, ii # failed to parse %
+                return Nullable{Float64}(), ii # failed to parse %
             else
-                return Some{Float64}(num.value / 100.0), k # the point after %
+                return Nullable{Float64}(num.value / 100.0), k # the point after %
             end
         end
     end
@@ -216,7 +217,7 @@ show(io::IO, c::StringToken) = print(io, "<string>")
 fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
 function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
-    R = Some{T}
+    R = Nullable{T}
     p = ' '
     i0 = i
     if opts.includequotes
@@ -404,10 +405,10 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
 
 
     @label done
-    return Some{T}(x), i
+    return Nullable{T}(x), i
 
     @label error
-    return nothing, i
+    return Nullable{T}(), i
 end
 
 ## Date and Time
@@ -428,10 +429,10 @@ fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
 
 function tryparsenext(dt::DateTimeToken{T}, str, i, len, opts) where {T}
-    R = Some{T}
+    R = Nullable{T}
     nt, i = tryparsenext_internal(T, str, i, len, dt.format, opts.endchar)
-    if nt === nothing
-        return nothing, i
+    if isnull(nt)
+        return R(), i
     else
         return R(T(nt.value...)), i
     end
@@ -480,7 +481,7 @@ end
 endchar(na::NAToken, opts) = na.endchar === nothing ? opts.endchar : na.endchar
 
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
-    R = Some{T}
+    R = Nullable{T}
     i = eatwhitespaces(str, i)
     y1 = iterate(str,i)
     if y1===nothing
@@ -513,13 +514,13 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
         i = eatwhitespaces(str, i)
         @goto null
     end
-    return nothing, i
+    return R(), i
 
     @label null
     return R(missing), i
 
     @label error
-    return nothing, i
+    return R(), i
 end
 
 fromtype(::Type{Union{Missing,T}}) where T = NAToken(fromtype(T))
@@ -562,7 +563,7 @@ function swapinner(f::Field, inner::AbstractToken;
 end
 
 function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
-    R = Some{T}
+    R = Nullable{T}
     i > len && @goto error
     if f.ignore_init_whitespace
         y1 = iterate(str, i)
@@ -629,7 +630,7 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     end
 
     @label error
-    return nothing, i
+    return R(), i
 
     @label done
     return R(convert(T, res)), i

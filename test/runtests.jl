@@ -4,6 +4,7 @@ import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Test
 using Dates
+using Nullables
 
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
@@ -487,7 +488,7 @@ import TextParse: eatwhitespaces
             ii = eatwhitespaces(str, ii, len)
             c, k = iterate(str, ii)
             if c != '%'
-                return nothing, ii # failed to parse %
+                return Nullable{Float64}(), ii # failed to parse %
             else
                 return num, k # the point after %
             end

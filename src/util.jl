@@ -26,10 +26,10 @@ macro chk2(expr,label=:error)
     quote
         x = $(esc(rhs))
         $(esc(state)) = x[2] # bubble error location
-        if x[1] === nothing
+        if isnull(x[1])
             $(esc(:(@goto $label)))
         else
-            $(esc(res)) = something(x[1])
+            $(esc(res)) = x[1].value
         end
     end
 end
@@ -46,8 +46,9 @@ end
 end
 
 @inline function tryparsenext_base10(T, str,i,len)
+    R = Nullable{T}
     y = tryparsenext_base10_digit(T,str,i, len)
-    y===nothing && return nothing, i
+    y===nothing && return R(), i
     r = y[1]; i = y[2]
     ten = T(10)
     while true
@@ -56,21 +57,23 @@ end
         d = y2[1]; i = y2[2]
         r = r*ten + d
     end
-    return Some{T}(convert(T, r)), i
+    return R(convert(T, r)), i
 end
 
 @inline function tryparsenext_sign(str, i, len)
+    R = Nullable{Int}
+
     y = iterate(str, i)
     if y===nothing
-        return nothing, i
+        return return R(), i
     else
         c = y[1]; ii = y[2]
         if c == '-'
-            return Some{Int}(-1), ii
+            return R(-1), ii
         elseif c == '+'
-            return Some{Int}(1), ii
+            return R(1), ii
         else
-            return Some{Int}(1), i
+            return R(1), i
         end
     end
 end
@@ -154,8 +157,8 @@ end
 
 ### Testing helpers
 
-unwrap(xs) = (something(xs[1]), xs[2:end]...)
-failedat(xs) = (@assert xs[1] === nothing; xs[2])
+unwrap(xs) = (get(xs[1]), xs[2:end]...)
+failedat(xs) = (@assert isnull(xs[1]); xs[2])
 
 # String speedup hacks
 
