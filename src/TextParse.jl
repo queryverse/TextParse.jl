@@ -1,6 +1,6 @@
 module TextParse
 
-using CodecZlib, WeakRefStrings, Dates, Nullables
+using CodecZlib, WeakRefStrings, Dates, Nullables, DoubleFloats
 
 include("lib/compat.jl")
 include("util.jl")

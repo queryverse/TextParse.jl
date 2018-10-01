@@ -34,6 +34,53 @@ macro chk2(expr,label=:error)
     end
 end
 
+@inline _isdigit(c::Char) = '0' <= c <= '9'
+
+@inline function parse_uint_and_stop(str, i, len, n::T) where {T <: Integer}
+    ten = T(10)
+    # specialize handling of the first digit so we can return an error
+    max_without_overflow = div(typemax(T)-9,10) # the larg
+    y1 = iterate(str, i)
+    y1===nothing && return n, false, i
+    c = y1[1]
+    if _isdigit(c) && n <= max_without_overflow
+        n *= ten
+        n += T(c-'0')
+    else
+        return n, false, i
+    end
+    i = y1[2]
+    
+    y2 = iterate(str, i)
+    while y2!==nothing && n <= max_without_overflow
+        c = y2[1]
+        if _isdigit(c)
+            n *= ten
+            n += T(c-'0')
+        else
+            return n, true, i
+        end
+        i = y2[2]
+
+        y2 = iterate(str, i)
+    end
+    return n, true, i
+end
+
+# slurp up extra digits
+@inline function read_digits(str, i, len)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]
+        if !_isdigit(c) # do nothing
+            return i
+        end
+        i = y[2]
+        y = iterate(str, i)
+    end
+    return i
+end
+
 @inline function tryparsenext_base10_digit(T,str,i, len)
     y = iterate(str,i)
     y===nothing && @goto error

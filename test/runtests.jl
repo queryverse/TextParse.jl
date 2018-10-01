@@ -3,7 +3,7 @@ using TextParse
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Test
-using Dates
+using Dates, Random
 using Nullables
 
 # dumb way to compare two AbstractTokens
@@ -40,6 +40,11 @@ import TextParse: fromtype, Percentage
     @test tryparsenext(fromtype(Float64), "5.e-3", 1, 5) |> unwrap == (5.0e-3,6) # 32
     @test tryparsenext(Percentage(), "33%") |> unwrap == (.33,4)
     @test tryparsenext(Percentage(), "3.3%") |> unwrap == (.033,5)
+
+    rng = MersenneTwister(0)
+    floats = rand(1_000)
+    parsed_floats = map(i->get(tryparsenext(fromtype(Float64), i, 1, lastindex(i))[1]), string.(floats))
+    @test parsed_floats == floats
 end
 
 

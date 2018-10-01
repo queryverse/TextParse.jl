@@ -136,41 +136,119 @@ end
     tryparsenext_base10(T,str, i, len)
 end
 
+@inline _is_e(str, i) = str[i]=='e' || str[i]=='E'
+
+@inline _is_negative(str, i) = str[i]=='-'
+
+@inline _is_positive(str, i) = str[i]=='+'
+
+@inline function convert_to_double(f1::Int64, exp::Int)
+    f = Float64(f1)
+    r = f1 - Int64(f) # get the remainder
+    x = Double64(f) + Double64(r)
+  
+    maxexp = 308
+    minexp = -256
+  
+    if exp >= 0
+        x *= Double64(10.0)^(exp)
+    else
+        if exp < minexp # not sure why this is a good choice, but it seems to be!
+            x /= Double64(10.0)^(-minexp)
+            x /= Double64(10.0)^(-exp + minexp)
+        else
+            x /= Double64(10.0)^(-exp)
+        end
+    end
+    return Float64(x)
+end
+
 @inline function tryparsenext(::Numeric{F}, str, i, len) where {F<:AbstractFloat}
     R = Nullable{F}
-    f = 0.0
-    @chk2 sign, i = tryparsenext_sign(str, i, len)
-    x=0
 
     y1 = iterate(str, i)
-    y1 === nothing && @goto error
-    c = y1[1]; ii = y1[2]
-    if c == '.'
-        i=ii
-        @goto dec
+    y1===nothing && @goto error
+
+    negate = false
+    c = y1[1]
+    if c=='-'
+        negate = true
+        i = y1[2]
+    elseif c=='+'
+        i = y1[2]
     end
-    @chk2 x, i = tryparsenext_base10(Int, str, i, len)
+
+    f1::Int64 = 0
+
+    # read an integer up to the decimal point
+    f1, rval1, idecpt = parse_uint_and_stop(str, i, len, f1)
+    idecpt = read_digits(str, idecpt, len) # get any trailing digits
+    i = idecpt
+
+    ie = i
+    frac_digits = 0
+
+    # next thing must be dec pt.
     y2 = iterate(str, i)
-    y2 === nothing && @goto done
-    c = y2[1]; ii = y2[2]
+    if y2!==nothing && y2[1]=='.'
+        i =y2[2]
+        f1, rval2, ie = parse_uint_and_stop(str, i, len, f1)
+        # TODO This is incorrect for string types where a digit takes up
+        # more than one codeunit, we need to return the number of digits
+        # from parse_uint_and_stop instead. Ok for now because we are
+        # not handling any such string types.
+        frac_digits = ie - i
 
-    c != '.' && @goto parse_e
-    @label dec
-    @chk2 y, i = tryparsenext_base10(Int, str, ii, len) parse_e
-    f = y / 10.0^(i-ii)
+        ie = read_digits(str, ie, len) # get any trailing digits
+    elseif !rval1 # no first number, and now no deciaml point => invalid
+        @goto error
+    end
 
-    @label parse_e
-    y3 = iterate(str,i)
-    y3 === nothing && @goto done
-    c = y3[1]; ii = y3[2]
+    # Next thing must be exponent
+    i = ie
+    eval::Int32 = 0
 
-    if c == 'e' || c == 'E'
-        @chk2 exp, i = tryparsenext(Numeric(Int), str, ii, len)
-        return R(convert(F, sign*(x+f) * 10.0^exp)), i
+    y3 = iterate(str, i)
+    if y3!==nothing && _is_e(str, i)
+        i = y3[2]
+    
+        y4 = iterate(str, i)
+        if y4!==nothing
+            enegate = false
+            if _is_negative(str, i)
+                enegate = true
+                i = y4[2]
+            elseif _is_positive(str, i)
+                i = y4[2]
+            end
+        end
+        eval, rval3, i = parse_uint_and_stop(str, i, len, eval)
+        if enegate
+            eval *= Int32(-1)
+        end
+    end
+
+    exp = eval - frac_digits
+
+    maxexp = 308
+    minexp = -307
+
+    if frac_digits <= 15 && -22 <= exp <= 22
+        if exp >= 0
+            f = F(f1)*10.0^exp
+        else
+            f = F(f1)/10.0^(-exp)
+        end
+    else
+          f = convert_to_double(f1, exp)
+    end
+
+    if negate
+        f = -f
     end
 
     @label done
-    return R(convert(F, sign*(x+f))), i
+    return R(convert(F, f)), i
 
     @label error
     return R(), i
