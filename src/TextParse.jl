@@ -7,6 +7,8 @@ include("util.jl")
 include("field.jl")
 include("record.jl")
 
+include("utf8optimizations.jl")
+
 include("guesstype.jl")
 include("csv.jl")
 
