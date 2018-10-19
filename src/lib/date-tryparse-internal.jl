@@ -108,8 +108,8 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
             quote
                 pos > len && @goto done
                 $nullable, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
-                $nullable===nothing && @goto error
-                $name = $nullable
+                isnull($nullable) && @goto error
+                $name = unsafe_get($nullable)
                 pos = next_pos
                 num_parsed += 1
                 directive_index += 1
@@ -117,9 +117,8 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
         else
             quote
                 pos > len && @goto done
-                nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
-                nothingable_tuple===nothing && @goto error
-                nullable_delim, next_pos = nothingable_tuple                
+                nullable_delim, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
+                isnull(nullable_delim) && @goto error
                 pos = next_pos
                 directive_index += 1
             end

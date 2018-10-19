@@ -3,7 +3,8 @@ using TextParse
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Test
-using Dates
+using Dates, Random
+using Nullables
 
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
@@ -12,8 +13,21 @@ import TextParse: eatnewlines
 @testset "eatnewlines" begin
     @test eatnewlines("\n\r\nx") == (4, 2)
     @test eatnewlines("x\n\r\nx") == (1, 0)
+
+    # Also test the AbstractString variant
+    @test eatnewlines(SubString("\n\r\nx", 1)) == (4, 2)
+    @test eatnewlines(SubString("x\n\r\nx", 1)) == (1, 0)
 end
 
+import TextParse: eatwhitespaces
+@testset "eatwhitespaces" begin
+    @test eatwhitespaces("  x") == 3
+    @test eatwhitespaces("x  x") == 1
+
+    # Also test the AbstractString variant
+    @test eatwhitespaces(SubString("  x", 1)) == 3
+    @test eatwhitespaces(SubString("x  x", 1)) == 1
+end
 
 import TextParse: getlineend
 @testset "getlineend" begin
@@ -39,6 +53,29 @@ import TextParse: fromtype, Percentage
     @test tryparsenext(fromtype(Float64), "5.e-3", 1, 5) |> unwrap == (5.0e-3,6) # 32
     @test tryparsenext(Percentage(), "33%") |> unwrap == (.33,4)
     @test tryparsenext(Percentage(), "3.3%") |> unwrap == (.033,5)
+
+    # Also test AbstractString variant
+    @test tryparsenext(fromtype(Float64), SubString("1", 1), 1, 1) |> unwrap == (1.0, 2)
+    @test tryparsenext(fromtype(Float64), SubString("12", 1), 1, 2) |> unwrap == (12.0, 3)
+    @test tryparsenext(fromtype(Float64), SubString(".1", 1), 1, 2) |> unwrap == (0.1, 3)
+    @test tryparsenext(fromtype(Float64), SubString("1.1", 1), 1, 3) |> unwrap == (1.1, 4)
+    @test tryparsenext(fromtype(Float32), SubString("1.", 1), 1, 2) |> unwrap == (1f0,3)
+    @test tryparsenext(fromtype(Float64), SubString("-1.1", 1), 1, 4) |> unwrap == (-1.1,5)
+    @test tryparsenext(fromtype(Float64), SubString("-1.0e-12", 1), 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(fromtype(Float64), SubString("-1e-12", 1)) |> unwrap == (-1.0e-12,7)
+    @test tryparsenext(fromtype(Float64), SubString("-1.0E-12", 1), 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(fromtype(Float64), SubString("5.e-3", 1), 1, 5) |> unwrap == (5.0e-3,6) # 32
+    @test tryparsenext(Percentage(), SubString("33%", 1)) |> unwrap == (.33,4)
+    @test tryparsenext(Percentage(), SubString("3.3%", 1)) |> unwrap == (.033,5)
+
+    rng = MersenneTwister(0)
+    floats = rand(1_000)
+    parsed_floats = map(i->get(tryparsenext(fromtype(Float64), i, 1, lastindex(i))[1]), string.(floats))
+    @test parsed_floats == floats
+
+    # Also test AbstractString variant
+    parsed_floats = map(i->get(tryparsenext(fromtype(Float64), SubString(i,1), 1, lastindex(i))[1]), string.(floats))
+    @test parsed_floats == floats
 end
 
 
@@ -487,7 +524,7 @@ import TextParse: eatwhitespaces
             ii = eatwhitespaces(str, ii, len)
             c, k = iterate(str, ii)
             if c != '%'
-                return nothing, ii # failed to parse %
+                return Nullable{Float64}(), ii # failed to parse %
             else
                 return num, k # the point after %
             end

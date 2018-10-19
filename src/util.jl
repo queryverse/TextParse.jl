@@ -26,50 +26,102 @@ macro chk2(expr,label=:error)
     quote
         x = $(esc(rhs))
         $(esc(state)) = x[2] # bubble error location
-        if x[1] === nothing
+        if isnull(x[1])
             $(esc(:(@goto $label)))
         else
-            $(esc(res)) = something(x[1])
+            $(esc(res)) = x[1].value
         end
     end
 end
 
+@inline _isdigit(c::Char) = '0' <= c <= '9'
+
+@inline function parse_uint_and_stop(str, i, len, n::T) where {T <: Integer}
+    ten = T(10)
+    # specialize handling of the first digit so we can return an error
+    max_without_overflow = div(typemax(T)-9,10) # the larg
+    y1 = iterate(str, i)
+    y1===nothing && return n, false, i
+    c = y1[1]
+    if _isdigit(c) && n <= max_without_overflow
+        n *= ten
+        n += T(c-'0')
+    else
+        return n, false, i
+    end
+    i = y1[2]
+    
+    y2 = iterate(str, i)
+    while y2!==nothing && n <= max_without_overflow
+        c = y2[1]
+        if _isdigit(c)
+            n *= ten
+            n += T(c-'0')
+        else
+            return n, true, i
+        end
+        i = y2[2]
+
+        y2 = iterate(str, i)
+    end
+    return n, true, i
+end
+
+# slurp up extra digits
+@inline function read_digits(str, i, len)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]
+        if !_isdigit(c) # do nothing
+            return i
+        end
+        i = y[2]
+        y = iterate(str, i)
+    end
+    return i
+end
+
 @inline function tryparsenext_base10_digit(T,str,i, len)
-    R = Some{T}
-    i > len && @goto error
-    @inbounds c,ii = iterate(str,i)
+    y = iterate(str,i)
+    y===nothing && @goto error
+    c = y[1]; ii = y[2]
     '0' <= c <= '9' || @goto error
-    return R(convert(T, c-'0')), ii
+    return convert(T, c-'0'), ii
 
     @label error
-    return nothing, i
+    return nothing
 end
 
 @inline function tryparsenext_base10(T, str,i,len)
-    R = Some{T}
-    @chk2 r, i = tryparsenext_base10_digit(T,str,i, len)
+    R = Nullable{T}
+    y = tryparsenext_base10_digit(T,str,i, len)
+    y===nothing && return R(), i
+    r = y[1]; i = y[2]
     ten = T(10)
     while true
-        @chk2 d, i = tryparsenext_base10_digit(T,str,i,len) done
+        y2 = tryparsenext_base10_digit(T,str,i,len)
+        y2===nothing && break
+        d = y2[1]; i = y2[2]
         r = r*ten + d
     end
-    @label done
     return R(convert(T, r)), i
-
-    @label error
-    return nothing, i
 end
 
 @inline function tryparsenext_sign(str, i, len)
-    R = Some{Int}
-    i > len && return nothing, i
-    c, ii = iterate(str, i)
-    if c == '-'
-        return R(-1), ii
-    elseif c == '+'
-        return R(1), ii
+    R = Nullable{Int}
+
+    y = iterate(str, i)
+    if y===nothing
+        return return R(), i
     else
-        return (R(1), i)
+        c = y[1]; ii = y[2]
+        if c == '-'
+            return R(-1), ii
+        elseif c == '+'
+            return R(1), ii
+        else
+            return R(1), i
+        end
     end
 end
 
@@ -82,13 +134,15 @@ end
 end
 
 @inline function eatwhitespaces(str, i=1, l=lastindex(str))
-    while i <= l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         if isspace(c)
             i=ii
         else
             break
         end
+        y = iterate(str, i)
     end
     return i
 end
@@ -96,12 +150,15 @@ end
 
 function eatnewlines(str, i=1, l=lastindex(str))
     count = 0
-    while i<=l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         if c == '\r'
             i=ii
-            if i <= l
-                @inbounds c, ii = iterate(str, i)
+            y2 = iterate(str, i)
+            if y2!==nothing
+                c = y2[1]
+                ii = y2[2]
                 if c == '\n'
                     i=ii
                 end
@@ -109,8 +166,10 @@ function eatnewlines(str, i=1, l=lastindex(str))
             count += 1
         elseif c == '\n'
             i=ii
-            if i <= l
-                @inbounds c, ii = iterate(str, i)
+            y3 = iterate(str, i)
+            if y3!==nothing
+                c = y3[1]
+                ii = y3[2]
                 if c == '\r'
                     i=ii
                 end
@@ -119,6 +178,7 @@ function eatnewlines(str, i=1, l=lastindex(str))
         else
             break
         end
+        y = iterate(str, i)
     end
 
     return i, count
@@ -130,19 +190,22 @@ function stripquotes(x)
 end
 
 function getlineend(str, i=1, l=lastindex(str))
-    while i<=l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         isnewline(c) && break
         i = ii
+        y = iterate(str, i)
     end
 
+    # TODO Is this correct?
     return i-1
 end
 
 ### Testing helpers
 
-unwrap(xs) = (something(xs[1]), xs[2:end]...)
-failedat(xs) = (@assert xs[1] === nothing; xs[2])
+unwrap(xs) = (get(xs[1]), xs[2:end]...)
+failedat(xs) = (@assert isnull(xs[1]); xs[2])
 
 # String speedup hacks
 
@@ -172,10 +235,12 @@ function getlineat(str, i)
         ii = prevind(str, line_start)
     end
 
+    # TODO Handle nothing case
     c, ii = iterate(str, line_start)
     line_end = line_start
     while !isnewline(c) && ii <= l
         line_end = ii
+        # TODO Handle nothing case
         c, ii = iterate(str, ii)
     end
 

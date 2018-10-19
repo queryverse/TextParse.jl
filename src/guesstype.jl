@@ -30,7 +30,7 @@ function guessdateformat(str)
         catch err
             continue
         end
-        if x != nothing
+        if !isnull(x)
             try
                 typ(get(x)...)
                 if len > lastindex(str)
