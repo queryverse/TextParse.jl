@@ -1,5 +1,3 @@
-using Compat
-
 struct IRef{T}
     value::T
     IRef{T}() where {T} = new{T}()
