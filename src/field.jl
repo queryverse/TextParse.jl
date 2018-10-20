@@ -2,8 +2,6 @@ import Base.show
 
 export CustomParser, Quoted
 
-using Compat
-
 abstract type AbstractToken{T} end
 fieldtype(::AbstractToken{T}) where {T} = T
 fieldtype(::Type{AbstractToken{T}}) where {T} = T
