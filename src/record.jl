@@ -79,7 +79,7 @@ end
         ii = i
         err_code = PARSE_ERROR
         i > len && @goto error
-
+        
         $(fieldparsers...)
 
         @label done
@@ -97,6 +97,10 @@ end
 
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
     col[i] = alloc_string(str, val)
+    PARSE_SUCCESS
+end
+
+@inline function setcell!(col::Nothing, i, val, str)
     PARSE_SUCCESS
 end
 

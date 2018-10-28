@@ -50,6 +50,7 @@ tofield(f::StringToken, opts) = Field(Quoted(f))
 tofield(f::Type, opts) = tofield(fromtype(f), opts)
 tofield(f::Type{String}, opts) = tofield(fromtype(StrRange), opts)
 tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
+tofield(f::Nothing, opts) = Field(SkipToken())
 
 """
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
@@ -73,7 +74,11 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior
 - `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
 """
-csvread(file::String, delim=','; kwargs...) = _csvread_f(file, delim; kwargs...)[1:2]
+function csvread(file::String, delim=','; kwargs...)
+    cols, canonnames, parsers, finalrows = _csvread_f(file, delim; kwargs...)
+
+    return ((col for col in cols if col!==nothing)...,), [colname for (col, colname) in zip(cols, canonnames) if col!==nothing]
+end
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
@@ -85,7 +90,9 @@ function csvread(buffer::IO, delim=','; kwargs...)
 end
 
 function _csvread(str::AbstractString, delim=','; kwargs...)
-    _csvread_internal(str, delim; kwargs...)[1:2]
+    cols, canonnames, parsers, finalrows = _csvread_internal(str, delim; kwargs...)
+   
+    return ((col for col in cols if col!==nothing)...,), [colname for (col, colname) in zip(cols, canonnames) if col!==nothing]
 end
 
 function _csvread_f(file::AbstractString, delim=','; kwargs...)
@@ -105,7 +112,7 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
     end
 end
 
-const ColsPool = OrderedDict{Union{Int, String}, AbstractVector}
+const ColsPool = OrderedDict{Union{Int, String}, Union{AbstractVector, Nothing}}
 
 function csvread(files::AbstractVector{T},
                  delim=','; kwargs...) where {T<:AbstractString}
@@ -299,7 +306,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         cols = (_cols...,)
     end
 
-    if any(c->length(c) != nrows, cols)
+    if any(c->c!==nothing && length(c) != nrows, cols)
         resizecols(colspool, nrows)
     end
 
@@ -398,6 +405,10 @@ function _csvread_internal(str::AbstractString, delim=',';
 end
 
 function promote_field(failed_str, field, col, err, nastrings, stringtype)
+    if field.inner isa SkipToken
+        # No need to change
+        return field, col
+    end
     newtoken = guesstoken(failed_str, field.inner, nastrings)
     if newtoken == field.inner
         # no need to change
@@ -552,13 +563,15 @@ end
 
 function resizecols(colspool, nrecs)
     for (h, c) in colspool
-        l = length(c)
-        resize!(c, nrecs)
-        if eltype(c) <: AbstractString
-            # fill with blanks
-            c[l+1:nrecs] .= ""
-        elseif eltype(c) <: StrRange
-            c[l+1:nrecs] .= StrRange(1,0)
+        if c!==nothing
+            l = length(c)
+            resize!(c, nrecs)
+            if eltype(c) <: AbstractString
+                # fill with blanks
+                c[l+1:nrecs] .= ""
+            elseif eltype(c) <: StrRange
+                c[l+1:nrecs] .= StrRange(1,0)
+            end
         end
     end
 end
@@ -568,7 +581,9 @@ function makeoutputvecs(rec, N, stringtype)
 end
 
 function makeoutputvec(eltyp, N, stringtype)
-    if fieldtype(eltyp) == Missing # we weren't able to detect the type,
+    if fieldtype(eltyp)===Nothing
+        return nothing
+    elseif fieldtype(eltyp) == Missing # we weren't able to detect the type,
                                    # all cells were blank
         Array{Missing}(undef, N)
     elseif fieldtype(eltyp) == StrRange
