@@ -1,5 +1,5 @@
 @inline function eatwhitespaces(str::String, i=1, len=lastindex(str))
-    while i<=len    
+    while i<=len
         @inbounds b = codeunit(str, i)
 
         if b==0x20 # This is ' '
@@ -44,8 +44,9 @@ end
 @inline function tryparsenext_base10_digit(T,str::String,i, len)
     i > len && @goto error
     @inbounds b = codeunit(str,i)
-    ( (0x30 ≤ b) & (b ≤ 0x39) ) || @goto error
-    return convert(T, b-0x30), i+1
+    diff = b-0x30
+    diff >= 10 && @goto error
+    return convert(T, diff), i+1
 
     @label error
     return nothing
@@ -59,19 +60,21 @@ end
     max_without_overflow = div(typemax(T)-9,10) # the larg
     i <= len || return n, false, i
     @inbounds b = codeunit(str, i)
-    if _isdigit(b) && n <= max_without_overflow
+    diff = b-0x30
+    if diff < 10 && n <= max_without_overflow
         n *= ten
-        n += T(b-0x30)
+        n += T(diff)
     else
         return n, false, i
     end
     i += 1
-    
+
     while i <= len && n <= max_without_overflow
         @inbounds b = codeunit(str, i)
-        if _isdigit(b)
+        diff = b-0x30
+        if diff < 10
             n *= ten
-            n += T(b-0x30)
+            n += T(diff)
         else
             return n, true, i
         end
@@ -148,7 +151,7 @@ end
 
     if i <= len && _is_e(str, i)
         i += 1
-    
+
         enegate = false
         if i<=len
             if _is_negative(str, i)
@@ -162,7 +165,7 @@ end
         if enegate
             eval *= Int32(-1)
         end
-    end    
+    end
 
     exp = eval - frac_digits
 
