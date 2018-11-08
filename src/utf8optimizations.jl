@@ -45,7 +45,7 @@ end
     i > len && @goto error
     @inbounds b = codeunit(str,i)
     diff = b-0x30
-    diff >= Int8(10) && @goto error
+    diff >= UInt8(10) && @goto error
     return convert(T, diff), i+1
 
     @label error
@@ -61,7 +61,7 @@ end
     i <= len || return n, false, i
     @inbounds b = codeunit(str, i)
     diff = b-0x30
-    if diff < Int8(10) && n <= max_without_overflow
+    if diff < UInt8(10) && n <= max_without_overflow
         n *= ten
         n += T(diff)
     else
@@ -72,7 +72,7 @@ end
     while i <= len && n <= max_without_overflow
         @inbounds b = codeunit(str, i)
         diff = b-0x30
-        if diff < Int8(10)
+        if diff < UInt8(10)
             n *= ten
             n += T(diff)
         else

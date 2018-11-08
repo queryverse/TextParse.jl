@@ -34,7 +34,7 @@ macro chk2(expr,label=:error)
     end
 end
 
-@inline _isdigit(c::Char) = '0' <= c <= '9'
+@inline _isdigit(c::Char) = isdigit(c)
 
 @inline function parse_uint_and_stop(str, i, len, n::T) where {T <: Integer}
     ten = T(10)
@@ -50,7 +50,7 @@ end
         return n, false, i
     end
     i = y1[2]
-    
+
     y2 = iterate(str, i)
     while y2!==nothing && n <= max_without_overflow
         c = y2[1]
