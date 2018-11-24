@@ -29,8 +29,8 @@ Options local to the token currently being parsed.
 - `includequotes`: whether to include quotes while parsing
 - `includenewlines`: whether to include newlines while parsing
 """
-struct LocalOpts
-    endchar::Char         # End parsing at this char
+struct LocalOpts{T_ENDCHAR<:Union{Char,UInt8}}
+    endchar::T_ENDCHAR        # End parsing at this char
     spacedelim::Bool
     quotechar::Char       # Quote char
     escapechar::Char      # Escape char
@@ -38,7 +38,7 @@ struct LocalOpts
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
-const default_opts = LocalOpts(',', false, '"', '"', false, false)
+const default_opts = LocalOpts(UInt8(','), false, '"', '"', false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
     tryparsenext(tok, str, firstindex(str), lastindex(str), opts)
@@ -312,8 +312,8 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         c = y2[1]; ii = y2[2]
         if opts.spacedelim && (c == ' ' || c == '\t')
             break
-        elseif !opts.spacedelim && c == opts.endchar
-            if opts.endchar == opts.quotechar
+        elseif !opts.spacedelim && c == Char(opts.endchar)
+            if Char(opts.endchar) == opts.quotechar
                 # this means we're inside a quoted string
                 if opts.quotechar == opts.escapechar
                     # sometimes the quotechar is the escapechar
@@ -525,7 +525,6 @@ const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)
 struct NAToken{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
     emptyisna::Bool
-    endchar::Union{Char, Nothing}
     nastrings::Vector{String}
 end
 
@@ -540,21 +539,18 @@ Parses a Nullable item.
 - `nastrings`: strings that are to be considered NA. Defaults to `$NA_STRINGS`
 """
 function NAToken(
-    inner::S,
+    inner::S
   ; emptyisna=true
-  , endchar=nothing
   , nastrings=NA_STRINGS) where S
 
     T = fieldtype(inner)
-    NAToken{UnionMissing{T}, S}(inner, emptyisna, endchar, nastrings)
+    NAToken{UnionMissing{T}, S}(inner, emptyisna, nastrings)
 end
 
 function show(io::IO, na::NAToken)
     show(io, na.inner)
     print(io, "?")
 end
-
-endchar(na::NAToken, opts) = na.endchar === nothing ? opts.endchar : na.endchar
 
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
@@ -569,7 +565,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     end
 
     c = y1[1]; ii=y1[2]
-    if (c == endchar(na, opts) || isnewline(c)) && na.emptyisna
+    if (c == Char(opts.endchar) || isnewline(c)) && na.emptyisna
        @goto null
     end
 
@@ -582,7 +578,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     return R(convert(T, x)), ii
 
     @label maybe_null
-    naopts = LocalOpts(endchar(na,opts), opts.spacedelim, opts.quotechar,
+    naopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar,
                        opts.escapechar, false, opts.includenewlines)
     @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString{UInt8}), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
@@ -657,7 +653,7 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
         while y2!==nothing
             c = y2[1]; ii = y2[2]
-            !opts.spacedelim && opts.endchar == '\t' && c == '\t' && (i =ii; @goto done)
+            !opts.spacedelim && Char(opts.endchar) == '\t' && c == '\t' && (i =ii; @goto done)
             !isspace(c) && c != '\t' && break
             i = ii
             y2 = iterate(str, i)
@@ -679,7 +675,7 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     y3===nothing && error("Internal error.")
     c = y3[1]; ii = y3[2]
     opts.spacedelim && (isspace(c) || c == '\t') && (i=ii; @goto done)
-    !opts.spacedelim && opts.endchar == c && (i=ii; @goto done)
+    !opts.spacedelim && Char(opts.endchar) == c && (i=ii; @goto done)
 
     if f.eoldelim
         if c == '\r'

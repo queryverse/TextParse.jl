@@ -194,3 +194,69 @@ const pre_comp_exp = Float64[10.0^i for i=0:22]
     @label error
     return R(), i
 end
+
+function tryparsenext(f::Field{T}, str::String, i, len, opts::LocalOpts{T_ENDCHAR}) where {T, T_ENDCHAR<:UInt8}
+    R = Nullable{T}
+    i > len && @goto error
+    if f.ignore_init_whitespace
+        i = eatwhitespaces(str, i, len)
+    end
+    @chk2 res, i = tryparsenext(f.inner, str, i, len, opts)
+
+    if f.ignore_end_whitespace
+        i0 = i
+
+        while i<=len
+            @inbounds b = codeunit(str, i)
+
+            !opts.spacedelim && opts.endchar == 0x09 && b == 0x09 && (i = i+1; @goto done) # 0x09 is \t
+
+            b!=0x20 && b!=0x09 && break
+            i=i+1
+        end
+
+        opts.spacedelim && i > i0 && @goto done
+    end
+    # todo don't ignore whitespace AND spacedelim
+
+    if i > len
+        if f.eoldelim
+            @goto done
+        else
+            @goto error
+        end
+    end
+
+    i>len && error("Internal error.")
+    @inbounds b = codeunit(str, i)
+    opts.spacedelim && (b!=0x20 || b!=0x09) && (i+=1; @goto done)
+    !opts.spacedelim && opts.endchar == b && (i+=1; @goto done)
+
+    if f.eoldelim
+        if b == 0x0d # '\r'
+            i+=1
+            if i<=len
+                @inbounds b = codeunit(str, i)
+                if b == 0x0a # '\n'
+                    i+=1
+                end
+            end
+            @goto done
+        elseif b == 0x0a # '\n'
+            i+=1
+            if i<=len
+                @inbounds b = codeunit(str, i)
+                if b == 0x0d # '\r'
+                    i+=1
+                end
+            end
+            @goto done
+        end
+    end
+
+    @label error
+    return R(), i
+
+    @label done
+    return R(convert(T, res)), i
+end

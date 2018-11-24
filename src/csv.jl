@@ -170,7 +170,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     if pooledstrings === true
         warn("pooledstrings argument has been removed")
     end
-    opts = LocalOpts(delim, spacedelim, quotechar, escapechar, false, false)
+    opts = LocalOpts(UInt8(delim), spacedelim, quotechar, escapechar, false, false)
     len = lastindex(str)
     pos = firstindex(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
@@ -645,7 +645,7 @@ function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(st
     y1 = iterate(str, prevind(str, i))
     y1===nothing && error("Internal error.")
     c = y1[1]; i = y1[2]
-    if c == opts.endchar
+    if c == Char(opts.endchar)
         # edge case where there's a delim at the end of the string
         push!(strs, "")
     end
