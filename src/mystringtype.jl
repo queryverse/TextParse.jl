@@ -31,8 +31,8 @@ end
 # Base.String(x::WeakRefString) = string(x)
 # Base.Symbol(x::WeakRefString{UInt8}) = ccall(:jl_symbol_n, Ref{Symbol}, (Ptr{UInt8}, Int), x.ptr, x.len)
 
-# Base.pointer(s::WeakRefString) = s.ptr
-# Base.pointer(s::WeakRefString, i::Integer) = s.ptr + i - 1
+Base.pointer(s::MyStringType) = pointer(s.buffer)
+Base.pointer(s::MyStringType, i::Integer) = pointer(s.buffer) + i - 1
 
 @inline Base.ncodeunits(s::MyStringType) = length(s.buffer)
 Base.codeunit(s::MyStringType) = UInt8
