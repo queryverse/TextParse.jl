@@ -1,5 +1,4 @@
 using DataStructures
-using Mmap
 
 ismissingtype(T) = Missing <: T
 ismissingeltype(T) = missingtype(eltype(T))
@@ -75,14 +74,8 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 """
 csvread(file::String, delim=','; kwargs...) = _csvread_f(file, delim; kwargs...)[1:2]
 
-function csvread(file::IOStream, delim=','; kwargs...)
-    mmap_data = Mmap.mmap(file)
-    _csvread(String(pointer(mmap_data), length(mmap_data)), delim; kwargs...)
-end
-
 function csvread(buffer::IO, delim=','; kwargs...)
-    mmap_data = read(buffer)
-    _csvread(String(mmap_data), delim; kwargs...)
+    _csvread(String(read(buffer)), delim; kwargs...)
 end
 
 function _csvread(str::AbstractString, delim=','; kwargs...)
@@ -100,7 +93,7 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
         end
     else # Otherwise just try to read the file
         return open(file, "r") do io
-            data = Mmap.mmap(io)
+            data = read(io)
             _csvread_internal(String(data), delim; filename=file, kwargs...)
         end
     end
