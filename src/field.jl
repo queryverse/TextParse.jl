@@ -360,7 +360,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
 end
 
 @inline function _substring(::Type{String}, str, i, j)
-    str[i:j]
+    String(str[i:j])
 end
 
 @inline function _substring(::Type{T}, str, i, j) where {T<:SubString}
