@@ -2,9 +2,7 @@ module TextParse
 
 using CodecZlib, WeakRefStrings, Dates, Nullables, DoubleFloats
 
-export MyStringType
-
-include("mystringtype.jl")
+include("VectorBackedStrings.jl")
 include("lib/compat.jl")
 include("util.jl")
 include("field.jl")
