@@ -1,4 +1,4 @@
-@inline function eatwhitespaces(str::String, i=1, len=lastindex(str))
+@inline function eatwhitespaces(str::Union{VectorBackedUTF8String, String}, i=1, len=lastindex(str))
     while i<=len
         @inbounds b = codeunit(str, i)
 
@@ -11,7 +11,7 @@
     return i
 end
 
-@inline function eatnewlines(str::String, i=1, len=lastindex(str))
+@inline function eatnewlines(str::Union{VectorBackedUTF8String, String}, i=1, len=lastindex(str))
     count = 0
     while i<=len
         @inbounds b = codeunit(str, i)
@@ -41,7 +41,7 @@ end
     return i, count
 end
 
-@inline function tryparsenext_base10_digit(T,str::String,i, len)
+@inline function tryparsenext_base10_digit(T,str::Union{VectorBackedUTF8String, String},i, len)
     i > len && @goto error
     @inbounds b = codeunit(str,i)
     diff = b-0x30
@@ -54,7 +54,7 @@ end
 
 @inline _isdigit(b::UInt8) = ( (0x30 ≤ b) & (b ≤ 0x39) )
 
-@inline function parse_uint_and_stop(str::String, i, len, n::T) where {T <: Integer}
+@inline function parse_uint_and_stop(str::Union{VectorBackedUTF8String, String}, i, len, n::T) where {T <: Integer}
     ten = T(10)
     # specialize handling of the first digit so we can return an error
     max_without_overflow = div(typemax(T)-9,10) # the larg
@@ -83,7 +83,7 @@ end
     return n, true, i
 end
 
-@inline function read_digits(str::String, i, len)
+@inline function read_digits(str::Union{VectorBackedUTF8String, String}, i, len)
     # slurp up extra digits
     while i <= len
         @inbounds b = codeunit(str, i)
@@ -95,22 +95,22 @@ end
     return i
 end
 
-@inline function _is_e(str::String, i)
+@inline function _is_e(str::Union{VectorBackedUTF8String, String}, i)
     @inbounds b = codeunit(str, i)
     return  (b==0x65) | (b==0x45)
 end
 
-@inline function _is_negative(str::String, i)
+@inline function _is_negative(str::Union{VectorBackedUTF8String, String}, i)
     @inbounds b = codeunit(str, i)
     return b==0x2d
 end
 
-@inline function _is_positive(str::String, i)
+@inline function _is_positive(str::Union{VectorBackedUTF8String, String}, i)
     @inbounds b = codeunit(str, i)
     return b==0x2b
 end
 
-@inline function tryparsenext(::Numeric{F}, str::String, i, len) where {F<:AbstractFloat}
+@inline function tryparsenext(::Numeric{F}, str::Union{VectorBackedUTF8String, String}, i, len) where {F<:AbstractFloat}
     R = Nullable{F}
 
     i>len && @goto error

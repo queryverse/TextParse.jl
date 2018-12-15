@@ -550,3 +550,5 @@ end
         rm(fngz)
     end
 end
+
+include("test_vectorbackedstrings.jl")
