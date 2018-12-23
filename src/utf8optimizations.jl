@@ -196,7 +196,6 @@ const pre_comp_exp = Float64[10.0^i for i=0:22]
 end
 
 function tryparsenext(f::Field{T}, str::String, i, len, opts::LocalOpts{T_ENDCHAR}) where {T, T_ENDCHAR<:UInt8}
-    @info "HAPPENING"
     R = Nullable{T}
     i > len && @goto error
     if f.ignore_init_whitespace
