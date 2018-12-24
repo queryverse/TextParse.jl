@@ -110,6 +110,8 @@ end
     return b==0x2b
 end
 
+const pre_comp_exp = Float64[10.0^i for i=0:22]
+
 @inline function tryparsenext(::Numeric{F}, str::Union{VectorBackedUTF8String, String}, i, len) where {F<:AbstractFloat}
     R = Nullable{F}
 
@@ -174,9 +176,9 @@ end
 
     if frac_digits <= 15 && -22 <= exp <= 22
         if exp >= 0
-            f = F(f1)*10.0^exp
+            f = F(f1)*pre_comp_exp[exp+1]
         else
-            f = F(f1)/10.0^(-exp)
+            f = F(f1)/pre_comp_exp[-exp+1]
         end
     else
           f = convert_to_double(f1, exp)
