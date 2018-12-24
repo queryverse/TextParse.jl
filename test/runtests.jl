@@ -205,6 +205,26 @@ import TextParse: Field
     @test tryparsenext(Field(f,eoldelim=true), " 12\n", 1, 4, opts) |> unwrap == (12,5)
     @test tryparsenext(Field(f,eoldelim=true), " 12\n\r\n", 1, 5, opts) |> unwrap == (12,6)
     @test tryparsenext(Field(f,eoldelim=true), " 12") |> unwrap == (12,4)
+
+    # Also test AbstractString variant
+    @test tryparsenext(Field(f), SubString("12,3",1)) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f), SubString("12 ,3",1)) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f), SubString(" 12 ,3",1)) |> unwrap == (12, 6)
+    opts = LocalOpts('\t', false, 'x','x',true,false)
+    @test tryparsenext(Field(f), SubString("12\t3",1), 1, 4, opts) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f), SubString("12 \t3",1), 1, 5, opts) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f), SubString(" 12 \t 3",1), 1, 6, opts) |> unwrap == (12, 6)
+    opts = LocalOpts('\t', true, 'x','x',true,false)
+    @test tryparsenext(Field(f), SubString(" 12 3",1), 1, 5, opts) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f, ignore_end_whitespace=false), SubString(" 12 \t 3",1), 1,6, opts) |> unwrap == (12, 5)
+    opts = LocalOpts(' ', false, 'x','x',false, false)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false), SubString("12 3",1), 1,4,opts) |> unwrap == (12, 4)
+#    @test tryparsenext(Field(f,ignore_end_whitespace=false), "12 \t3", 1,5,opts) |> failedat == 3
+    opts = LocalOpts('\t', false, 'x','x',false, false)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false), SubString(" 12\t 3",1), 1, 6, opts) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), SubString(" 12\n",1), 1, 4, opts) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), SubString(" 12\n\r\n",1), 1, 5, opts) |> unwrap == (12,6)
+    @test tryparsenext(Field(f,eoldelim=true), SubString(" 12",1)) |> unwrap == (12,4)
 end
 
 
