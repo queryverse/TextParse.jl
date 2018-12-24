@@ -170,7 +170,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     if pooledstrings === true
         warn("pooledstrings argument has been removed")
     end
-    opts = LocalOpts(UInt8(delim), spacedelim, quotechar, escapechar, false, false)
+    opts = LocalOpts(isascii(delim) ? UInt8(delim) : delim, spacedelim, quotechar, escapechar, false, false)
     len = lastindex(str)
     pos = firstindex(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
