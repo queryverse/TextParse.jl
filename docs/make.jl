@@ -2,17 +2,11 @@ using Documenter, TextParse
 
 makedocs(
     modules = [TextParse],
-    clean = false,
-    format = :html,
     sitename = "TextParse.jl",
     authors = "Shashi Gowda",
     pages = Any["Home" => "index.md"],
 )
 
 deploydocs(
-    julia = "nightly",
-    repo = "github.com/JuliaComputing/TextParse.jl.git",
-    target = "build",
-    deps = nothing,
-    make = nothing,
+    repo = "github.com/JuliaComputing/TextParse.jl.git"
 )
