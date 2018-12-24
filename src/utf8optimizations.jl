@@ -195,7 +195,7 @@ const pre_comp_exp = Float64[10.0^i for i=0:22]
     return R(), i
 end
 
-function tryparsenext(f::Field{T}, str::String, i, len, opts::LocalOpts{T_ENDCHAR}) where {T, T_ENDCHAR<:UInt8}
+function tryparsenext(f::Field{T}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{T_ENDCHAR}) where {T, T_ENDCHAR<:UInt8}
     R = Nullable{T}
     i > len && @goto error
     if f.ignore_init_whitespace
