@@ -519,7 +519,7 @@ end
 
 function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
                     pos, lineno, rowno, l=lastindex(str)) where {N}
-    pos, lines = eatnewlines(str, pos)
+    pos, lines = eatnewlines(str, pos, l)
     lineno += lines
     pos <= l && while true
         prev_j = pos
@@ -533,7 +533,7 @@ function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspo
             pos = value(res)
         end
 
-        pos, lines = eatnewlines(str, pos)
+        pos, lines = eatnewlines(str, pos, l)
         lineno += lines
 
         if pos > l
