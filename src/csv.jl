@@ -257,8 +257,8 @@ function _csvread_internal(str::AbstractString, delim=',';
     current_record[] = rec
 
     if nrows == 0
-        # just an estimate, with some margin
-        nrows = ceil(Int, pos1/max(1, lineno) * sqrt(2))
+        # just an estimate, with some margin        
+        nrows = ceil(Int, (len-pos) / ((pos1-pos)/max(1, type_detect_rows)) * sqrt(2))
     end
 
     if isempty(colspool)
