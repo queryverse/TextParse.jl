@@ -1,7 +1,7 @@
 var documenterSearchIndex = {"docs": [
 
 {
-    "location": "index.html#",
+    "location": "#",
     "page": "Home",
     "title": "Home",
     "category": "page",
@@ -9,7 +9,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse-1",
+    "location": "#TextParse-1",
     "page": "Home",
     "title": "TextParse",
     "category": "section",
@@ -17,7 +17,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Installation-1",
+    "location": "#Installation-1",
     "page": "Home",
     "title": "Installation",
     "category": "section",
@@ -25,7 +25,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.csvread",
+    "location": "#TextParse.csvread",
     "page": "Home",
     "title": "TextParse.csvread",
     "category": "function",
@@ -33,7 +33,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Reading-CSV-1",
+    "location": "#Reading-CSV-1",
     "page": "Home",
     "title": "Reading CSV",
     "category": "section",
@@ -41,7 +41,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Dates.tryparsenext",
+    "location": "#Dates.tryparsenext",
     "page": "Home",
     "title": "Dates.tryparsenext",
     "category": "function",
@@ -49,7 +49,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Extensible-parsing-framework-1",
+    "location": "#Extensible-parsing-framework-1",
     "page": "Home",
     "title": "Extensible parsing framework",
     "category": "section",
@@ -57,7 +57,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.Numeric",
+    "location": "#TextParse.Numeric",
     "page": "Home",
     "title": "TextParse.Numeric",
     "category": "type",
@@ -65,7 +65,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.StringToken",
+    "location": "#TextParse.StringToken",
     "page": "Home",
     "title": "TextParse.StringToken",
     "category": "type",
@@ -73,7 +73,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.DateTimeToken",
+    "location": "#TextParse.DateTimeToken",
     "page": "Home",
     "title": "TextParse.DateTimeToken",
     "category": "type",
@@ -81,7 +81,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.NAToken",
+    "location": "#TextParse.NAToken",
     "page": "Home",
     "title": "TextParse.NAToken",
     "category": "type",
@@ -89,7 +89,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.Quoted",
+    "location": "#TextParse.Quoted",
     "page": "Home",
     "title": "TextParse.Quoted",
     "category": "type",
@@ -97,7 +97,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.CustomParser",
+    "location": "#TextParse.CustomParser",
     "page": "Home",
     "title": "TextParse.CustomParser",
     "category": "type",
@@ -105,7 +105,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Available-AbstractToken-types-1",
+    "location": "#Available-AbstractToken-types-1",
     "page": "Home",
     "title": "Available AbstractToken types",
     "category": "section",
@@ -113,7 +113,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#TextParse.LocalOpts",
+    "location": "#TextParse.LocalOpts",
     "page": "Home",
     "title": "TextParse.LocalOpts",
     "category": "type",
@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#LocalOpts-1",
+    "location": "#LocalOpts-1",
     "page": "Home",
     "title": "LocalOpts",
     "category": "section",
