@@ -446,7 +446,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
         end
 
         if q.stripwhitespaces
-            i = eatwhitespaces(str, i)
+            i = eatwhitespaces(str, i, len)
         end
     else
         q.required && @goto error
@@ -468,7 +468,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     end
 
     if q.stripwhitespaces
-        i = eatwhitespaces(str, i)
+        i = eatwhitespaces(str, i, len)
     end
     y2 = iterate(str, i)
     y2===nothing && error("Internal error.")
@@ -558,7 +558,7 @@ endchar(na::NAToken, opts) = na.endchar === nothing ? opts.endchar : na.endchar
 
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
-    i = eatwhitespaces(str, i)
+    i = eatwhitespaces(str, i, len)
     y1 = iterate(str,i)
     if y1===nothing
         if na.emptyisna
@@ -587,7 +587,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString{UInt8}), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
         i=ii
-        i = eatwhitespaces(str, i)
+        i = eatwhitespaces(str, i, len)
         @goto null
     end
     return R(), i

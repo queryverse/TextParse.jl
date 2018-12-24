@@ -38,13 +38,13 @@ whitespacestring = "abc  de"
 nowhitespacestring = "abcde"
 
 SUITE["util"]["eatwhitespaces"] = BenchmarkGroup()
-SUITE["util"]["eatwhitespaces"]["withwhitespace"] = @benchmarkable TextParse.eatwhitespaces($whitespacestring, 4)
-SUITE["util"]["eatwhitespaces"]["nowhitespacestring"] = @benchmarkable TextParse.eatwhitespaces($whitespacestring, 4)
+SUITE["util"]["eatwhitespaces"]["withwhitespace"] = @benchmarkable TextParse.eatwhitespaces($whitespacestring, 4, $(lastindex(whitespacestring)))
+SUITE["util"]["eatwhitespaces"]["nowhitespacestring"] = @benchmarkable TextParse.eatwhitespaces($whitespacestring, 4, $(lastindex(whitespacestring)))
 
 newlinestring = "ab\r\n\r\r"
 
 SUITE["util"]["eatnewlines"] = BenchmarkGroup()
-SUITE["util"]["eatnewlines"]["default"] = @benchmarkable TextParse.eatnewlines($newlinestring, 3)
+SUITE["util"]["eatnewlines"]["default"] = @benchmarkable TextParse.eatnewlines($newlinestring, 3, $(lastindex(newlinestring)))
 
 SUITE["util"]["getlineend"] = BenchmarkGroup()
 SUITE["util"]["getlineend"]["default"] = @benchmarkable TextParse.getlineend($newlinestring)
