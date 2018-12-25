@@ -260,3 +260,61 @@ function tryparsenext(f::Field{T}, str::Union{VectorBackedUTF8String, String}, i
     @label done
     return R(convert(T, res)), i
 end
+
+function tryparsenext(q::Quoted{T,S,<:UInt8,<:UInt8}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8}) where {T,S}
+    if i>len
+        q.required && @goto error
+        # check to see if inner thing is ok with an empty field
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, opts) error
+        @goto done
+    end
+    @inbounds b = codeunit(str, i)
+    ii = i+1
+    quotestarted = false
+    if q.quotechar == b
+        quotestarted = true
+        if !q.includequotes
+            i = ii
+        end
+
+        if q.stripwhitespaces
+            i = eatwhitespaces(str, i, len)
+        end
+    else
+        q.required && @goto error
+    end
+
+    if quotestarted
+        qopts = LocalOpts(q.quotechar, false, q.quotechar, q.escapechar,
+                         q.includequotes, q.includenewlines)
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
+    else
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, opts)
+    end
+
+    if i > len
+        if quotestarted && !q.includequotes
+            @goto error
+        end
+        @goto done
+    end
+
+    if q.stripwhitespaces
+        i = eatwhitespaces(str, i, len)
+    end
+    i>len && error("Internal error.")
+    @inbounds b = codeunit(str, i)
+    ii = i + 1
+
+    if quotestarted && !q.includequotes
+        b != q.quotechar && @goto error
+        i = ii
+    end
+
+
+    @label done
+    return Nullable{T}(x), i
+
+    @label error
+    return Nullable{T}(), i
+end

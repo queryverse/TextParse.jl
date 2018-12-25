@@ -29,16 +29,16 @@ Options local to the token currently being parsed.
 - `includequotes`: whether to include quotes while parsing
 - `includenewlines`: whether to include newlines while parsing
 """
-struct LocalOpts{T_ENDCHAR<:Union{Char,UInt8}}
+struct LocalOpts{T_ENDCHAR<:Union{Char,UInt8}, T_QUOTECHAR<:Union{Char,UInt8}, T_ESCAPECHAR<:Union{Char,UInt8}}
     endchar::T_ENDCHAR        # End parsing at this char
     spacedelim::Bool
-    quotechar::Char       # Quote char
-    escapechar::Char      # Escape char
+    quotechar::T_QUOTECHAR       # Quote char
+    escapechar::T_ESCAPECHAR      # Escape char
     includequotes::Bool   # Whether to include quotes in string parsing
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
-const default_opts = LocalOpts(UInt8(','), false, '"', '"', false, false)
+const default_opts = LocalOpts(UInt8(','), false, UInt8('"'), UInt8('"'), false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
     tryparsenext(tok, str, firstindex(str), lastindex(str), opts)
@@ -300,7 +300,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y = iterate(str, i)
         if y!==nothing
             c = y[1]; ii = y[2]
-            if c == opts.quotechar
+            if c == Char(opts.quotechar)
                 i = ii # advance counter so that
                        # the while loop doesn't react to opening quote
             end
@@ -313,9 +313,9 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         if opts.spacedelim && (c == ' ' || c == '\t')
             break
         elseif !opts.spacedelim && c == Char(opts.endchar)
-            if Char(opts.endchar) == opts.quotechar
+            if Char(opts.endchar) == Char(opts.quotechar)
                 # this means we're inside a quoted string
-                if opts.quotechar == opts.escapechar
+                if Char(opts.quotechar) == Char(opts.escapechar)
                     # sometimes the quotechar is the escapechar
                     # in that case we need to see the next char
                     y3 = iterate(str, ii)
@@ -326,7 +326,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
                         break
                     else
                         nxt = y3[1]; j = y3[2]
-                        if nxt == opts.quotechar
+                        if nxt == Char(opts.quotechar)
                             # the current character is escaping the
                             # next one
                             i = j # skip next char as well
@@ -335,7 +335,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
                             continue
                         end
                     end
-                elseif p == opts.escapechar
+                elseif p == Char(opts.escapechar)
                     # previous char escaped this one
                     i = ii
                     p = c
@@ -383,18 +383,18 @@ end
 
 export Quoted
 
-struct Quoted{T, S<:AbstractToken} <: AbstractToken{T}
+struct Quoted{T, S<:AbstractToken, T_QUOTECHAR<:Union{Char,UInt8}, T_ESCAPECHAR<:Union{Char,UInt8}} <: AbstractToken{T}
     inner::S
     required::Bool
     stripwhitespaces::Bool
     includequotes::Bool
     includenewlines::Bool
-    quotechar::Union{Char, Nothing}
-    escapechar::Union{Char, Nothing}
+    quotechar::T_QUOTECHAR
+    escapechar::T_ESCAPECHAR
 end
 
 function show(io::IO, q::Quoted)
-    c = quotechar(q, default_opts)
+    c = Char(q.quotechar)
     print(io, "$c")
     show(io, q.inner)
     print(io, "$c")
@@ -411,25 +411,21 @@ end
 - `quotechar`: character to use to quote (default decided by `LocalOpts`)
 - `escapechar`: character that escapes the quote char (default set by `LocalOpts`)
 """
-function Quoted(inner::S;
+function Quoted(inner::S,
+    quotechar::T_QUOTECHAR, escapechar::T_ESCAPECHAR;
     required=false,
     stripwhitespaces=fieldtype(S)<:Number,
     includequotes=false,
-    includenewlines=true,
-    quotechar=nothing,   # This is to allow file-wide config
-    escapechar=nothing) where S<:AbstractToken
+    includenewlines=true) where {S<:AbstractToken,T_QUOTECHAR,T_ESCAPECHAR}
 
     T = fieldtype(S)
-    Quoted{T,S}(inner, required, stripwhitespaces, includequotes,
+    Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}(inner, required, stripwhitespaces, includequotes,
                 includenewlines, quotechar, escapechar)
 end
 
-@inline quotechar(q::Quoted, opts) = q.quotechar === nothing ? opts.quotechar : q.quotechar
-@inline escapechar(q::Quoted, opts) = q.escapechar === nothing ? opts.escapechar : q.escapechar
+Quoted(t::Type, quotechar, escapechar; kwargs...) = Quoted(fromtype(t), quotechar, escapechar; kwargs...)
 
-Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
-
-function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
+function tryparsenext(q::Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}, str, i, len, opts) where {T,S,T_QUOTECHAR,T_ESCAPECHAR}
     y1 = iterate(str, i)
     if y1===nothing
         q.required && @goto error
@@ -439,7 +435,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     end
     c = y1[1]; ii = y1[2]
     quotestarted = false
-    if quotechar(q, opts) == c
+    if Char(q.quotechar) == c
         quotestarted = true
         if !q.includequotes
             i = ii
@@ -453,7 +449,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     end
 
     if quotestarted
-        qopts = LocalOpts(quotechar(q, opts), false, quotechar(q, opts), escapechar(q, opts),
+        qopts = LocalOpts(q.quotechar, false, q.quotechar, q.escapechar,
                          q.includequotes, q.includenewlines)
         @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
     else
@@ -475,7 +471,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     c = y2[1]; ii = y2[2]
 
     if quotestarted && !q.includequotes
-        c != quotechar(q, opts) && @goto error
+        c != Char(q.quotechar) && @goto error
         i = ii
     end
 
