@@ -103,6 +103,7 @@ end
         y2===nothing && break
         d = y2[1]; i = y2[2]
         r = r*ten + d
+        r < 0 && return R(), i
     end
     return R(convert(T, r)), i
 end
