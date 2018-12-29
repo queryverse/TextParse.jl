@@ -138,14 +138,14 @@ using WeakRefStrings
 
     opts = LocalOpts(',', false, '"', '"', false, true)
     # test that includequotes option doesn't affect string
-    @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"\"", 3)
+    @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"", 3)
 
     opts = LocalOpts(',', false, '"', '\\', false, false)
     str =  "Owner 2 ”Vicepresident\"\""
-    @test tryparsenext(Quoted(String, '"', '\\'), str) |> unwrap == (str, lastindex(str)+1)
+    @test tryparsenext(Quoted(String), str, opts) |> unwrap == (str, lastindex(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
-    @test tryparsenext(Quoted(String,'"', '"'), str1) |> unwrap == (str, lastindex(str1)+1)
-    @test tryparsenext(Quoted(String,'"', '\\'), "\"\tx\"") |> unwrap == ("\tx", 5)
+    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == ("Owner 2 ”Vicepresident\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(String), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
 
@@ -162,13 +162,23 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(String, '"', '"'), "\"x\"") |> unwrap == ("x", 4)
     @test tryparsenext(Quoted(String, '"', '"', includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
     str2 =  "\"\"\"\""
+<<<<<<< HEAD
     @test tryparsenext(Quoted(String, '"', '"'), str2, opts) |> unwrap == ("\"\"", lastindex(str2)+1)
+=======
+    @test tryparsenext(Quoted(String), str2, opts) |> unwrap == ("\"", lastindex(str2)+1)
+>>>>>>> Progress
     str1 =  "\"x”y\"\"\""
     @test tryparsenext(Quoted(StringToken(String), '"', '"', required=true), "x\"y\"") |> failedat == 1
 
+<<<<<<< HEAD
     @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
     @test tryparsenext(Quoted(StringToken(String), '"', '\\'), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
     @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "1") |> unwrap == (1,2)
+=======
+    @test tryparsenext(Quoted(String, escapechar='"'), str1) |> unwrap == ("x”y\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String), escapechar='\\'), "\"x\\\"yz\"") |> unwrap == ("x\"yz", 8)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "1") |> unwrap == (1,2)
+>>>>>>> Progress
 
     t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "") |> unwrap
     @test ismissing(t[1])
@@ -302,12 +312,12 @@ import TextParse: quotedsplit
     @test quotedsplit("\"x\", \"y\"", opts,false, 1, 8) == ["x", "y"]
     @test quotedsplit("\"x\", \"y\"", opts,true, 1, 8) == ["\"x\"", "\"y\""]
     str = """x\nx,"s,", "\\",x" """
-    @test quotedsplit(str, opts, false, 3, length(str)) == ["x", "s,", "\\\",x"]
+    @test quotedsplit(str, opts, false, 3, length(str)) == ["x", "s,", "\",x"]
     @test quotedsplit(",", opts, true, 1, 1) == ["", ""]
     @test quotedsplit(", ", opts, false, 1, 2) == ["", ""]
     str = "1, \"x \"\"y\"\" z\", 1"
     qopts = LocalOpts(',', false,'"', '"', false, false)
-    @test quotedsplit(str, qopts,true, 1, lastindex(str)) == ["1", "\"x \"\"y\"\" z\"", "1"]
+    @test quotedsplit(str, qopts,true, 1, lastindex(str)) == ["1", "\"x \"y\" z\"", "1"]
 end
 
 import TextParse: LocalOpts, readcolnames
@@ -549,7 +559,7 @@ import TextParse: _csvread
     @test _csvread("") == ((), String[])
 
     @test _csvread("""x""y"", z
-                   a""b"", 1""") == ((["a\"\"b\"\""], [1]), ["x\"\"y\"\"", "z"])
+                   a""b"", 1""") == ((["a\"b\""], [1]), ["x\"y\"", "z"])
 end
 
 @testset "skiplines_begin" begin

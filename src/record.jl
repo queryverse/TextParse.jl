@@ -96,11 +96,13 @@ end
 end
 
 @inline function setcell!(col::Array{String,1}, i, val::StrRange, str)
+    val.escapecount>0 && error("Not yet implemented")
     col[i] = alloc_string(str, val)
     PARSE_SUCCESS
 end
 
 @inline Base.@propagate_inbounds function setcell!(col::StringVector, i, val::StrRange, str)
+    val.escapecount>0 && error("Not yet implemented")
     col[i] = WeakRefString(pointer(str, val.offset + 1), val.length)
     PARSE_SUCCESS
 end
