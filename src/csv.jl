@@ -470,7 +470,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
             break
         end
 
-        lineend = getlineend(str, pos)
+        lineend = getrowend(str, pos, lastindex(str), opts, opts.endchar)
 
         fields = quotedsplit(str, opts, true, pos, lineend)
 
@@ -632,7 +632,7 @@ end
 function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(str))
     strtok = Quoted(StringToken(String), required=false,
                     includequotes=includequotes)
-
+                    
     f = Field(strtok, eoldelim=true)
     strs = String[]
     if l == 0
