@@ -235,6 +235,9 @@ function getrowend(str, i, len, opts, delim)
                     break;
                 end
                 y2 = iterate(str, i)
+                if y2===nothing
+                    error("Parsing error, quoted string never terminated.")
+                end
             end
             i = eatwhitespaces(str, i, len)
             y4 = iterate(str, i)
