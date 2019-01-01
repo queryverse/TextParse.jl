@@ -45,14 +45,18 @@ import TextParse: getrowend
     @test getrowend("x\nx", 1, lastindex("x\nx"), opts, ',') == 1
     @test getrowend("x\ny", 2, lastindex("x\ny"), opts, ',') == 1
     @test getrowend("x\nyz", 3, lastindex("x\nyz"), opts, ',') == 4
+    @test getrowend("\"x\"\nyz", 1, lastindex("x\nyz"), opts, ',') == 3
+    @test_throws ErrorException getrowend("\"x\" er", 1, lastindex("\"x\" er"), opts, ',')
     @test getrowend("", 1, lastindex(""), opts, ',') == 0
     @test getrowend("  ", 1, lastindex("  "), opts, ',') == 2
     @test getrowend("a,b,c\nd,e,f", 1, lastindex("a,b,c\nd,e,f"), opts, ',') == 5
     @test getrowend("a,\"b\"\"ef\",c\nd,e,f", 1, lastindex("a,\"b\"\"ef\",c\nd,e,f"), opts, ',') == 11
     @test getrowend("a,\"b\"\"ef\"", 1, lastindex("a,\"b\"\"ef\""), opts, ',') == 9
+    @test_throws ErrorException getrowend("\"xy", 1, lastindex("\"xy"), opts, ',')
 
     opts = LocalOpts(',', false, '"', '\\', true, true)
     @test getrowend("a,\"bef\",f\na,b", 1, lastindex("a,\"bef\",f\na,b"), opts, ',') == 9
+    @test_throws ErrorException getrowend("\"xy\\", 1, lastindex("\"xy"), opts, ',')
 end
 
 import TextParse: fromtype, Percentage
