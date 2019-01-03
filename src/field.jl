@@ -140,6 +140,8 @@ end
 
 @inline _is_positive(str, i) = str[i]=='+'
 
+const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
+
 @inline function convert_to_double(f1::Int64, exp::Int)
     f = Float64(f1)
     r = f1 - Int64(f) # get the remainder
@@ -149,13 +151,13 @@ end
     minexp = -256
   
     if exp >= 0
-        x *= Double64(10.0)^(exp)
+        x *= pre_comp_exp_double[exp+1]
     else
         if exp < minexp # not sure why this is a good choice, but it seems to be!
-            x /= Double64(10.0)^(-minexp)
-            x /= Double64(10.0)^(-exp + minexp)
+            x /= pre_comp_exp_double[-minexp+1]
+            x /= pre_comp_exp_double[-exp + minexp + 1]
         else
-            x /= Double64(10.0)^(-exp)
+            x /= pre_comp_exp_double[-exp+1]
         end
     end
     return Float64(x)
