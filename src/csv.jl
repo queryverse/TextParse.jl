@@ -46,7 +46,7 @@ optionsiter(opts::AbstractVector, header) = optionsiter(opts)
 
 tofield(f::AbstractField, opts) = f
 tofield(f::AbstractToken, opts) = Field(f)
-tofield(f::StringToken, opts) = Field(Quoted(f))
+tofield(f::StringToken, opts) = Field(Quoted(f, opts.quotechar, opts.escapechar))
 tofield(f::Type, opts) = tofield(fromtype(f), opts)
 tofield(f::Type{String}, opts) = tofield(fromtype(StrRange), opts)
 tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
@@ -170,7 +170,9 @@ function _csvread_internal(str::AbstractString, delim=',';
     if pooledstrings === true
         warn("pooledstrings argument has been removed")
     end
-    opts = LocalOpts(delim, spacedelim, quotechar, escapechar, false, false)
+    opts = LocalOpts(isascii(delim) ? UInt8(delim) : delim, spacedelim,
+        isascii(quotechar) ? UInt8(quotechar) : quotechar,
+        isascii(escapechar) ? UInt8(escapechar) : escapechar, false, false)
     len = lastindex(str)
     pos = firstindex(str)
     rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
@@ -359,7 +361,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
-                c = promote_field(s, f, col, err, nastrings, stringtype)
+                c = promote_field(s, f, col, err, nastrings, stringtype, opts)
                 colspool[name] = c[2]
                 c
             end
@@ -397,8 +399,8 @@ function _csvread_internal(str::AbstractString, delim=',';
     cols, canonnames, parsers, finalrows
 end
 
-function promote_field(failed_str, field, col, err, nastrings, stringtype)
-    newtoken = guesstoken(failed_str, field.inner, nastrings)
+function promote_field(failed_str, field, col, err, nastrings, stringtype, opts)
+    newtoken = guesstoken(failed_str, opts, field.inner, nastrings)
     if newtoken == field.inner
         # no need to change
         return field, col
@@ -495,7 +497,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
                 error("previous rows had $(length(guess)) fields but row $i2 has $(length(fields))")
             end
             try
-                guess[j] = guesstoken(fields[j], guess[j], nastrings)
+                guess[j] = guesstoken(fields[j], opts, guess[j], nastrings)
             catch err
                 println(stderr, "Error while guessing a common type for column $j")
                 println(stderr, "new value: $(fields[j]), prev guess was: $(guess[j])")
@@ -630,7 +632,7 @@ function showerrorchar(str, pos, maxchar)
 end
 
 function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(str))
-    strtok = Quoted(StringToken(String), required=false,
+    strtok = Quoted(StringToken(String), opts.quotechar, opts.escapechar, required=false,
                     includequotes=includequotes)
 
     f = Field(strtok, eoldelim=true)
@@ -645,7 +647,7 @@ function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(st
     y1 = iterate(str, prevind(str, i))
     y1===nothing && error("Internal error.")
     c = y1[1]; i = y1[2]
-    if c == opts.endchar
+    if c == Char(opts.endchar)
         # edge case where there's a delim at the end of the string
         push!(strs, "")
     end

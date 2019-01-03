@@ -73,3 +73,7 @@ SUITE["util"]["tryparsenext"]["Percentage"] = @benchmarkable TextParse.tryparsen
 SUITE["util"]["tryparsenext"]["StringToken"] = @benchmarkable TextParse.tryparsenext($(TextParse.StringToken(String)), $somestring,1,$somestringlen, TextParse.default_opts)
 SUITE["util"]["tryparsenext"]["DateTimeToken"] = @benchmarkable TextParse.tryparsenext($tok, $datetimestr,1,$datetimestrlen, $opts)
 SUITE["util"]["tryparsenext"]["QuotedStringToken"] = @benchmarkable TextParse.tryparsenext($(Quoted(String,quotechar='"', escapechar='"')), $somequotedstring)
+
+somefieldstring = " 12,3"
+f = TextParse.fromtype(Int)
+SUITE["util"]["tryparsenext"]["Field"] = @benchmarkable TextParse.tryparsenext($(TextParse.Field(f)), $somefieldstring)

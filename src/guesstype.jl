@@ -52,7 +52,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS)
+function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -65,23 +65,23 @@ function guesstoken(x, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS
         else
             prev_inner = prev_guess
         end
-        inner_token = guesstoken(strip(strip(x, q)), prev_inner, nastrings)
-        return Quoted(inner_token)
+        inner_token = guesstoken(strip(strip(x, q)), opts, prev_inner, nastrings)
+        return Quoted(inner_token, opts.quotechar, opts.escapechar)
     elseif isa(prev_guess, Quoted)
         # but this token is not quoted
-        return Quoted(guesstoken(x, prev_guess.inner, nastrings))
+        return Quoted(guesstoken(x, opts, prev_guess.inner, nastrings), opts.quotechar, opts.escapechar)
     elseif isa(prev_guess, NAToken)
         # This column is nullable
         if isna(x, nastrings)
             # x is null too, return previous guess
             return prev_guess
         else
-            tok = guesstoken(x, prev_guess.inner, nastrings)
+            tok = guesstoken(x, opts, prev_guess.inner, nastrings)
             if isa(tok, StringToken)
                 return tok # never wrap a string in NAToken
             elseif isa(tok, Quoted)
                 # Always put the quoted wrapper on top
-                return Quoted(NAToken(tok.inner))
+                return Quoted(NAToken(tok.inner), opts.quotechar, opts.escapechar)
             else
                 return NAToken(tok, nastrings=nastrings)
             end
