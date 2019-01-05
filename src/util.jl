@@ -92,18 +92,48 @@ end
     return nothing
 end
 
+Base.@pure maxdigits(::Type{T}) where {T} = ndigits(typemax(T))
+Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, 10^(ndigits(typemax(T))-1))
+
 @inline function tryparsenext_base10(T, str,i,len)
+    i0 = i
     R = Nullable{T}
     y = tryparsenext_base10_digit(T,str,i, len)
     y===nothing && return R(), i
     r = y[1]; i = y[2]
+
+    # Eat zeros
+    while r==0
+        y2 = tryparsenext_base10_digit(T,str,i, len)
+        y2 === nothing && return R(convert(T, 0)), i
+        r = y2[1]; i = y2[2]
+    end
+   
+    digits = 1
     ten = T(10)
     while true
         y2 = tryparsenext_base10_digit(T,str,i,len)
         y2===nothing && break
+        digits += 1
         d = y2[1]; i = y2[2]
         r = r*ten + d
     end
+
+    max_digits = maxdigits(T)
+
+    # Checking for overflow
+    if digits > max_digits
+        # More digits than the max value we can hold, this is certainly
+        # an overflow
+        return R(), i0
+    elseif digits == max_digits && r < min_with_max_digits(T)
+        # Same digits as the max digits we can hold. If the number we computed
+        # is now smaller than the smallest number with the same number of
+        # digits as the typemax number, we must have overflown, so we
+        # again return a parsing failure
+        return R(), i0
+    end
+
     return R(convert(T, r)), i
 end
 
