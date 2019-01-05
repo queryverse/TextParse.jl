@@ -358,7 +358,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
     end
 
-    return R(_substring(T, str, i0, i-1)), i
+    return R(_substring(T, str, i0, prevind(str, i))), i
 end
 
 @inline function _substring(::Type{String}, str, i, j)

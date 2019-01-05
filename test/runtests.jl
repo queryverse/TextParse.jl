@@ -35,6 +35,7 @@ import TextParse: getlineend
     @test getlineend("x\nx") == 1
     @test getlineend("x\ny", 2) == 1
     @test getlineend("x\nyz", 3) == 4
+    @test getlineend("xβ\nyz") == 2
 end
 
 
@@ -113,6 +114,8 @@ using WeakRefStrings
     @test tryparsenext(Quoted(String,'"', '\\'), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
+
+    @test tryparsenext(StringToken(String), "abcβ") |> unwrap == ("abcβ", 6)
 end
 
 
