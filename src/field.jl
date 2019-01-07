@@ -364,13 +364,18 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
     end
 
-    return R(_substring(T, str, i0, i-1, escapecount, opts.escapechar, opts.quotechar)), i
+    return R(_substring(T, str, i0, i-1, escapecount, opts.escapechar, opts.quotechar, opts.includequotes)), i
 end
 
-@inline function _substring(::Type{String}, str, i, j, escapecount, escapechar, quotechar)
+@inline function _substring(::Type{String}, str, i, j, escapecount, escapechar, quotechar, includequotes)
     if escapecount > 0
         buf = IOBuffer()
         cur_i = i
+        c = str[cur_i] 
+        if includequotes && c==quotechar
+            print(buf, c)
+            cur_i = nextind(str, cur_i)
+        end
         while cur_i <= j
             c = str[cur_i] 
             if c == escapechar
@@ -392,7 +397,7 @@ end
     end
 end
 
-@inline function _substring(::Type{T}, str, i, j, escapecount, escapechar, quotechar) where {T<:SubString}
+@inline function _substring(::Type{T}, str, i, j, escapecount, escapechar, quotechar, includequotes) where {T<:SubString}
     escapecount > 0 && error("Not yet handled 2")
     T(str, i, thisind(j))
 end
@@ -403,11 +408,11 @@ fromtype(::Type{StrRange}) = StringToken(StrRange)
     unsafe_string(pointer(str, 1 + r.offset), r.length)
 end
 
-@inline function _substring(::Type{StrRange}, str, i, j, escapecount, escapechar, quotechar)
+@inline function _substring(::Type{StrRange}, str, i, j, escapecount, escapechar, quotechar, includequotes)
     StrRange(i - 1, j - i + 1, escapecount)
 end
 
-@inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, escapechar, quotechar)
+@inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, escapechar, quotechar, includequotes)
     escapecount > 0 && error("Not yet handled 3")
     WeakRefString(convert(Ptr{UInt8}, pointer(str, i)), j - i + 1)
 end
