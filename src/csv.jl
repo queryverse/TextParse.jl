@@ -408,7 +408,9 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, opts)
     newcol = try
         promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype)
     catch err2
+        # TODO Should this really be shown?
         Base.showerror(stderr, err2)
+        println(stderr)
         rethrow(err)
     end
     swapinner(field, newtoken), newcol

@@ -9,6 +9,8 @@ using Nullables
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
 
+@testset "TextParse" begin
+
 import TextParse: eatnewlines
 @testset "eatnewlines" begin
     @test eatnewlines("\n\r\nx") == (4, 2)
@@ -573,3 +575,5 @@ end
 end
 
 include("test_vectorbackedstrings.jl")
+
+end
