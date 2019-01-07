@@ -77,7 +77,11 @@ csvread(file::String, delim=','; kwargs...) = _csvread_f(file, delim; kwargs...)
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
-    _csvread(VectorBackedUTF8String(mmap_data), delim; kwargs...)
+    try
+        _csvread(VectorBackedUTF8String(mmap_data), delim; kwargs...)
+    finally
+        finalize(mmap_data)
+    end
 end
 
 function csvread(buffer::IO, delim=','; kwargs...)
@@ -100,7 +104,11 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
     else # Otherwise just try to read the file
         return open(file, "r") do io
             data = Mmap.mmap(io)
-            _csvread_internal(VectorBackedUTF8String(data), delim; filename=file, kwargs...)
+            try
+                _csvread_internal(VectorBackedUTF8String(data), delim; filename=file, kwargs...)
+            finally
+                finalize(data)
+            end
         end
     end
 end
