@@ -149,6 +149,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  quotechar='"',
                  escapechar='"',
                  stringtype=String,
+                 stringarraytype=Array,
                  noresize=false,
                  rowno::Int=1,
                  prevheaders=nothing,
@@ -265,7 +266,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     if isempty(colspool)
         # this is the first file, use nrows
-        cols = makeoutputvecs(rec, nrows, stringtype)
+        cols = makeoutputvecs(rec, nrows, stringtype, stringarraytype)
         for (c2, h) in zip(cols, canonnames)
             colspool[h] = c2
         end
@@ -280,13 +281,13 @@ function _csvread_internal(str::AbstractString, delim=',';
                     try
                         return colspool[c] = promote_column(colspool[c],
                                                             rowno-1,
-                                                            fieldtype(f), stringtype)
+                                                            fieldtype(f), stringtype, stringarraytype)
                     catch err
                         error("Could not convert column $c of eltype $(eltype(colspool[c])) to eltype $(fieldtype(f))")
                     end
                 end
             else
-                return colspool[c] = makeoutputvec(f, nrows, stringtype)
+                return colspool[c] = makeoutputvec(f, nrows, stringtype, stringarraytype)
             end
         end
         # promote missing columns to nullable
@@ -295,7 +296,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             if !ismissingtype(eltype(colspool[k])) && !(eltype(colspool[k]) <: StringLike)
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
-                                             UnionMissing{eltype(colspool[k])}, stringtype)
+                                             UnionMissing{eltype(colspool[k])}, stringtype, stringarraytype)
             end
         end
         cols = (_cols...,)
@@ -361,7 +362,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
-                c = promote_field(s, f, col, err, nastrings, stringtype, opts)
+                c = promote_field(s, f, col, err, nastrings, stringtype, stringarraytype, opts)
                 colspool[name] = c[2]
                 c
             end
@@ -399,14 +400,14 @@ function _csvread_internal(str::AbstractString, delim=',';
     cols, canonnames, parsers, finalrows
 end
 
-function promote_field(failed_str, field, col, err, nastrings, stringtype, opts)
+function promote_field(failed_str, field, col, err, nastrings, stringtype, stringarraytype, opts)
     newtoken = guesstoken(failed_str, opts, field.inner, nastrings)
     if newtoken == field.inner
         # no need to change
         return field, col
     end
     newcol = try
-        promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype)
+        promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype, stringarraytype)
     catch err2
         Base.showerror(stderr, err2)
         rethrow(err)
@@ -414,10 +415,10 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, opts)
     swapinner(field, newtoken), newcol
 end
 
-function promote_column(col, rowno, T, stringtype, inner=false)
+function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
     if typeof(col) <: Array{Missing}
         if T <: StringLike
-            arr = StringVector{stringtype}(length(col))
+            arr = stringarraytype{stringtype,1}(undef, length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
@@ -565,18 +566,18 @@ function resizecols(colspool, nrecs)
     end
 end
 
-function makeoutputvecs(rec, N, stringtype)
-    map(f->makeoutputvec(f, N, stringtype), rec.fields)
+function makeoutputvecs(rec, N, stringtype, stringarraytype)
+    map(f->makeoutputvec(f, N, stringtype, stringarraytype), rec.fields)
 end
 
-function makeoutputvec(eltyp, N, stringtype)
+function makeoutputvec(eltyp, N, stringtype, stringarraytype)
     if fieldtype(eltyp) == Missing # we weren't able to detect the type,
                                    # all cells were blank
         Array{Missing}(undef, N)
     elseif fieldtype(eltyp) == StrRange
-        StringVector{stringtype}(N)
+        stringarraytype{stringtype,1}(undef, N)
     elseif ismissingtype(fieldtype(eltyp)) && fieldtype(eltyp) <: StrRange
-        StringVector{Union{Missing, String}}(N)
+        stringarraytype{Union{Missing, String},1}(undef, N)
     else
         Array{fieldtype(eltyp)}(undef, N)
     end
