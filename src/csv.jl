@@ -176,7 +176,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  type_detect_rows=20)
 
     if pooledstrings === true
-        warn("pooledstrings argument has been removed")
+        @warn("pooledstrings argument has been removed")
     end
     opts = LocalOpts(isascii(delim) ? UInt8(delim) : delim, spacedelim,
         isascii(quotechar) ? UInt8(quotechar) : quotechar,
@@ -359,7 +359,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
             if length(failed_strs) != length(cols[err.colno:end])
                 fn = err.filename === nothing ? "" : "In $(err.filename) "
-                warn("$(fn)line $(err.lineno) has $(length(err.colno) + length(failed_strs) - 1) fields but $(length(cols)) fields are expected. Skipping row.")
+                @warn("$(fn)line $(err.lineno) has $(length(err.colno) + length(failed_strs) - 1) fields but $(length(cols)) fields are expected. Skipping row.")
                 pos = last(rng)+1
                 rowno = err.rowno
                 lineno = err.lineno+1
