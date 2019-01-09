@@ -362,11 +362,11 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
 end
 
 @inline function _substring(::Type{String}, str, i, j)
-    String(str[i:j])
+    String(str[i:thisind(str, j)])
 end
 
 @inline function _substring(::Type{T}, str, i, j) where {T<:SubString}
-    T(str, i, j)
+    T(str, i, thisind(j))
 end
 
 fromtype(::Type{StrRange}) = StringToken(StrRange)

@@ -228,8 +228,7 @@ function getlineend(str, i=1, l=lastindex(str))
         y = iterate(str, i)
     end
 
-    # TODO Is this correct?
-    return i-1
+    return prevind(str, i)
 end
 
 ### Testing helpers
