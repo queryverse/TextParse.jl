@@ -231,6 +231,73 @@ function getlineend(str, i=1, l=lastindex(str))
     return prevind(str, i)
 end
 
+# This is similar to getlineend, but ignores line ends inside
+# quotes
+function getrowend(str, i, len, opts, delim)
+    i0 = i
+    i = eatwhitespaces(str, i, len)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; i = y[2]
+        if c==Char(opts.quotechar)
+            # We are now inside a quoted field
+            y2 = iterate(str, i)
+            while y2!==nothing
+                c = y2[1]; i = y2[2]
+                if c==Char(opts.escapechar)
+                    y3 = iterate(str, i)
+                    if y3===nothing
+                        if c==Char(opts.quotechar)
+                            return prevind(str, i)
+                        else
+                            error("Parsing error, quoted string never terminated.")
+                        end
+                    else
+                        c2 = y3[1]; ii = y3[2]
+                        if c2==Char(opts.quotechar)
+                            i = ii
+                        elseif c==Char(opts.quotechar)
+                            break
+                        end
+                    end
+                elseif c==Char(opts.quotechar)
+                    break;
+                end
+                y2 = iterate(str, i)
+                if y2===nothing
+                    error("Parsing error, quoted string never terminated.")
+                end
+            end
+            i = eatwhitespaces(str, i, len)
+            y4 = iterate(str, i)
+            if y4!==nothing
+                c = y4[1]; i4 = y4[2]
+                if isnewline(c)
+                    return prevind(str, i)
+                elseif c!=Char(delim)
+                    error("Invalid line")
+                end
+            else
+                return prevind(str, i)
+            end
+        else
+            # We are now inside a non quoted field
+            while y!==nothing
+                c = y[1]; i = y[2]
+                if c==Char(delim)
+                    i = eatwhitespaces(str, i)
+                    break
+                elseif isnewline(c)
+                    return prevind(str, i, 2)
+                end
+                y = iterate(str, i)
+            end
+        end
+        y = iterate(str, i)
+    end
+    return prevind(str, i)
+end
+
 ### Testing helpers
 
 unwrap(xs) = (get(xs[1]), xs[2:end]...)
