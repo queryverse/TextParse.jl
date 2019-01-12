@@ -415,10 +415,19 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, strin
     swapinner(field, newtoken), newcol
 end
 
+function _construct_stringvector(::Type{T}, ::Type{S}, len) where {T<:Array,S}
+    return Vector{S}(undef, len)
+end
+
+function _construct_stringvector(::Type{T}, ::Type{S}, len) where {T<:StringArray,S}
+    return StringVector{S}(len)
+end
+
+
 function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
     if typeof(col) <: Array{Missing}
         if T <: StringLike
-            arr = stringarraytype{stringtype,1}(undef, length(col))
+            arr = _construct_stringvector(stringarraytype, stringtype, length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
@@ -575,9 +584,9 @@ function makeoutputvec(eltyp, N, stringtype, stringarraytype)
                                    # all cells were blank
         Array{Missing}(undef, N)
     elseif fieldtype(eltyp) == StrRange
-        stringarraytype{stringtype,1}(undef, N)
+        _construct_stringvector(stringarraytype, stringtype, N)
     elseif ismissingtype(fieldtype(eltyp)) && fieldtype(eltyp) <: StrRange
-        stringarraytype{Union{Missing, String},1}(undef, N)
+        _construct_stringvector(stringarraytype, Union{Missing, String}, N)
     else
         Array{fieldtype(eltyp)}(undef, N)
     end
