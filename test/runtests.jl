@@ -162,23 +162,13 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(String, '"', '"'), "\"x\"") |> unwrap == ("x", 4)
     @test tryparsenext(Quoted(String, '"', '"', includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
     str2 =  "\"\"\"\""
-<<<<<<< HEAD
-    @test tryparsenext(Quoted(String, '"', '"'), str2, opts) |> unwrap == ("\"\"", lastindex(str2)+1)
-=======
     @test tryparsenext(Quoted(String), str2, opts) |> unwrap == ("\"", lastindex(str2)+1)
->>>>>>> Progress
     str1 =  "\"x”y\"\"\""
     @test tryparsenext(Quoted(StringToken(String), '"', '"', required=true), "x\"y\"") |> failedat == 1
 
-<<<<<<< HEAD
-    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
-    @test tryparsenext(Quoted(StringToken(String), '"', '\\'), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
+    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("x”y\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String), '"', '\\'), "\"x\\\"yz\"") |> unwrap == ("x\"yz", 8)
     @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "1") |> unwrap == (1,2)
-=======
-    @test tryparsenext(Quoted(String, escapechar='"'), str1) |> unwrap == ("x”y\"", lastindex(str1)+1)
-    @test tryparsenext(Quoted(StringToken(String), escapechar='\\'), "\"x\\\"yz\"") |> unwrap == ("x\"yz", 8)
-    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "1") |> unwrap == (1,2)
->>>>>>> Progress
 
     t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "") |> unwrap
     @test ismissing(t[1])
