@@ -430,7 +430,7 @@ function _construct_stringvector(::Type{T}, ::Type{S}, len) where {T<:Array,S}
 end
 
 function _construct_stringvector(::Type{T}, ::Type{S}, len) where {T<:StringArray,S}
-    return StringVector{S}(len)
+    return StringVector{S}(undef, len)
 end
 
 
