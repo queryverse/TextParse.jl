@@ -426,7 +426,7 @@ function promote_column(col, rowno, T, stringtype, inner=false)
             error("empty to non-nullable")
         end
     elseif ismissingtype(T)
-        arr = convert(Array{UnionMissing{eltype(col)}}, col)
+        arr = convert(Array{UnionMissing{T}}, col)
         for i=rowno+1:length(arr)
             # if we convert an Array{Int} to be missing-friendly, we will not have missing in here by default
             arr[i] = missing
