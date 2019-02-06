@@ -52,7 +52,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS)
+function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS, stringarraytype=StringArray)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -65,18 +65,18 @@ function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_S
         else
             prev_inner = prev_guess
         end
-        inner_token = guesstoken(strip(strip(x, q)), opts, prev_inner, nastrings)
+        inner_token = guesstoken(strip(strip(x, q)), opts, prev_inner, nastrings, stringarraytype)
         return Quoted(inner_token, opts.quotechar, opts.escapechar)
     elseif isa(prev_guess, Quoted)
         # but this token is not quoted
-        return Quoted(guesstoken(x, opts, prev_guess.inner, nastrings), opts.quotechar, opts.escapechar)
+        return Quoted(guesstoken(x, opts, prev_guess.inner, nastrings, stringarraytype), opts.quotechar, opts.escapechar)
     elseif isa(prev_guess, NAToken)
         # This column is nullable
         if isna(x, nastrings)
             # x is null too, return previous guess
             return prev_guess
         else
-            tok = guesstoken(x, opts, prev_guess.inner, nastrings)
+            tok = guesstoken(x, opts, prev_guess.inner, nastrings, stringarraytype)
             if isa(tok, StringToken)
                 return tok # never wrap a string in NAToken
             elseif isa(tok, Quoted)
@@ -108,17 +108,17 @@ function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_S
                 return Numeric(promote_type(T, fieldtype(prev_guess)))
             else
                 # something like a date turned into a single number?
-                return StringToken(StrRange)
+                return StringToken(stringarraytype<:StringArray ? StrRange : String)
             end
         else
             # fast-path
             if length(filter(isnumeric, x)) < 4
-                return StringToken(StrRange)
+                return StringToken(stringarraytype<:StringArray ? StrRange : String)
             end
 
             maybedate = guessdateformat(x)
             if maybedate === nothing
-                return StringToken(StrRange)
+                return StringToken(stringarraytype<:StringArray ? StrRange : String)
             else
                 return maybedate
             end
