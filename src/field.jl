@@ -146,10 +146,10 @@ const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
     f = Float64(f1)
     r = f1 - Int64(f) # get the remainder
     x = Double64(f) + Double64(r)
-  
+
     maxexp = 308
     minexp = -256
-  
+
     if exp >= 0
         x *= pre_comp_exp_double[exp+1]
     else
@@ -211,7 +211,7 @@ end
     y3 = iterate(str, i)
     if y3!==nothing && _is_e(str, i)
         i = y3[2]
-    
+
         y4 = iterate(str, i)
         if y4!==nothing
             enegate = false
@@ -266,7 +266,7 @@ function tryparsenext(::Percentage, str, i, len, opts)
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
         y = iterate(str, ii)
-        if y===nothing 
+        if y===nothing
             return Nullable{Float64}(), ii # failed to parse %
         else
             c = y[1]; k = y[2]
@@ -369,15 +369,15 @@ end
 
 @inline function _substring(::Type{String}, str, i, j, escapecount, escapechar, quotechar, includequotes)
     if escapecount > 0
-        buf = IOBuffer()
+        buf = IOBuffer(sizehint=j-i+1-escapecount)
         cur_i = i
-        c = str[cur_i] 
+        c = str[cur_i]
         if includequotes && c==quotechar
             print(buf, c)
             cur_i = nextind(str, cur_i)
         end
         while cur_i <= j
-            c = str[cur_i] 
+            c = str[cur_i]
             if c == escapechar
                 next_i = nextind(str, cur_i)
                 if next_i <= j && str[next_i] == quotechar
