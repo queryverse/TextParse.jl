@@ -142,10 +142,10 @@ using WeakRefStrings
 
     opts = LocalOpts(',', false, '"', '\\', false, false)
     str =  "Owner 2 ”Vicepresident\"\""
-    @test tryparsenext(Quoted(String), str, opts) |> unwrap == (str, lastindex(str)+1)
+    @test tryparsenext(Quoted(String, '"', '\\'), str, opts) |> unwrap == (str, lastindex(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
-    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == ("Owner 2 ”Vicepresident\"", lastindex(str1)+1)
-    @test tryparsenext(Quoted(String), "\"\tx\"") |> unwrap == ("\tx", 5)
+    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("Owner 2 ”Vicepresident\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(String, '"', '"'), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
 
@@ -162,7 +162,7 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(String, '"', '"'), "\"x\"") |> unwrap == ("x", 4)
     @test tryparsenext(Quoted(String, '"', '"', includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
     str2 =  "\"\"\"\""
-    @test tryparsenext(Quoted(String), str2, opts) |> unwrap == ("\"", lastindex(str2)+1)
+    @test tryparsenext(Quoted(String, '"', '"'), str2, opts) |> unwrap == ("\"", lastindex(str2)+1)
     str1 =  "\"x”y\"\"\""
     @test tryparsenext(Quoted(StringToken(String), '"', '"', required=true), "x\"y\"") |> failedat == 1
 
@@ -394,7 +394,7 @@ import TextParse: guesscolparsers
     """
     opts = LocalOpts(',', false, '"', '\\', false, false)
     _, pos = readcolnames(str1, opts, 1, String[])
-    testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers)
+    testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers, StringArray)
     @test testtill(0) |> first == Any[]
     @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
@@ -549,7 +549,7 @@ import TextParse: _csvread
     @test _csvread("") == ((), String[])
 
     @test _csvread("""x""y"", z
-                   a""b"", 1""") == ((["a\"b\""], [1]), ["x\"y\"", "z"])
+                   a""b"", 1""", stringarraytype=Array) == ((["a\"b\""], [1]), ["x\"y\"", "z"])
 end
 
 @testset "skiplines_begin" begin
