@@ -549,7 +549,7 @@ import TextParse: _csvread
     @test _csvread("") == ((), String[])
 
     @test _csvread("""x""y"", z
-                   a""b"", 1""", stringarraytype=Array) == ((["a\"b\""], [1]), ["x\"y\"", "z"])
+                   a""b"", 1""", stringarraytype=Array) == ((["a\"\"b\"\""], [1]), ["x\"\"y\"\"", "z"])
 end
 
 @testset "skiplines_begin" begin
