@@ -634,8 +634,8 @@ function showerrorchar(str, pos, maxchar)
     pointer = String(['_' for i=1:(pos-first(rng)-1)]) * "^"
     if length(substr) > maxchar
         # center the error char
-        lst = min(pos+ceil(Int, hmaxchar), last(rng))
-        fst = max(first(rng), pos-hmaxchar)
+        lst = thisind(str, min(pos+ceil(Int, hmaxchar), last(rng)))
+        fst = thisind(str, max(first(rng), pos-hmaxchar))
         substr = "..." * strip(str[fst:lst]) * "..."
         pointer = String(['_' for i=1:(pos-fst+2)]) * "^"
     end

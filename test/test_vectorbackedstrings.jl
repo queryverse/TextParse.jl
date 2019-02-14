@@ -29,12 +29,13 @@ s = VectorBackedUTF8String(buffer)
 
 @test iterate(s, 5) == nothing
 
+@test string(s) == "Test"
+
 @test_throws ErrorException s == "Test"
 @test_throws ErrorException "Test" == s
 @test_throws ErrorException hash(s, UInt(1))
 @test_throws ErrorException print(s)
 @test_throws ErrorException textwidth(s)
-@test_throws ErrorException string(s)
 @test_throws ErrorException convert(VectorBackedUTF8String, "foo")
 @test_throws ErrorException convert(String, s)
 @test_throws ErrorException String(s)
