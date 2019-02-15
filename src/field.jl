@@ -398,7 +398,7 @@ end
 end
 
 @inline function _substring(::Type{T}, str, i, j, escapecount, escapechar, quotechar, includequotes) where {T<:SubString}
-    escapecount > 0 && error("Not yet handled 2")
+    escapecount > 0 && error("Not yet handled.")
     T(str, i, thisind(j))
 end
 
@@ -413,7 +413,7 @@ end
 end
 
 @inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, escapechar, quotechar, includequotes)
-    escapecount > 0 && error("Not yet handled 3")
+    escapecount > 0 && error("Not yet handled.")
     WeakRefString(convert(Ptr{UInt8}, pointer(str, i)), j - i + 1)
 end
 
