@@ -426,19 +426,10 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, strin
     swapinner(field, newtoken), newcol
 end
 
-function _construct_stringvector(::Type{T}, ::Type{S}, len) where {T<:Array,S}
-    return Vector{S}(undef, len)
-end
-
-function _construct_stringvector(::Type{T}, ::Type{S}, len) where {T<:StringArray,S}
-    return StringVector{S}(len)
-end
-
-
 function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
     if typeof(col) <: Array{Missing}
         if T <: StringLike
-            arr = _construct_stringvector(stringarraytype, stringtype, length(col))
+            arr = stringarraytype{stringtype,1}(undef, length(col))
             for i = 1:rowno
                 arr[i] = ""
             end
@@ -449,7 +440,7 @@ function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
             error("empty to non-nullable")
         end
     elseif ismissingtype(T)
-        arr = convert(Array{UnionMissing{eltype(col)}}, col)
+        arr = convert(Array{UnionMissing{T}}, col)
         for i=rowno+1:length(arr)
             # if we convert an Array{Int} to be missing-friendly, we will not have missing in here by default
             arr[i] = missing
@@ -595,9 +586,9 @@ function makeoutputvec(eltyp, N, stringtype, stringarraytype)
                                    # all cells were blank
         Array{Missing}(undef, N)
     elseif fieldtype(eltyp) == StrRange
-        _construct_stringvector(stringarraytype, stringtype, N)
+        stringarraytype{stringtype,1}(undef, N)
     elseif ismissingtype(fieldtype(eltyp)) && fieldtype(eltyp) <: StrRange
-        _construct_stringvector(stringarraytype, Union{Missing, String}, N)
+        stringarraytype{Union{Missing, String},1}(undef, N)
     else
         Array{fieldtype(eltyp)}(undef, N)
     end
@@ -644,8 +635,8 @@ function showerrorchar(str, pos, maxchar)
     pointer = String(['_' for i=1:(pos-first(rng)-1)]) * "^"
     if length(substr) > maxchar
         # center the error char
-        lst = min(pos+ceil(Int, hmaxchar), last(rng))
-        fst = max(first(rng), pos-hmaxchar)
+        lst = thisind(str, min(pos+ceil(Int, hmaxchar), last(rng)))
+        fst = thisind(str, max(first(rng), pos-hmaxchar))
         substr = "..." * strip(str[fst:lst]) * "..."
         pointer = String(['_' for i=1:(pos-fst+2)]) * "^"
     end

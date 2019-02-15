@@ -75,7 +75,7 @@ Base.print(io::IO, s::VectorBackedUTF8String) = error("Not yet implemented.")
 
 Base.textwidth(s::VectorBackedUTF8String) = error("Not yet implemented.")
 
-Base.string(x::VectorBackedUTF8String) = error("Not yet implemented.")
+Base.string(x::VectorBackedUTF8String) = unsafe_string(pointer(x.buffer), length(x.buffer))
 
 Base.convert(::Type{VectorBackedUTF8String}, x::String) = error("Not yet implemented.")
 
