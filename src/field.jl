@@ -393,7 +393,7 @@ end
         end
         return String(take!(buf))
     else
-        return String(str[i:thisind(str, j)])
+        return unsafe_string(pointer(str, i), j-i+1)
     end
 end
 
