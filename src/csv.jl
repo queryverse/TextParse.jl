@@ -209,7 +209,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     end
 
     # Ignore commented lines before the header.
-    pos, lines = eatcommentlines(str, pos, lastindex(str), commentchar)
+    pos, lines = eatcommentlines(str, pos, len, commentchar)
     lineno += lines
 
     if header_exists
@@ -549,7 +549,7 @@ function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspo
         lineno += lines
 
         # Do not try to parse commented lines.
-        pos, lines = eatcommentlines(str, pos, lastindex(str), commentchar)
+        pos, lines = eatcommentlines(str, pos, l, commentchar)
         lineno += lines
         pos > l && return rowno-1
 
