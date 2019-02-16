@@ -3,17 +3,33 @@ using TextParse
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
 using Test
-using Dates
+using Dates, Random
+using Nullables
 
 # dumb way to compare two AbstractTokens
 Base.:(==)(a::T, b::T) where {T<:AbstractToken} = string(a) == string(b)
+
+@testset "TextParse" begin
 
 import TextParse: eatnewlines
 @testset "eatnewlines" begin
     @test eatnewlines("\n\r\nx") == (4, 2)
     @test eatnewlines("x\n\r\nx") == (1, 0)
+
+    # Also test the AbstractString variant
+    @test eatnewlines(SubString("\n\r\nx", 1)) == (4, 2)
+    @test eatnewlines(SubString("x\n\r\nx", 1)) == (1, 0)
 end
 
+import TextParse: eatwhitespaces
+@testset "eatwhitespaces" begin
+    @test eatwhitespaces("  x") == 3
+    @test eatwhitespaces("x  x") == 1
+
+    # Also test the AbstractString variant
+    @test eatwhitespaces(SubString("  x", 1)) == 3
+    @test eatwhitespaces(SubString("x  x", 1)) == 1
+end
 
 import TextParse: getlineend
 @testset "getlineend" begin
@@ -21,8 +37,30 @@ import TextParse: getlineend
     @test getlineend("x\nx") == 1
     @test getlineend("x\ny", 2) == 1
     @test getlineend("x\nyz", 3) == 4
+    @test getlineend("xβ\nyz") == 2
 end
 
+import TextParse: getrowend
+@testset "getrowend" begin
+    opts = LocalOpts(',', false, '"', '"', true, true)
+
+    @test getrowend("\nx", 1, lastindex("\nx"), opts, ',') == 0
+    @test getrowend("x\nx", 1, lastindex("x\nx"), opts, ',') == 1
+    @test getrowend("x\ny", 2, lastindex("x\ny"), opts, ',') == 1
+    @test getrowend("x\nyz", 3, lastindex("x\nyz"), opts, ',') == 4
+    @test getrowend("\"x\"\nyz", 1, lastindex("x\nyz"), opts, ',') == 3
+    @test_throws ErrorException getrowend("\"x\" er", 1, lastindex("\"x\" er"), opts, ',')
+    @test getrowend("", 1, lastindex(""), opts, ',') == 0
+    @test getrowend("  ", 1, lastindex("  "), opts, ',') == 2
+    @test getrowend("a,b,c\nd,e,f", 1, lastindex("a,b,c\nd,e,f"), opts, ',') == 5
+    @test getrowend("a,\"b\"\"ef\",c\nd,e,f", 1, lastindex("a,\"b\"\"ef\",c\nd,e,f"), opts, ',') == 11
+    @test getrowend("a,\"b\"\"ef\"", 1, lastindex("a,\"b\"\"ef\""), opts, ',') == 9
+    @test_throws ErrorException getrowend("\"xy", 1, lastindex("\"xy"), opts, ',')
+
+    opts = LocalOpts(',', false, '"', '\\', true, true)
+    @test getrowend("a,\"bef\",f\na,b", 1, lastindex("a,\"bef\",f\na,b"), opts, ',') == 9
+    @test_throws ErrorException getrowend("\"xy\\", 1, lastindex("\"xy"), opts, ',')
+end
 
 import TextParse: fromtype, Percentage
 @testset "Float parsing" begin
@@ -39,8 +77,42 @@ import TextParse: fromtype, Percentage
     @test tryparsenext(fromtype(Float64), "5.e-3", 1, 5) |> unwrap == (5.0e-3,6) # 32
     @test tryparsenext(Percentage(), "33%") |> unwrap == (.33,4)
     @test tryparsenext(Percentage(), "3.3%") |> unwrap == (.033,5)
+
+    # Also test AbstractString variant
+    @test tryparsenext(fromtype(Float64), SubString("1", 1), 1, 1) |> unwrap == (1.0, 2)
+    @test tryparsenext(fromtype(Float64), SubString("12", 1), 1, 2) |> unwrap == (12.0, 3)
+    @test tryparsenext(fromtype(Float64), SubString(".1", 1), 1, 2) |> unwrap == (0.1, 3)
+    @test tryparsenext(fromtype(Float64), SubString("1.1", 1), 1, 3) |> unwrap == (1.1, 4)
+    @test tryparsenext(fromtype(Float32), SubString("1.", 1), 1, 2) |> unwrap == (1f0,3)
+    @test tryparsenext(fromtype(Float64), SubString("-1.1", 1), 1, 4) |> unwrap == (-1.1,5)
+    @test tryparsenext(fromtype(Float64), SubString("-1.0e-12", 1), 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(fromtype(Float64), SubString("-1e-12", 1)) |> unwrap == (-1.0e-12,7)
+    @test tryparsenext(fromtype(Float64), SubString("-1.0E-12", 1), 1, 8) |> unwrap == (-1.0e-12,9)
+    @test tryparsenext(fromtype(Float64), SubString("5.e-3", 1), 1, 5) |> unwrap == (5.0e-3,6) # 32
+    @test tryparsenext(Percentage(), SubString("33%", 1)) |> unwrap == (.33,4)
+    @test tryparsenext(Percentage(), SubString("3.3%", 1)) |> unwrap == (.033,5)
+
+    rng = MersenneTwister(0)
+    floats = rand(1_000)
+    parsed_floats = map(i->get(tryparsenext(fromtype(Float64), i, 1, lastindex(i))[1]), string.(floats))
+    @test parsed_floats == floats
+
+    # Also test AbstractString variant
+    parsed_floats = map(i->get(tryparsenext(fromtype(Float64), SubString(i,1), 1, lastindex(i))[1]), string.(floats))
+    @test parsed_floats == floats
 end
 
+@testset "Int parsing" begin
+    @test tryparsenext(fromtype(Int64), "1", 1, 1) |> unwrap == (1, 2)
+    @test tryparsenext(fromtype(Int64), "01", 1, 2) |> unwrap == (1, 3)
+    @test tryparsenext(fromtype(Int64), "0001", 1, 4) |> unwrap == (1, 5)
+    @test tryparsenext(fromtype(Int64), "123", 1, 3) |> unwrap == (123, 4)
+    @test tryparsenext(fromtype(Int64), "00123", 1, 5) |> unwrap == (123, 6)
+    @test tryparsenext(fromtype(Int64), "9223372036854775807", 1, 19) |> unwrap == (9223372036854775807, 20)
+    @test tryparsenext(fromtype(Int64), "9223372036854775808", 1, 19) |> failedat == 1
+    @test tryparsenext(fromtype(Int64), "19223372036854775808", 1, 20) |> failedat == 1
+
+end
 
 import TextParse: StringToken
 using WeakRefStrings
@@ -70,12 +142,14 @@ using WeakRefStrings
 
     opts = LocalOpts(',', false, '"', '\\', false, false)
     str =  "Owner 2 ”Vicepresident\"\""
-    @test tryparsenext(Quoted(String), str) |> unwrap == (str, lastindex(str)+1)
+    @test tryparsenext(Quoted(String, '"', '\\'), str) |> unwrap == (str, lastindex(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
-    @test tryparsenext(Quoted(String,quotechar='"', escapechar='"'), str1) |> unwrap == (str, lastindex(str1)+1)
-    @test tryparsenext(Quoted(String), "\"\tx\"") |> unwrap == ("\tx", 5)
+    @test tryparsenext(Quoted(String,'"', '"'), str1) |> unwrap == (str, lastindex(str1)+1)
+    @test tryparsenext(Quoted(String,'"', '\\'), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
+
+    @test tryparsenext(StringToken(String), "abcβ") |> unwrap == ("abcβ", 6)
 end
 
 
@@ -83,55 +157,55 @@ import TextParse: Quoted, NAToken, Unknown
 @testset "Quoted string parsing" begin
     opts = LocalOpts(',', false, '"', '"', true, true)
 
-    @test tryparsenext(Quoted(String), "\"\"") |> unwrap == ("", 3)
-    @test tryparsenext(Quoted(String), "\"\" ", opts) |> unwrap == ("", 3)
-    @test tryparsenext(Quoted(String), "\"x\"") |> unwrap == ("x", 4)
-    @test tryparsenext(Quoted(String, includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
+    @test tryparsenext(Quoted(String, '"', '"'), "\"\"") |> unwrap == ("", 3)
+    @test tryparsenext(Quoted(String, '"', '"'), "\"\" ", opts) |> unwrap == ("", 3)
+    @test tryparsenext(Quoted(String, '"', '"'), "\"x\"") |> unwrap == ("x", 4)
+    @test tryparsenext(Quoted(String, '"', '"', includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
     str2 =  "\"\"\"\""
-    @test tryparsenext(Quoted(String), str2, opts) |> unwrap == ("\"\"", lastindex(str2)+1)
+    @test tryparsenext(Quoted(String, '"', '"'), str2, opts) |> unwrap == ("\"\"", lastindex(str2)+1)
     str1 =  "\"x”y\"\"\""
-    @test tryparsenext(Quoted(StringToken(String), required=true), "x\"y\"") |> failedat == 1
+    @test tryparsenext(Quoted(StringToken(String), '"', '"', required=true), "x\"y\"") |> failedat == 1
 
-    @test tryparsenext(Quoted(String, escapechar='"'), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
-    @test tryparsenext(Quoted(StringToken(String), escapechar='\\'), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
-    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "1") |> unwrap == (1,2)
+    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String), '"', '\\'), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "1") |> unwrap == (1,2)
 
-    t = tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap
+    t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "") |> unwrap
     @test ismissing(t[1])
     @test t[2] == 1
 
-    t = tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap
+    t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "\"\"") |> unwrap
     @test ismissing(t[1])
     @test t[2] == 3
-    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"1\"") |> unwrap == (1, 4)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "\"1\"") |> unwrap == (1, 4)
 
 
-    @test tryparsenext(Quoted(StringToken(String)), "\"abc\"") |> unwrap == ("abc", 6)
-    @test tryparsenext(Quoted(StringToken(String)), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
-    @test tryparsenext(Quoted(StringToken(String)), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
-    @test tryparsenext(Quoted(StringToken(String), required=true), "x\"abc\"") |> failedat == 1
-    @test tryparsenext(Quoted(fromtype(Int)), "21") |> unwrap == (21,3)
-    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "21") |> unwrap == (21,3)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"'), "\"abc\"") |> unwrap == ("abc", 6)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"'), "x\"abc\"") |> unwrap == ("x\"abc\"", 7)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"'), "\"a\nbc\"") |> unwrap == ("a\nbc", 7)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"', required=true), "x\"abc\"") |> failedat == 1
+    @test tryparsenext(Quoted(fromtype(Int), '"', '"'), "21") |> unwrap == (21,3)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "21") |> unwrap == (21,3)
 
-    t = tryparsenext(Quoted(NAToken(fromtype(Int))), "") |> unwrap
+    t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "") |> unwrap
     @test ismissing(t[1])
     @test t[2] == 1
 
-    t = tryparsenext(Quoted(NAToken(fromtype(Int))), "\"\"") |> unwrap
+    t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "\"\"") |> unwrap
     @test ismissing(t[1])
     @test t[2] == 3
 
-    @test tryparsenext(Quoted(NAToken(fromtype(Int))), "\"21\"") |> unwrap == (21, 5)
-    @test ismissing(tryparsenext(Quoted(NAToken(Unknown())), " ") |> unwrap |> first)
+    @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "\"21\"") |> unwrap == (21, 5)
+    @test ismissing(tryparsenext(Quoted(NAToken(Unknown()), '"', '"'), " ") |> unwrap |> first)
     opts = LocalOpts(',', false,'"', '"', false, false)
-    @test tryparsenext(Quoted(StringToken(String)), "x,", opts) |> unwrap == ("x", 2)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"'), "x,", opts) |> unwrap == ("x", 2)
 
     # stripspaces
-    @test tryparsenext(Quoted(Percentage()), "\" 10%\",", opts) |> unwrap == (0.1, 7)
-    @test tryparsenext(Quoted(String), "\" 10%\",", opts) |> unwrap == (" 10%", 7)
+    @test tryparsenext(Quoted(Percentage(), '"', '"'), "\" 10%\",", opts) |> unwrap == (0.1, 7)
+    @test tryparsenext(Quoted(String, '"', '"'), "\" 10%\",", opts) |> unwrap == (" 10%", 7)
     opts = LocalOpts(',', true,'"', '"', false, false)
-    @test tryparsenext(Quoted(StringToken(String)), "\"x y\" y", opts) |> unwrap == ("x y", 6)
-    @test tryparsenext(Quoted(StringToken(String)), "x y", opts) |> unwrap == ("x", 2)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"'), "\"x y\" y", opts) |> unwrap == ("x y", 6)
+    @test tryparsenext(Quoted(StringToken(String), '"', '"'), "x y", opts) |> unwrap == ("x", 2)
 end
 
 @testset "NA parsing" begin
@@ -168,6 +242,26 @@ import TextParse: Field
     @test tryparsenext(Field(f,eoldelim=true), " 12\n", 1, 4, opts) |> unwrap == (12,5)
     @test tryparsenext(Field(f,eoldelim=true), " 12\n\r\n", 1, 5, opts) |> unwrap == (12,6)
     @test tryparsenext(Field(f,eoldelim=true), " 12") |> unwrap == (12,4)
+
+    # Also test AbstractString variant
+    @test tryparsenext(Field(f), SubString("12,3",1)) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f), SubString("12 ,3",1)) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f), SubString(" 12 ,3",1)) |> unwrap == (12, 6)
+    opts = LocalOpts('\t', false, 'x','x',true,false)
+    @test tryparsenext(Field(f), SubString("12\t3",1), 1, 4, opts) |> unwrap == (12, 4)
+    @test tryparsenext(Field(f), SubString("12 \t3",1), 1, 5, opts) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f), SubString(" 12 \t 3",1), 1, 6, opts) |> unwrap == (12, 6)
+    opts = LocalOpts('\t', true, 'x','x',true,false)
+    @test tryparsenext(Field(f), SubString(" 12 3",1), 1, 5, opts) |> unwrap == (12, 5)
+    @test tryparsenext(Field(f, ignore_end_whitespace=false), SubString(" 12 \t 3",1), 1,6, opts) |> unwrap == (12, 5)
+    opts = LocalOpts(' ', false, 'x','x',false, false)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false), SubString("12 3",1), 1,4,opts) |> unwrap == (12, 4)
+#    @test tryparsenext(Field(f,ignore_end_whitespace=false), "12 \t3", 1,5,opts) |> failedat == 3
+    opts = LocalOpts('\t', false, 'x','x',false, false)
+    @test tryparsenext(Field(f,ignore_end_whitespace=false), SubString(" 12\t 3",1), 1, 6, opts) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), SubString(" 12\n",1), 1, 4, opts) |> unwrap == (12,5)
+    @test tryparsenext(Field(f,eoldelim=true), SubString(" 12\n\r\n",1), 1, 5, opts) |> unwrap == (12,6)
+    @test tryparsenext(Field(f,eoldelim=true), SubString(" 12",1)) |> unwrap == (12,4)
 end
 
 
@@ -238,53 +332,54 @@ end
 
 import TextParse: guesstoken, Unknown, Numeric, DateTimeToken, StrRange
 @testset "guesstoken" begin
+    opts = LocalOpts(UInt8(','), false, UInt8('"'), UInt8('"'), false, false)
     # Test null values
-    @test guesstoken("", Unknown()) == NAToken(Unknown())
-    @test guesstoken("null", Unknown()) == NAToken(Unknown())
-    @test guesstoken("", NAToken(Unknown())) == NAToken(Unknown())
-    @test guesstoken("null", NAToken(Unknown())) == NAToken(Unknown())
+    @test guesstoken("", opts, Unknown()) == NAToken(Unknown())
+    @test guesstoken("null", opts, Unknown()) == NAToken(Unknown())
+    @test guesstoken("", opts, NAToken(Unknown())) == NAToken(Unknown())
+    @test guesstoken("null", opts, NAToken(Unknown())) == NAToken(Unknown())
 
     # Test NA
-    @test guesstoken("1", NAToken(Unknown())) == NAToken(Numeric(Int))
-    @test guesstoken("1", NAToken(Numeric(Int))) == NAToken(Numeric(Int))
-    @test guesstoken("", NAToken(Numeric(Int))) == NAToken(Numeric(Int))
-    @test guesstoken("1%", NAToken(Unknown())) == NAToken(Percentage())
+    @test guesstoken("1", opts, NAToken(Unknown())) == NAToken(Numeric(Int))
+    @test guesstoken("1", opts, NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+    @test guesstoken("", opts, NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+    @test guesstoken("1%", opts, NAToken(Unknown())) == NAToken(Percentage())
 
     # Test non-null numeric
-    @test guesstoken("1", Unknown()) == Numeric(Int)
-    @test guesstoken("1", Numeric(Int)) == Numeric(Int)
-    @test guesstoken("", Numeric(Int)) == NAToken(Numeric(Int))
-    @test guesstoken("1.0", Numeric(Int)) == Numeric(Float64)
+    @test guesstoken("1", opts, Unknown()) == Numeric(Int)
+    @test guesstoken("1", opts, Numeric(Int)) == Numeric(Int)
+    @test guesstoken("", opts, Numeric(Int)) == NAToken(Numeric(Int))
+    @test guesstoken("1.0", opts, Numeric(Int)) == Numeric(Float64)
 
     # Test strings
-    @test guesstoken("x", Unknown()) == StringToken(StrRange)
+    @test guesstoken("x", opts, Unknown()) == StringToken(StrRange)
 
     # Test nullable to string
-    @test guesstoken("x", NAToken(Unknown())) == StringToken(StrRange)
+    @test guesstoken("x", opts, NAToken(Unknown())) == StringToken(StrRange)
 
     # Test string to non-null (short circuit)
-    @test guesstoken("1", StringToken(StrRange)) == StringToken(StrRange)
+    @test guesstoken("1", opts, StringToken(StrRange)) == StringToken(StrRange)
 
     # Test quoting
-    @test guesstoken("\"1\"", Unknown()) == Quoted(Numeric(Int))
-    @test guesstoken("\"1\"", Quoted(Numeric(Int))) == Quoted(Numeric(Int))
+    @test guesstoken("\"1\"", opts, Unknown()) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"1\"", opts, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
 
     # Test quoting with Nullable tokens
-    @test guesstoken("\"\"", Quoted(Unknown())) == Quoted(NAToken(Unknown()))
-    @test guesstoken("\"\"", Quoted(NAToken(Unknown()))) == Quoted(NAToken(Unknown()))
-    @test guesstoken("\"\"", Quoted(Numeric(Int))) == Quoted(NAToken(Numeric(Int)))
-    @test guesstoken("\"\"", Unknown()) == Quoted(NAToken(Unknown()))
-    @test guesstoken("\"\"", Numeric(Int)) == Quoted(NAToken(Numeric(Int)))
-    @test guesstoken("", Quoted(Numeric(Int))) == Quoted(NAToken(Numeric(Int)))
-    @test guesstoken("", Quoted(NAToken(Numeric(Int)))) == Quoted(NAToken(Numeric(Int)))
-    @test guesstoken("1", Quoted(NAToken(Numeric(Int)))) == Quoted(NAToken(Numeric(Int)))
-    @test guesstoken("\"1\"", Quoted(NAToken(Numeric(Int)))) == Quoted(NAToken(Numeric(Int)))
+    @test guesstoken("\"\"", opts, Quoted(Unknown(), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, Unknown()) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, Numeric(Int)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("", opts, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("", opts, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("1", opts, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"1\"", opts, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
 
     # Test DateTime detection:
-    tok = guesstoken("2016-01-01 10:10:10.10", Unknown())
+    tok = guesstoken("2016-01-01 10:10:10.10", opts, Unknown())
     @test tok == DateTimeToken(DateTime, dateformat"yyyy-mm-dd HH:MM:SS.s")
-    @test guesstoken("2016-01-01 10:10:10.10", tok) == tok
-    @test guesstoken("2016-01-01 10:10:10.10", Quoted(NAToken(Unknown()))) == Quoted(NAToken(tok))
+    @test guesstoken("2016-01-01 10:10:10.10", opts, tok) == tok
+    @test guesstoken("2016-01-01 10:10:10.10", opts, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(tok), opts.quotechar, opts.escapechar)
 end
 
 import TextParse: guesscolparsers
@@ -336,8 +431,8 @@ end
     str = "1970-02-02 02:20:20"
     @test tryparsenext(tok, str, 1, length(str), opts) |> unwrap == (DateTime("1970-02-02T02:20:20"), length(str)+1)
     @test tryparsenext(tok, str*"x", 1, length(str)+1, opts) |> unwrap == (DateTime("1970-02-02T02:20:20"), length(str)+1)
-   #@test tryparsenext(tok, str[1:end-3]*"x", 1, length(str)-2, opts) |> failedat == length(str)-2
-   #@test tryparsenext(tok, str[1:end-3]*"y", 1, length(str)-2, opts) |> unwrap == (DateTime("1970-02-02T02:20"), length(str)-2)
+    @test tryparsenext(tok, str[1:end-3]*"x", 1, length(str)-2, opts) |> failedat == length(str)-2
+    @test tryparsenext(tok, str[1:end-3]*"y", 1, length(str)-2, opts) |> unwrap == (DateTime("1970-02-02T02:20"), length(str)-2)
 end
 
 
@@ -578,7 +673,7 @@ import TextParse: eatwhitespaces
             ii = eatwhitespaces(str, ii, len)
             c, k = iterate(str, ii)
             if c != '%'
-                return nothing, ii # failed to parse %
+                return Nullable{Float64}(), ii # failed to parse %
             else
                 return num, k # the point after %
             end
@@ -603,4 +698,8 @@ end
     if isfile(fngz)
         rm(fngz)
     end
+end
+
+include("test_vectorbackedstrings.jl")
+
 end

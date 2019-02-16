@@ -15,7 +15,7 @@ Returns a 2-element tuple `(values, pos)`:
 * `pos::Int`: The character index at which parsing stopped.
 """
 @generated function tryparsenext_internal(
-                                          ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar='\0', raise::Bool=false,
+                                          ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar=UInt('\0'), raise::Bool=false,
 ) where {T<:TimeType}
     letters = character_codes(df)
 
@@ -51,7 +51,7 @@ Returns a 2-element tuple `(values, pos)`:
         unsafe_val = unsafe_get(values)
         $(assign_value_till...)
         if isnull(values)
-            if (pos <= len && str[pos] == endchar) ||
+            if (pos <= len && str[pos] == Char(endchar)) ||
                 num_parsed == $(length(value_names))
                 # finished parsing and found an extra char,
                 # or parsing was terminated by a delimiter
@@ -107,9 +107,10 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
             vi += 1
             quote
                 pos > len && @goto done
-                $nullable, next_pos = tryparsenext(directives[$i], str, pos, len, locale)
-                $nullable===nothing && @goto error
-                $name = $nullable
+                nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
+                nothingable_tuple===nothing && @goto error
+                $name = nothingable_tuple[1]
+                next_pos = nothingable_tuple[2]
                 pos = next_pos
                 num_parsed += 1
                 directive_index += 1
@@ -119,7 +120,8 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
                 pos > len && @goto done
                 nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
                 nothingable_tuple===nothing && @goto error
-                nullable_delim, next_pos = nothingable_tuple                
+                nullable_delim = nothingable_tuple[1]
+                next_pos = nothingable_tuple[2]
                 pos = next_pos
                 directive_index += 1
             end

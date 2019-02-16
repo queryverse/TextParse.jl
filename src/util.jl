@@ -26,50 +26,132 @@ macro chk2(expr,label=:error)
     quote
         x = $(esc(rhs))
         $(esc(state)) = x[2] # bubble error location
-        if x[1] === nothing
+        if isnull(x[1])
             $(esc(:(@goto $label)))
         else
-            $(esc(res)) = something(x[1])
+            $(esc(res)) = x[1].value
         end
     end
 end
 
-@inline function tryparsenext_base10_digit(T,str,i, len)
-    R = Some{T}
-    i > len && @goto error
-    @inbounds c,ii = iterate(str,i)
-    '0' <= c <= '9' || @goto error
-    return R(convert(T, c-'0')), ii
+@inline _isdigit(c::Char) = isdigit(c)
 
-    @label error
-    return nothing, i
+@inline function parse_uint_and_stop(str, i, len, n::T) where {T <: Integer}
+    ten = T(10)
+    # specialize handling of the first digit so we can return an error
+    max_without_overflow = div(typemax(T)-9,10) # the larg
+    y1 = iterate(str, i)
+    y1===nothing && return n, false, i
+    c = y1[1]
+    if _isdigit(c) && n <= max_without_overflow
+        n *= ten
+        n += T(c-'0')
+    else
+        return n, false, i
+    end
+    i = y1[2]
+
+    y2 = iterate(str, i)
+    while y2!==nothing && n <= max_without_overflow
+        c = y2[1]
+        if _isdigit(c)
+            n *= ten
+            n += T(c-'0')
+        else
+            return n, true, i
+        end
+        i = y2[2]
+
+        y2 = iterate(str, i)
+    end
+    return n, true, i
 end
 
-@inline function tryparsenext_base10(T, str,i,len)
-    R = Some{T}
-    @chk2 r, i = tryparsenext_base10_digit(T,str,i, len)
-    ten = T(10)
-    while true
-        @chk2 d, i = tryparsenext_base10_digit(T,str,i,len) done
-        r = r*ten + d
+# slurp up extra digits
+@inline function read_digits(str, i, len)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]
+        if !_isdigit(c) # do nothing
+            return i
+        end
+        i = y[2]
+        y = iterate(str, i)
     end
-    @label done
-    return R(convert(T, r)), i
+    return i
+end
+
+@inline function tryparsenext_base10_digit(T,str,i, len)
+    y = iterate(str,i)
+    y===nothing && @goto error
+    c = y[1]; ii = y[2]
+    '0' <= c <= '9' || @goto error
+    return convert(T, c-'0'), ii
 
     @label error
-    return nothing, i
+    return nothing
+end
+
+Base.@pure maxdigits(::Type{T}) where {T} = ndigits(typemax(T))
+Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, 10^(ndigits(typemax(T))-1))
+
+@inline function tryparsenext_base10(T, str,i,len)
+    i0 = i
+    R = Nullable{T}
+    y = tryparsenext_base10_digit(T,str,i, len)
+    y===nothing && return R(), i
+    r = y[1]; i = y[2]
+
+    # Eat zeros
+    while r==0
+        y2 = tryparsenext_base10_digit(T,str,i, len)
+        y2 === nothing && return R(convert(T, 0)), i
+        r = y2[1]; i = y2[2]
+    end
+   
+    digits = 1
+    ten = T(10)
+    while true
+        y2 = tryparsenext_base10_digit(T,str,i,len)
+        y2===nothing && break
+        digits += 1
+        d = y2[1]; i = y2[2]
+        r = r*ten + d
+    end
+
+    max_digits = maxdigits(T)
+
+    # Checking for overflow
+    if digits > max_digits
+        # More digits than the max value we can hold, this is certainly
+        # an overflow
+        return R(), i0
+    elseif digits == max_digits && r < min_with_max_digits(T)
+        # Same digits as the max digits we can hold. If the number we computed
+        # is now smaller than the smallest number with the same number of
+        # digits as the typemax number, we must have overflown, so we
+        # again return a parsing failure
+        return R(), i0
+    end
+
+    return R(convert(T, r)), i
 end
 
 @inline function tryparsenext_sign(str, i, len)
-    R = Some{Int}
-    i > len && return nothing, i
-    c, ii = iterate(str, i)
-    if c == '-'
-        return R(-1), ii
-    elseif c == '+'
-        return R(1), ii
+    R = Nullable{Int}
+
+    y = iterate(str, i)
+    if y===nothing
+        return return R(), i
     else
-        return (R(1), i)
+        c = y[1]; ii = y[2]
+        if c == '-'
+            return R(-1), ii
+        elseif c == '+'
+            return R(1), ii
+        else
+            return R(1), i
+        end
     end
 end
 
@@ -82,13 +164,15 @@ end
 end
 
 @inline function eatwhitespaces(str, i=1, l=lastindex(str))
-    while i <= l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         if isspace(c)
             i=ii
         else
             break
         end
+        y = iterate(str, i)
     end
     return i
 end
@@ -96,12 +180,15 @@ end
 
 function eatnewlines(str, i=1, l=lastindex(str))
     count = 0
-    while i<=l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         if c == '\r'
             i=ii
-            if i <= l
-                @inbounds c, ii = iterate(str, i)
+            y2 = iterate(str, i)
+            if y2!==nothing
+                c = y2[1]
+                ii = y2[2]
                 if c == '\n'
                     i=ii
                 end
@@ -109,8 +196,10 @@ function eatnewlines(str, i=1, l=lastindex(str))
             count += 1
         elseif c == '\n'
             i=ii
-            if i <= l
-                @inbounds c, ii = iterate(str, i)
+            y3 = iterate(str, i)
+            if y3!==nothing
+                c = y3[1]
+                ii = y3[2]
                 if c == '\r'
                     i=ii
                 end
@@ -119,6 +208,7 @@ function eatnewlines(str, i=1, l=lastindex(str))
         else
             break
         end
+        y = iterate(str, i)
     end
 
     return i, count
@@ -145,19 +235,88 @@ function stripquotes(x)
 end
 
 function getlineend(str, i=1, l=lastindex(str))
-    while i<=l
-        c, ii = iterate(str, i)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; ii = y[2]
         isnewline(c) && break
         i = ii
+        y = iterate(str, i)
     end
 
-    return i-1
+    return prevind(str, i)
+end
+
+# This is similar to getlineend, but ignores line ends inside
+# quotes
+function getrowend(str, i, len, opts, delim)
+    i0 = i
+    i = eatwhitespaces(str, i, len)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; i = y[2]
+        if c==Char(opts.quotechar)
+            # We are now inside a quoted field
+            y2 = iterate(str, i)
+            while y2!==nothing
+                c = y2[1]; i = y2[2]
+                if c==Char(opts.escapechar)
+                    y3 = iterate(str, i)
+                    if y3===nothing
+                        if c==Char(opts.quotechar)
+                            return prevind(str, i)
+                        else
+                            error("Parsing error, quoted string never terminated.")
+                        end
+                    else
+                        c2 = y3[1]; ii = y3[2]
+                        if c2==Char(opts.quotechar)
+                            i = ii
+                        elseif c==Char(opts.quotechar)
+                            break
+                        end
+                    end
+                elseif c==Char(opts.quotechar)
+                    break;
+                end
+                y2 = iterate(str, i)
+                if y2===nothing
+                    error("Parsing error, quoted string never terminated.")
+                end
+            end
+            i = eatwhitespaces(str, i, len)
+            y4 = iterate(str, i)
+            if y4!==nothing
+                c = y4[1]; i4 = y4[2]
+                if isnewline(c)
+                    return prevind(str, i)
+                elseif c!=Char(delim)
+                    error("Invalid line")
+                end
+            else
+                return prevind(str, i)
+            end
+        else
+            # We are now inside a non quoted field
+            while y!==nothing
+                c = y[1]; i = y[2]
+                if c==Char(delim)
+                    i = eatwhitespaces(str, i)
+                    break
+                elseif isnewline(c)
+                    return prevind(str, i, 2)
+                end
+                y = iterate(str, i)
+            end
+        end
+        y = iterate(str, i)
+    end
+    return prevind(str, i)
 end
 
 ### Testing helpers
 
-unwrap(xs) = (something(xs[1]), xs[2:end]...)
-failedat(xs) = (@assert xs[1] === nothing; xs[2])
+unwrap(xs) = (get(xs[1]), xs[2:end]...)
+failedat(xs) = (@assert isnull(xs[1]); xs[2])
 
 # String speedup hacks
 
@@ -187,10 +346,12 @@ function getlineat(str, i)
         ii = prevind(str, line_start)
     end
 
+    # TODO Handle nothing case
     c, ii = iterate(str, line_start)
     line_end = line_start
     while !isnewline(c) && ii <= l
         line_end = ii
+        # TODO Handle nothing case
         c, ii = iterate(str, ii)
     end
 
