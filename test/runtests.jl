@@ -111,7 +111,12 @@ end
     @test tryparsenext(fromtype(Int64), "9223372036854775807", 1, 19) |> unwrap == (9223372036854775807, 20)
     @test tryparsenext(fromtype(Int64), "9223372036854775808", 1, 19) |> failedat == 1
     @test tryparsenext(fromtype(Int64), "19223372036854775808", 1, 20) |> failedat == 1
-
+    @test tryparsenext(fromtype(UInt64), "18446744073709551615", 1, 20) |> unwrap == (0xffffffffffffffff, 21)
+    @test tryparsenext(fromtype(UInt64), "18446744073709551616", 1, 20) |> failedat == 1
+    @test tryparsenext(fromtype(Int128), "170141183460469231731687303715884105727", 1, 39) |> unwrap == (170141183460469231731687303715884105727, 40)
+    @test tryparsenext(fromtype(Int128), "170141183460469231731687303715884105728", 1, 39) |> failedat == 1
+    @test tryparsenext(fromtype(UInt128), "340282366920938463463374607431768211455", 1, 39) |> unwrap == (0xffffffffffffffffffffffffffffffff, 40)
+    @test tryparsenext(fromtype(UInt128), "340282366920938463463374607431768211456", 1, 39) |> failedat == 1
 end
 
 import TextParse: StringToken
