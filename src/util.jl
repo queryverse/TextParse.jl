@@ -214,6 +214,23 @@ function eatnewlines(str, i=1, l=lastindex(str))
     return i, count
 end
 
+# Move past consecutive lines that start with commentchar.
+# Return a tuple of the new pos in str and the amount of comment lines moved past.
+function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, Nothing}=nothing) 
+    commentchar === nothing && return i, 0
+
+    count = 0
+    while i <= l && str[i] == commentchar
+        i = getlineend(str, i)
+        y = iterate(str, i)
+        y === nothing && return i, count
+        i = y[2]
+        i, lines = eatnewlines(str, i)
+        count += lines
+    end
+    return i, count
+end
+
 function stripquotes(x)
     x[1] in ('\'', '"') && x[1] == x[end] ?
         strip(x, x[1]) : x
