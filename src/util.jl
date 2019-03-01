@@ -222,7 +222,9 @@ function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, No
     count = 0
     while i <= l && str[i] == commentchar
         i = getlineend(str, i)
-        _, i = iterate(str, i)
+        y = iterate(str, i)
+        y === nothing && return i, count
+        i = y[2]
         i, lines = eatnewlines(str, i)
         count += lines
     end
