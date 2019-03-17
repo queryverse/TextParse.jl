@@ -93,7 +93,7 @@ end
 end
 
 Base.@pure maxdigits(::Type{T}) where {T} = ndigits(typemax(T))
-Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, 10^(ndigits(typemax(T))-1))
+Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, T(10)^(maxdigits(T)-1))
 
 @inline function tryparsenext_base10(T, str,i,len)
     i0 = i
@@ -108,7 +108,7 @@ Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, 10^(ndigits(typ
         y2 === nothing && return R(convert(T, 0)), i
         r = y2[1]; i = y2[2]
     end
-   
+
     digits = 1
     ten = T(10)
     while true
@@ -211,6 +211,23 @@ function eatnewlines(str, i=1, l=lastindex(str))
         y = iterate(str, i)
     end
 
+    return i, count
+end
+
+# Move past consecutive lines that start with commentchar.
+# Return a tuple of the new pos in str and the amount of comment lines moved past.
+function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, Nothing}=nothing) 
+    commentchar === nothing && return i, 0
+
+    count = 0
+    while i <= l && str[i] == commentchar
+        i = getlineend(str, i)
+        y = iterate(str, i)
+        y === nothing && return i, count
+        i = y[2]
+        i, lines = eatnewlines(str, i)
+        count += lines
+    end
     return i, count
 end
 

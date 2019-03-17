@@ -66,6 +66,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `spacedelim`: (Bool) parse space-delimited files. `delim` has no effect if true.
 - `quotechar`: character used to quote strings, defaults to `"`
 - `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
+- `commentchar`: ignore lines that begin with commentchar
 - `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
 - `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
@@ -157,6 +158,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  spacedelim=false,
                  quotechar='"',
                  escapechar='"',
+                 commentchar=nothing,
                  stringtype=String,
                  stringarraytype=StringArray,
                  noresize=false,
@@ -206,6 +208,11 @@ function _csvread_internal(str::AbstractString, delim=',';
         pos, lines = eatnewlines(str, pos)
         lineno += lines
     end
+
+    # Ignore commented lines before the header.
+    pos, lines = eatcommentlines(str, pos, len, commentchar)
+    lineno += lines
+
     if header_exists
         merged_colnames, pos = readcolnames(str, opts, pos, colnames)
         lineno += 1
@@ -235,8 +242,8 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     # seed guesses using those from previous file
     guess, pos1 = guesscolparsers(str, canonnames, opts,
-                                  pos, type_detect_rows, colparsers,
-                                  stringarraytype, nastrings, prev_parsers)
+                                  pos, type_detect_rows, colparsers, stringarraytype, 
+                                  commentchar, nastrings, prev_parsers)
     if isempty(canonnames)
         canonnames = Any[1:length(guess);]
     end
@@ -319,7 +326,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     @label retry
     try
         finalrows = parsefill!(str, opts, rec, nrows, cols, colspool,
-                               pos, lineno, rowno, lastindex(str))
+                               pos, lineno, rowno, lastindex(str), commentchar)
         if !noresize
             resizecols(colspool, finalrows)
         end
@@ -470,9 +477,8 @@ function readcolnames(str, opts, pos, colnames)
     colnames_inferred, lineend+1
 end
 
-
 function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, colparsers, stringarraytype, nastrings=NA_STRINGS, prevs=nothing)
+                       nrows::Int, colparsers, stringarraytype, commentchar=nothing, nastrings=NA_STRINGS, prevs=nothing)
     # Field type guesses
     guess = []
     prevfields = String[]
@@ -480,9 +486,10 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
     givenkeys = !isempty(colparsers) ? first.(collect(optionsiter(colparsers, header))) : []
     for i2=1:nrows
         pos, _ = eatnewlines(str, pos)
-        if pos > lastindex(str)
-            break
-        end
+
+        # Move past commented lines before guessing.
+        pos, _ = eatcommentlines(str, pos, lastindex(str), commentchar)
+        pos > lastindex(str) && break
 
         lineend = getrowend(str, pos, lastindex(str), opts, opts.endchar)
 
@@ -532,12 +539,19 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 end
 
 function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspool,
-                    pos, lineno, rowno, l=lastindex(str)) where {N}
+                    pos, lineno, rowno, l=lastindex(str), commentchar=nothing) where {N}
     pos, lines = eatnewlines(str, pos, l)
     lineno += lines
+
     pos <= l && while true
         prev_j = pos
         lineno += lines
+
+        # Do not try to parse commented lines.
+        pos, lines = eatcommentlines(str, pos, l, commentchar)
+        lineno += lines
+        pos > l && return rowno-1
+
         res = tryparsesetindex(rec, str, pos, l, cols, rowno, opts)
         if !issuccess(res)
             pos, fieldpos, colno, err_code = geterror(res)
@@ -553,6 +567,7 @@ function parsefill!(str::AbstractString, opts, rec::RecN{N}, nrecs, cols, colspo
         if pos > l
             return rowno
         end
+
         rowno += 1
         lineno += 1
         if rowno > nrecs

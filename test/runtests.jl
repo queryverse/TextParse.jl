@@ -111,7 +111,12 @@ end
     @test tryparsenext(fromtype(Int64), "9223372036854775807", 1, 19) |> unwrap == (9223372036854775807, 20)
     @test tryparsenext(fromtype(Int64), "9223372036854775808", 1, 19) |> failedat == 1
     @test tryparsenext(fromtype(Int64), "19223372036854775808", 1, 20) |> failedat == 1
-
+    @test tryparsenext(fromtype(UInt64), "18446744073709551615", 1, 20) |> unwrap == (0xffffffffffffffff, 21)
+    @test tryparsenext(fromtype(UInt64), "18446744073709551616", 1, 20) |> failedat == 1
+    @test tryparsenext(fromtype(Int128), "170141183460469231731687303715884105727", 1, 39) |> unwrap == (170141183460469231731687303715884105727, 40)
+    @test tryparsenext(fromtype(Int128), "170141183460469231731687303715884105728", 1, 39) |> failedat == 1
+    @test tryparsenext(fromtype(UInt128), "340282366920938463463374607431768211455", 1, 39) |> unwrap == (0xffffffffffffffffffffffffffffffff, 40)
+    @test tryparsenext(fromtype(UInt128), "340282366920938463463374607431768211456", 1, 39) |> failedat == 1
 end
 
 import TextParse: StringToken
@@ -552,6 +557,86 @@ import TextParse: _csvread
 
     @test _csvread("""x""y"", z
                    a""b"", 1""", stringarraytype=Array) == ((["a\"\"b\"\""], [1]), ["x\"\"y\"\"", "z"])
+end
+
+import TextParse: _csvread
+@testset "commentchar" begin
+
+    # First line a comment.
+    str1 = """
+    x,y,z
+    #1,1,1
+    2,2,2
+    """
+
+    @test _csvread(str1, commentchar='#') == (([2], [2], [2]), String["x", "y","z"])
+
+    # Last line a comment.
+    str2 = """
+    x,y,z
+    1,1,1
+    #2,2,2
+    """
+
+    @test _csvread(str2, commentchar='#') == (([1], [1], [1]), String["x", "y","z"])
+
+    # Multiple comments.
+    str3 = """
+    x,y,z
+    1,1,1
+    #2,2,2
+    #3,3,3
+    #4,4,4
+    5,5,5
+    #6,6,6
+    """
+
+    @test _csvread(str3, commentchar='#') == (([1, 5], [1, 5], [1, 5]), String["x", "y","z"])
+
+    # Comments before headers.
+    str4 = """
+    #foo
+    #bar
+    x,y,z
+    1,1,1
+    #2,2,2
+    """
+
+    @test _csvread(str4, commentchar='#') == (([1], [1], [1]), String["x", "y","z"])
+
+    # No comments.
+    str5 = """
+    x,y,z
+    1,1,1
+    2,2,2
+    """
+
+    @test _csvread(str5, commentchar='#') == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
+
+    # Non-default comment.
+    str6 = """
+    %test
+    x,y,z
+    1,1,1
+    %2,2,2
+    2,2,2
+    """
+
+    @test _csvread(str6, commentchar='%') == (([1, 2], [1, 2], [1, 2]), String["x", "y","z"])
+
+    # Do not skip commented lines (commentchar=nothing).
+    str7 = """
+    x,y,z
+    1,1,1
+    #2,2,2
+    """
+
+    # Since we are not skipping commented lines the '#' character is considered 
+    # data. This will force parsing to treat columns with '#'s as String columns.
+    # Here, we verify this behavior.
+    result = _csvread(str7)
+    @test eltype(result[1][1]) == String
+    @test result == ((["1", "#2"], [1, 2], [1, 2]), String["x", "y","z"])
 end
 
 @testset "skiplines_begin" begin
