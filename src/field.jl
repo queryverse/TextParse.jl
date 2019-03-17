@@ -295,6 +295,7 @@ show(io::IO, c::StringToken) = print(io, "<string>")
 fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
 function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
+    inside_quoted_strong = Char(opts.endchar) == Char(opts.quotechar)
     escapecount = 0
     R = Nullable{T}
     p = ' '
@@ -314,14 +315,14 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     while y2!==nothing
         c = y2[1]; ii = y2[2]
 
-        if p==Char(opts.escapechar)
+        if inside_quoted_strong && p==Char(opts.escapechar)
             escapecount += 1
         end
 
         if opts.spacedelim && (c == ' ' || c == '\t')
             break
         elseif !opts.spacedelim && c == Char(opts.endchar)
-            if Char(opts.endchar) == Char(opts.quotechar)
+            if inside_quoted_strong
                 # this means we're inside a quoted string
                 if Char(opts.quotechar) == Char(opts.escapechar)
                     # sometimes the quotechar is the escapechar
