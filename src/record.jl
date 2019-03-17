@@ -96,7 +96,7 @@ end
 end
 
 @inline Base.@propagate_inbounds function setcell!(col::StringVector, i, val::StrRange, str)
-    val.escapecount>0 && error("Not yet implemented")
+    val.escapecount>0 && @debug("Not yet implemented")
     col[i] = WeakRefString(pointer(str, val.offset + 1), val.length)
     PARSE_SUCCESS
 end
