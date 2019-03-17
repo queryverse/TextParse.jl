@@ -365,23 +365,23 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
     end
 
-    return R(_substring(T, str, i0, i-1, escapecount, opts.escapechar, opts.quotechar, opts.includequotes)), i
+    return R(_substring(T, str, i0, i-1, escapecount, opts)), i
 end
 
-@inline function _substring(::Type{String}, str, i, j, escapecount, escapechar, quotechar, includequotes)
+@inline function _substring(::Type{String}, str, i, j, escapecount, opts)
     if escapecount > 0
         buf = IOBuffer(sizehint=j-i+1-escapecount)
         cur_i = i
         c = str[cur_i]
-        if includequotes && c==Char(quotechar)
+        if opts.includequotes && c==Char(opts.quotechar)
             print(buf, c)
             cur_i = nextind(str, cur_i)
         end
         while cur_i <= j
             c = str[cur_i]
-            if c == Char(escapechar)
+            if c == Char(opts.escapechar)
                 next_i = nextind(str, cur_i)
-                if next_i <= j && str[next_i] == Char(quotechar)
+                if next_i <= j && str[next_i] == Char(opts.quotechar)
                     print(buf, str[next_i])
                     cur_i = next_i
                 else
@@ -398,7 +398,7 @@ end
     end
 end
 
-@inline function _substring(::Type{T}, str, i, j, escapecount, escapechar, quotechar, includequotes) where {T<:SubString}
+@inline function _substring(::Type{T}, str, i, j, escapecount, opts) where {T<:SubString}
     escapecount > 0 && error("Not yet handled.")
     T(str, i, thisind(j))
 end
@@ -409,11 +409,11 @@ fromtype(::Type{StrRange}) = StringToken(StrRange)
     unsafe_string(pointer(str, 1 + r.offset), r.length)
 end
 
-@inline function _substring(::Type{StrRange}, str, i, j, escapecount, escapechar, quotechar, includequotes)
+@inline function _substring(::Type{StrRange}, str, i, j, escapecount, opts)
     StrRange(i - 1, j - i + 1, escapecount)
 end
 
-@inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, escapechar, quotechar, includequotes)
+@inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, opts)
     escapecount > 0 && error("Not yet handled.")
     WeakRefString(convert(Ptr{UInt8}, pointer(str, i)), j - i + 1)
 end
