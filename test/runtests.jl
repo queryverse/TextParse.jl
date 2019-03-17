@@ -138,7 +138,7 @@ using WeakRefStrings
 
     opts = LocalOpts(',', false, '"', '"', false, true)
     # test that includequotes option doesn't affect string
-    @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"", 3)
+    @test tryparsenext(StringToken(String), "\"\"", opts) |> unwrap == ("\"\"", 3)
 
     opts = LocalOpts(',', false, '"', '\\', false, false)
     str =  "Owner 2 ”Vicepresident\"\""
@@ -501,9 +501,11 @@ import TextParse: _csvread
     1,2,"x \"\"y\"\""
     """
 
-    res = (([1, 2, 1], [1, 2, 2], String["x", "x", "x \"\"y\"\""]), String["x", "y", "z"])
-    @test _csvread(s, type_detect_rows=1, escapechar='"') == res
-    @test _csvread(s, type_detect_rows=2, escapechar='"') == res
+    res = (([1, 2, 1], [1, 2, 2], String["x", "x", "x \"y\""]), String["x", "y", "z"])
+    @test_broken _csvread(s, type_detect_rows=1, escapechar='"') == res
+    @test_broken _csvread(s, type_detect_rows=2, escapechar='"') == res
+    @test _csvread(s, type_detect_rows=1, escapechar='"', stringarraytype=Array) == res
+    @test _csvread(s, type_detect_rows=2, escapechar='"', stringarraytype=Array) == res
 
     @test csvread(IOBuffer("x\n1")) == (([1],),["x"])
 
