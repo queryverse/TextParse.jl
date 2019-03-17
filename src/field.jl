@@ -314,7 +314,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     while y2!==nothing
         c = y2[1]; ii = y2[2]
 
-        if p==opts.escapechar
+        if p==Char(opts.escapechar)
             escapecount += 1
         end
 
@@ -372,15 +372,15 @@ end
         buf = IOBuffer(sizehint=j-i+1-escapecount)
         cur_i = i
         c = str[cur_i]
-        if includequotes && c==quotechar
+        if includequotes && c==Char(quotechar)
             print(buf, c)
             cur_i = nextind(str, cur_i)
         end
         while cur_i <= j
             c = str[cur_i]
-            if c == escapechar
+            if c == Char(escapechar)
                 next_i = nextind(str, cur_i)
-                if next_i <= j && str[next_i] == quotechar
+                if next_i <= j && str[next_i] == Char(quotechar)
                     print(buf, str[next_i])
                     cur_i = next_i
                 else
