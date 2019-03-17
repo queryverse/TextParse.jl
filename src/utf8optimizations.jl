@@ -318,3 +318,41 @@ function tryparsenext(q::Quoted{T,S,<:UInt8,<:UInt8}, str::Union{VectorBackedUTF
     @label error
     return Nullable{T}(), i
 end
+
+@inline function _substring(::Type{String}, str::Union{VectorBackedUTF8String, String}, i, j, escapecount, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8})
+    if escapecount > 0
+        buffer = Vector{UInt8}(undef, j-i+1-escapecount)
+        cur_i = i
+        cur_buffer_i = 1
+        @inbounds c = codeunit(str, cur_i)
+        if opts.includequotes && c==opts.quotechar
+            @inbounds buffer[cur_buffer_i] = c
+            cur_i += 1
+            cur_buffer_i += 1
+        end
+        while cur_i <= j
+            @inbounds c = codeunit(str, cur_i)
+            if c == opts.escapechar
+                next_i = cur_i + 1
+                if next_i <= j
+                    @inbounds next_c = codeunit(str, next_i)
+                    if next_c == opts.quotechar
+                        @inbounds buffer[cur_buffer_i] = next_c
+                        cur_buffer_i += 1
+                        cur_i = next_i
+                    end
+                else
+                    @inbounds buffer[cur_buffer_i] = c
+                    cur_buffer_i += 1
+                end
+            else
+                @inbounds buffer[cur_buffer_i] = c
+                cur_buffer_i += 1
+            end
+            cur_i += 1
+        end
+        return String(buffer)
+    else
+        return unsafe_string(pointer(str, i), j-i+1)
+    end
+end
