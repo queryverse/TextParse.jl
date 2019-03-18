@@ -741,3 +741,22 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     return R(convert(T, res)), i
 end
 
+struct BooleanToken{T} <: AbstractToken{T}
+end
+
+function BooleanToken(t::Type{T}) where T
+    BooleanToken{T}()
+end
+
+fromtype(::Type{Bool}) = BooleanToken(Bool)
+
+function tryparsenext(::BooleanToken{Bool}, str, i, len, opts)
+    value, ii = tryparsenext(StringToken(String), str, i, len, opts)
+    if value.value in ("true", "True")
+        return Nullable{Bool}(true), ii
+    elseif value.value in ("false", "False")
+        return Nullable{Bool}(false), ii
+    else
+        return Nullable{Bool}(), ii
+    end
+end

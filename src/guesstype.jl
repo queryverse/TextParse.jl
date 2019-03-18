@@ -17,7 +17,11 @@ const common_datetime_formats = Any[
     dateformat"yyyymmdd HH:MM:SS.s"
 ]
 
-const DEFAULT_QUOTES = ('"', ''')
+const default_true_strings = String["true", "True", "T"]
+
+const default_false_strings = String["false", "False", "F"]
+
+const DEFAULT_QUOTES = ('"', '\'')
 
 function guessdateformat(str)
 
@@ -110,6 +114,8 @@ function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_S
                 # something like a date turned into a single number?
                 return StringToken(stringarraytype<:StringArray ? StrRange : String)
             end
+        elseif x in default_true_strings || x in default_false_strings
+            return BooleanToken(Bool)
         else
             # fast-path
             if length(filter(isnumeric, x)) < 4
