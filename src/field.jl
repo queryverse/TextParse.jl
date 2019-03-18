@@ -12,7 +12,7 @@ fieldtype(::Type{T}) where {T<:AbstractToken} = fieldtype(supertype(T))
 
 Parses the string `str` starting at position `i` and ending at or before position `till`. `localopts` is a [LocalOpts](@ref) object which contains contextual options for quoting and NA parsing. (see [LocalOpts](@ref) documentation)
 
-`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Union{Some{T}, Nothing}`, nothing if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
+`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Nullable{T}`, `Nullable{T}()` if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
 """
 function tryparsenext end
 
@@ -91,7 +91,7 @@ The parser function must take the following arguments:
 
 The parser function must return a tuple of two values:
 
-- `result`: A `Union{Some{T}, Nothing}`. Set to nothing if parsing must fail, containing the value otherwise.
+- `result`: A `Nullable{T}`. Set to `Nothing{T}()` if parsing must fail, containing the value otherwise.
 - `nextpos`: If parsing succeeded this must be the next position after parsing finished, if it failed this must be the position at which parsing failed.
 """
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
