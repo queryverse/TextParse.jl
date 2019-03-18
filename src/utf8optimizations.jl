@@ -318,3 +318,115 @@ function tryparsenext(q::Quoted{T,S,<:UInt8,<:UInt8}, str::Union{VectorBackedUTF
     @label error
     return Nullable{T}(), i
 end
+
+@inline function isnewline(b::UInt8)
+    b == UInt8(10) || b == UInt8(13)
+end
+
+function tryparsenext(s::StringToken{T}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8}) where {T}
+    len = ncodeunits(str)
+    inside_quoted_strong = opts.endchar == opts.quotechar
+    escapecount = 0
+    R = Nullable{T}
+    p = UInt8(0)
+    i0 = i
+    if opts.includequotes
+        if i<=len
+            @inbounds b = codeunit(str, i)
+            if b==opts.quotechar
+                # advance counter so that
+                # the while loop doesn't react to opening quote
+                i += 1
+            end
+        end
+    end
+
+    while i<=len
+        @inbounds b = codeunit(str, i)
+        ii = i + 1
+
+        if inside_quoted_strong && p==opts.escapechar
+            escapecount += 1
+        end
+
+        if opts.spacedelim && (b == UInt8(32) || b == UInt8(9)) # 32 = ' ' and 9 = '\t'
+            break
+        elseif !opts.spacedelim && b == opts.endchar
+            if inside_quoted_strong
+                # this means we're inside a quoted string
+                if opts.quotechar == opts.escapechar
+                    # sometimes the quotechar is the escapechar
+                    # in that case we need to see the next char
+                    if ii > len
+                        if opts.includequotes
+                            i=ii
+                        end
+                        break
+                    else
+                        @inbounds next_b = codeunit(str, ii)
+                        if next_b == opts.quotechar
+                            # the current character is escaping the
+                            # next one
+                            i = ii + 1 # skip next char as well
+                            p = next_b
+                            continue
+                        end
+                    end
+                elseif p == opts.escapechar
+                    # previous char escaped this one
+                    i = ii
+                    p = b
+                    continue
+                end
+            end
+            if opts.includequotes
+                i = ii
+            end
+            break
+        elseif (!opts.includenewlines && isnewline(b))
+            break
+        end
+        i = ii
+        p = b
+    end
+
+    return R(_substring(T, str, i0, i-1, escapecount, opts)), i
+end
+
+@inline function _substring(::Type{String}, str::Union{VectorBackedUTF8String, String}, i, j, escapecount, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8})
+    if escapecount > 0
+        buffer = Vector{UInt8}(undef, j-i+1-escapecount)
+        cur_i = i
+        cur_buffer_i = 1
+        @inbounds c = codeunit(str, cur_i)
+        if opts.includequotes && c==opts.quotechar
+            @inbounds buffer[cur_buffer_i] = c
+            cur_i += 1
+            cur_buffer_i += 1
+        end
+        while cur_i <= j
+            @inbounds c = codeunit(str, cur_i)
+            if c == opts.escapechar
+                next_i = cur_i + 1
+                if next_i <= j
+                    @inbounds next_c = codeunit(str, next_i)
+                    if next_c == opts.quotechar
+                        @inbounds buffer[cur_buffer_i] = next_c
+                        cur_buffer_i += 1
+                        cur_i = next_i
+                    end
+                else
+                    @inbounds buffer[cur_buffer_i] = c
+                    cur_buffer_i += 1
+                end
+            else
+                @inbounds buffer[cur_buffer_i] = c
+                cur_buffer_i += 1
+            end
+            cur_i += 1
+        end
+        return String(buffer)
+    else
+        return unsafe_string(pointer(str, i), j-i+1)
+    end
+end

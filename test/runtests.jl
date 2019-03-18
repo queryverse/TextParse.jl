@@ -147,10 +147,10 @@ using WeakRefStrings
 
     opts = LocalOpts(',', false, '"', '\\', false, false)
     str =  "Owner 2 ”Vicepresident\"\""
-    @test tryparsenext(Quoted(String, '"', '\\'), str) |> unwrap == (str, lastindex(str)+1)
+    @test tryparsenext(Quoted(String, '"', '\\'), str, opts) |> unwrap == (str, lastindex(str)+1)
     str1 =  "\"Owner 2 ”Vicepresident\"\"\""
-    @test tryparsenext(Quoted(String,'"', '"'), str1) |> unwrap == (str, lastindex(str1)+1)
-    @test tryparsenext(Quoted(String,'"', '\\'), "\"\tx\"") |> unwrap == ("\tx", 5)
+    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("Owner 2 ”Vicepresident\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(String, '"', '"'), "\"\tx\"") |> unwrap == ("\tx", 5)
     opts = LocalOpts(',', true, '"', '\\', false, false)
     @test tryparsenext(StringToken(String), "x y",1,3, opts) |> unwrap == ("x", 2)
 
@@ -167,12 +167,12 @@ import TextParse: Quoted, NAToken, Unknown
     @test tryparsenext(Quoted(String, '"', '"'), "\"x\"") |> unwrap == ("x", 4)
     @test tryparsenext(Quoted(String, '"', '"', includequotes=true), "\"x\"") |> unwrap == ("\"x\"", 4)
     str2 =  "\"\"\"\""
-    @test tryparsenext(Quoted(String, '"', '"'), str2, opts) |> unwrap == ("\"\"", lastindex(str2)+1)
+    @test tryparsenext(Quoted(String, '"', '"'), str2, opts) |> unwrap == ("\"", lastindex(str2)+1)
     str1 =  "\"x”y\"\"\""
     @test tryparsenext(Quoted(StringToken(String), '"', '"', required=true), "x\"y\"") |> failedat == 1
 
-    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("x”y\"\"", lastindex(str1)+1)
-    @test tryparsenext(Quoted(StringToken(String), '"', '\\'), "\"x\\\"yz\"") |> unwrap == ("x\\\"yz", 8)
+    @test tryparsenext(Quoted(String, '"', '"'), str1) |> unwrap == ("x”y\"", lastindex(str1)+1)
+    @test tryparsenext(Quoted(StringToken(String), '"', '\\'), "\"x\\\"yz\"") |> unwrap == ("x\"yz", 8)
     @test tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "1") |> unwrap == (1,2)
 
     t = tryparsenext(Quoted(NAToken(fromtype(Int)), '"', '"'), "") |> unwrap
@@ -307,12 +307,12 @@ import TextParse: quotedsplit
     @test quotedsplit("\"x\", \"y\"", opts,false, 1, 8) == ["x", "y"]
     @test quotedsplit("\"x\", \"y\"", opts,true, 1, 8) == ["\"x\"", "\"y\""]
     str = """x\nx,"s,", "\\",x" """
-    @test quotedsplit(str, opts, false, 3, length(str)) == ["x", "s,", "\\\",x"]
+    @test quotedsplit(str, opts, false, 3, length(str)) == ["x", "s,", "\",x"]
     @test quotedsplit(",", opts, true, 1, 1) == ["", ""]
     @test quotedsplit(", ", opts, false, 1, 2) == ["", ""]
     str = "1, \"x \"\"y\"\" z\", 1"
     qopts = LocalOpts(',', false,'"', '"', false, false)
-    @test quotedsplit(str, qopts,true, 1, lastindex(str)) == ["1", "\"x \"\"y\"\" z\"", "1"]
+    @test quotedsplit(str, qopts,true, 1, lastindex(str)) == ["1", "\"x \"y\" z\"", "1"]
 end
 
 import TextParse: LocalOpts, readcolnames
@@ -399,7 +399,7 @@ import TextParse: guesscolparsers
     """
     opts = LocalOpts(',', false, '"', '\\', false, false)
     _, pos = readcolnames(str1, opts, 1, String[])
-    testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers)
+    testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers, StringArray)
     @test testtill(0) |> first == Any[]
     @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
     @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
@@ -506,9 +506,11 @@ import TextParse: _csvread
     1,2,"x \"\"y\"\""
     """
 
-    res = (([1, 2, 1], [1, 2, 2], String["x", "x", "x \"\"y\"\""]), String["x", "y", "z"])
-    @test _csvread(s, type_detect_rows=1, escapechar='"') == res
-    @test _csvread(s, type_detect_rows=2, escapechar='"') == res
+    res = (([1, 2, 1], [1, 2, 2], String["x", "x", "x \"y\""]), String["x", "y", "z"])
+    @test_broken _csvread(s, type_detect_rows=1, escapechar='"') == res
+    @test_broken _csvread(s, type_detect_rows=2, escapechar='"') == res
+    @test _csvread(s, type_detect_rows=1, escapechar='"', stringarraytype=Array) == res
+    @test _csvread(s, type_detect_rows=2, escapechar='"', stringarraytype=Array) == res
 
     @test csvread(IOBuffer("x\n1")) == (([1],),["x"])
 
@@ -554,7 +556,7 @@ import TextParse: _csvread
     @test _csvread("") == ((), String[])
 
     @test _csvread("""x""y"", z
-                   a""b"", 1""") == ((["a\"\"b\"\""], [1]), ["x\"\"y\"\"", "z"])
+                   a""b"", 1""", stringarraytype=Array) == ((["a\"\"b\"\""], [1]), ["x\"\"y\"\"", "z"])
 end
 
 import TextParse: _csvread

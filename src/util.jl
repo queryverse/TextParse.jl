@@ -333,6 +333,7 @@ failedat(xs) = (@assert isnull(xs[1]); xs[2])
 struct StrRange
     offset::Int
     length::Int
+    escapecount::Int
 end
 
 function getlineat(str, i)

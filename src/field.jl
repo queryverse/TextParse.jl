@@ -146,10 +146,10 @@ const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
     f = Float64(f1)
     r = f1 - Int64(f) # get the remainder
     x = Double64(f) + Double64(r)
-  
+
     maxexp = 308
     minexp = -256
-  
+
     if exp >= 0
         x *= pre_comp_exp_double[exp+1]
     else
@@ -211,7 +211,7 @@ end
     y3 = iterate(str, i)
     if y3!==nothing && _is_e(str, i)
         i = y3[2]
-    
+
         y4 = iterate(str, i)
         if y4!==nothing
             enegate = false
@@ -266,7 +266,7 @@ function tryparsenext(::Percentage, str, i, len, opts)
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
         y = iterate(str, ii)
-        if y===nothing 
+        if y===nothing
             return Nullable{Float64}(), ii # failed to parse %
         else
             c = y[1]; k = y[2]
@@ -295,6 +295,8 @@ show(io::IO, c::StringToken) = print(io, "<string>")
 fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
 function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
+    inside_quoted_strong = Char(opts.endchar) == Char(opts.quotechar)
+    escapecount = 0
     R = Nullable{T}
     p = ' '
     i0 = i
@@ -312,10 +314,15 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     y2 = iterate(str, i)
     while y2!==nothing
         c = y2[1]; ii = y2[2]
+
+        if inside_quoted_strong && p==Char(opts.escapechar)
+            escapecount += 1
+        end
+
         if opts.spacedelim && (c == ' ' || c == '\t')
             break
         elseif !opts.spacedelim && c == Char(opts.endchar)
-            if Char(opts.endchar) == Char(opts.quotechar)
+            if inside_quoted_strong
                 # this means we're inside a quoted string
                 if Char(opts.quotechar) == Char(opts.escapechar)
                     # sometimes the quotechar is the escapechar
@@ -358,14 +365,41 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
     end
 
-    return R(_substring(T, str, i0, i-1)), i
+    return R(_substring(T, str, i0, i-1, escapecount, opts)), i
 end
 
-@inline function _substring(::Type{String}, str, i, j)
-    String(str[i:thisind(str, j)])
+@inline function _substring(::Type{String}, str, i, j, escapecount, opts)
+    if escapecount > 0
+        buf = IOBuffer(sizehint=j-i+1-escapecount)
+        cur_i = i
+        c = str[cur_i]
+        if opts.includequotes && c==Char(opts.quotechar)
+            print(buf, c)
+            cur_i = nextind(str, cur_i)
+        end
+        while cur_i <= j
+            c = str[cur_i]
+            if c == Char(opts.escapechar)
+                next_i = nextind(str, cur_i)
+                if next_i <= j && str[next_i] == Char(opts.quotechar)
+                    print(buf, str[next_i])
+                    cur_i = next_i
+                else
+                    print(buf, c)
+                end
+            else
+                print(buf, c)
+            end
+            cur_i = nextind(str, cur_i)
+        end
+        return String(take!(buf))
+    else
+        return unsafe_string(pointer(str, i), j-i+1)
+    end
 end
 
-@inline function _substring(::Type{T}, str, i, j) where {T<:SubString}
+@inline function _substring(::Type{T}, str, i, j, escapecount, opts) where {T<:SubString}
+    escapecount > 0 && error("Not yet handled.")
     T(str, i, thisind(j))
 end
 
@@ -375,11 +409,12 @@ fromtype(::Type{StrRange}) = StringToken(StrRange)
     unsafe_string(pointer(str, 1 + r.offset), r.length)
 end
 
-@inline function _substring(::Type{StrRange}, str, i, j)
-    StrRange(i - 1, j - i + 1)
+@inline function _substring(::Type{StrRange}, str, i, j, escapecount, opts)
+    StrRange(i - 1, j - i + 1, escapecount)
 end
 
-@inline function _substring(::Type{<:WeakRefString}, str, i, j)
+@inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, opts)
+    escapecount > 0 && error("Not yet handled.")
     WeakRefString(convert(Ptr{UInt8}, pointer(str, i)), j - i + 1)
 end
 

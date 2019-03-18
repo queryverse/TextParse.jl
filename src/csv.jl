@@ -44,12 +44,13 @@ end
 
 optionsiter(opts::AbstractVector, header) = optionsiter(opts)
 
-tofield(f::AbstractField, opts) = f
-tofield(f::AbstractToken, opts) = Field(f)
-tofield(f::StringToken, opts) = Field(Quoted(f, opts.quotechar, opts.escapechar))
-tofield(f::Type, opts) = tofield(fromtype(f), opts)
-tofield(f::Type{String}, opts) = tofield(fromtype(StrRange), opts)
-tofield(f::DateFormat, opts) = tofield(DateTimeToken(DateTime, f), opts)
+tofield(f::AbstractField, opts, stringarraytype) = f
+tofield(f::AbstractToken, opts, stringarraytype) = Field(f)
+tofield(f::StringToken, opts, stringarraytype) = Field(Quoted(f, opts.quotechar, opts.escapechar))
+tofield(f::Type, opts, stringarraytype) = tofield(fromtype(f), opts, stringarraytype)
+tofield(f::Type{String}, opts, stringarraytype::Type{StringArray}) = tofield(fromtype(StrRange), opts, stringarraytype)
+tofield(f::Type{String}, opts, stringarraytype::Type{Array}) = tofield(fromtype(String), opts, stringarraytype)
+tofield(f::DateFormat, opts, stringarraytype) = tofield(DateTimeToken(DateTime, f), opts, stringarraytype)
 
 """
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
@@ -241,9 +242,8 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     # seed guesses using those from previous file
     guess, pos1 = guesscolparsers(str, canonnames, opts,
-                                  pos, type_detect_rows, 
-                                  colparsers, commentchar,
-                                  nastrings, prev_parsers)
+                                  pos, type_detect_rows, colparsers, stringarraytype, 
+                                  commentchar, nastrings, prev_parsers)
     if isempty(canonnames)
         canonnames = Any[1:length(guess);]
     end
@@ -255,7 +255,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         if !(fieldtype(v) <: StringLike) && prev_parsers !== nothing && !haskey(colspool, c)
             v = isa(v, NAToken) ? v : NAToken(v)
         end
-        p = tofield(v, opts)
+        p = tofield(v, opts, stringarraytype)
         guess[i] = p
     end
 
@@ -276,7 +276,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     current_record[] = rec
 
     if nrows == 0
-        # just an estimate, with some margin        
+        # just an estimate, with some margin
         nrows = ceil(Int, (len-pos) / ((pos1-pos)/max(1, type_detect_rows)) * sqrt(2))
     end
 
@@ -417,7 +417,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 end
 
 function promote_field(failed_str, field, col, err, nastrings, stringtype, stringarraytype, opts)
-    newtoken = guesstoken(failed_str, opts, field.inner, nastrings)
+    newtoken = guesstoken(failed_str, opts, field.inner, nastrings, stringarraytype)
     if newtoken == field.inner
         # no need to change
         return field, col
@@ -478,8 +478,7 @@ function readcolnames(str, opts, pos, colnames)
 end
 
 function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
-                       nrows::Int, colparsers, commentchar=nothing, nastrings=NA_STRINGS,
-                       prevs=nothing)
+                       nrows::Int, colparsers, stringarraytype, commentchar=nothing, nastrings=NA_STRINGS, prevs=nothing)
     # Field type guesses
     guess = []
     prevfields = String[]
@@ -517,7 +516,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
                 error("previous rows had $(length(guess)) fields but row $i2 has $(length(fields))")
             end
             try
-                guess[j] = guesstoken(fields[j], opts, guess[j], nastrings)
+                guess[j] = guesstoken(fields[j], opts, guess[j], nastrings, stringarraytype)
             catch err
                 println(stderr, "Error while guessing a common type for column $j")
                 println(stderr, "new value: $(fields[j]), prev guess was: $(guess[j])")
@@ -534,7 +533,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
     # override guesses with user request
     for (i, v) in optionsiter(colparsers, header)
-        guess[i] = tofield(v, opts)
+        guess[i] = tofield(v, opts, stringarraytype)
     end
     guess, pos
 end
@@ -662,7 +661,7 @@ end
 function quotedsplit(str, opts, includequotes, i=firstindex(str), l=lastindex(str))
     strtok = Quoted(StringToken(String), opts.quotechar, opts.escapechar, required=false,
                     includequotes=includequotes)
-                    
+
     f = Field(strtok, eoldelim=true)
     strs = String[]
     if l == 0
