@@ -45,7 +45,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Home",
     "title": "Dates.tryparsenext",
     "category": "function",
-    "text": "tryparsenext{T}(tok::AbstractToken{T}, str, i, till, localopts)\n\nParses the string str starting at position i and ending at or before position till. localopts is a LocalOpts object which contains contextual options for quoting and NA parsing. (see LocalOpts documentation)\n\ntryparsenext returns a tuple (result, nextpos) where result is of type Union{Some{T}, Nothing}, nothing if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, nextpos is the position the next token, if any, starts at. If parsing failed, nextpos is the position at which the parsing failed.\n\n\n\n\n\n"
+    "text": "tryparsenext{T}(tok::AbstractToken{T}, str, i, till, localopts)\n\nParses the string str starting at position i and ending at or before position till. localopts is a LocalOpts object which contains contextual options for quoting and NA parsing. (see LocalOpts documentation)\n\ntryparsenext returns a tuple (result, nextpos) where result is of type Nullable{T}, Nullable{T}() if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, nextpos is the position the next token, if any, starts at. If parsing failed, nextpos is the position at which the parsing failed.\n\n\n\n\n\n"
 },
 
 {
@@ -101,7 +101,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Home",
     "title": "TextParse.CustomParser",
     "category": "type",
-    "text": "CustomParser(f, T)\n\nProvide a custom parsing mechanism.\n\nArguments:\n\nf: the parser function\nT: The type of the parsed value\n\nThe parser function must take the following arguments:\n\nstr: the entire string being parsed\npos: the position in the string at which to start parsing\nlen: the length of the string the maximum position where to parse till\nopts: a LocalOpts object with options local to the current field.\n\nThe parser function must return a tuple of two values:\n\nresult: A Union{Some{T}, Nothing}. Set to nothing if parsing must fail, containing the value otherwise.\nnextpos: If parsing succeeded this must be the next position after parsing finished, if it failed this must be the position at which parsing failed.\n\n\n\n\n\n"
+    "text": "CustomParser(f, T)\n\nProvide a custom parsing mechanism.\n\nArguments:\n\nf: the parser function\nT: The type of the parsed value\n\nThe parser function must take the following arguments:\n\nstr: the entire string being parsed\npos: the position in the string at which to start parsing\nlen: the length of the string the maximum position where to parse till\nopts: a LocalOpts object with options local to the current field.\n\nThe parser function must return a tuple of two values:\n\nresult: A Nullable{T}. Set to Nothing{T}() if parsing must fail, containing the value otherwise.\nnextpos: If parsing succeeded this must be the next position after parsing finished, if it failed this must be the position at which parsing failed.\n\n\n\n\n\n"
 },
 
 {
