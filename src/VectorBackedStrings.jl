@@ -15,6 +15,8 @@ Base.pointer(s::VectorBackedUTF8String) = pointer(s.buffer)
 
 Base.pointer(s::VectorBackedUTF8String, i::Integer) = pointer(s.buffer) + i - 1
 
+Base.pointer(s::SubString{VectorBackedUTF8String}, i::Integer) = pointer(s.string) + s.offset + i - 1
+
 @inline Base.ncodeunits(s::VectorBackedUTF8String) = length(s.buffer)
 
 Base.codeunit(s::VectorBackedUTF8String) = UInt8

@@ -354,6 +354,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                     pos = first(rng)
                     rowno = err.rowno
                     lineno = err.lineno
+                    current_record[] = rec
                     @goto retry
                 end
                 println(stderr, "Expected another field on row $(err.rowno) (line $(err.lineno))")
@@ -402,6 +403,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             rowno = err.rowno
             lineno = err.lineno
             pos = first(rng)
+            current_record[] = rec
             @goto retry
 
         end

@@ -31,6 +31,13 @@ s = VectorBackedUTF8String(buffer)
 
 @test string(s) == "Test"
 
+sub_s = SubString(s, 2:3)
+
+@test sub_s == "es"
+
+@test pointer(sub_s, 1) == pointer(s, 2)
+@test pointer(sub_s, 2) == pointer(s, 3)
+
 @test_throws ErrorException s == "Test"
 @test_throws ErrorException "Test" == s
 @test_throws ErrorException hash(s, UInt(1))
