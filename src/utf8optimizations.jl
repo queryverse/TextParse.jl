@@ -430,3 +430,46 @@ end
         return unsafe_string(pointer(str, i), j-i+1)
     end
 end
+
+function tryparsenext(na::NAToken{T}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8}) where {T}
+    R = Nullable{T}
+    i = eatwhitespaces(str, i, len)
+    if i > len
+        if na.emptyisna
+            @goto null
+        else
+            @goto error
+        end
+    end
+
+    @inbounds b = codeunit(str, i)
+    ii = i + 1
+    if (b == opts.endchar || isnewline(b)) && na.emptyisna
+       @goto null
+    end
+
+    if isa(na.inner, Unknown)
+        @goto maybe_null
+    end
+    @chk2 x,ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
+
+    @label done
+    return R(convert(T, x)), ii
+
+    @label maybe_null
+    naopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar,
+                       opts.escapechar, false, opts.includenewlines)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString{UInt8}), str, i, len, naopts)
+    if !isempty(searchsorted(na.nastrings, nastr))
+        i=ii
+        i = eatwhitespaces(str, i, len)
+        @goto null
+    end
+    return R(), i
+
+    @label null
+    return R(missing), i
+
+    @label error
+    return R(), i
+end
