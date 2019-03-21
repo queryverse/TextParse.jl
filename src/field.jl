@@ -449,7 +449,7 @@ end
 - `escapechar`: character that escapes the quote char (default set by `LocalOpts`)
 """
 function Quoted(inner::S,
-    quotechar::T_QUOTECHAR, escapechar::T_ESCAPECHAR;
+    quotechar::T_QUOTECHAR=UInt8('"'), escapechar::T_ESCAPECHAR=UInt8('"');
     required=false,
     stripwhitespaces=fieldtype(S)<:Number,
     includequotes=false,
@@ -460,7 +460,7 @@ function Quoted(inner::S,
                 includenewlines, quotechar, escapechar)
 end
 
-Quoted(t::Type, quotechar, escapechar; kwargs...) = Quoted(fromtype(t), quotechar, escapechar; kwargs...)
+Quoted(t::Type, quotechar=UInt8('"'), escapechar=UInt8('"'); kwargs...) = Quoted(fromtype(t), quotechar, escapechar; kwargs...)
 
 function tryparsenext(q::Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}, str, i, len, opts) where {T,S,T_QUOTECHAR,T_ESCAPECHAR}
     y1 = iterate(str, i)
