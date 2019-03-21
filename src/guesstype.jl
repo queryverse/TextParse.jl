@@ -17,7 +17,7 @@ const common_datetime_formats = Any[
     dateformat"yyyymmdd HH:MM:SS.s"
 ]
 
-const DEFAULT_QUOTES = ('"', ''')
+const DEFAULT_QUOTES = ('"', '\'')
 
 function guessdateformat(str)
 
