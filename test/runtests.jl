@@ -401,11 +401,11 @@ import TextParse: guesscolparsers
     _, pos = readcolnames(str1, opts, 1, String[])
     testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers, StringArray)
     @test testtill(0) |> first == Any[]
-    @test testtill(1) |> first == Any[Quoted(StringToken(StrRange)), fromtype(Int), fromtype(Int), fromtype(Int)]
-    @test testtill(2) |> first == Any[Quoted(StringToken(StrRange)), fromtype(Int), fromtype(Int), fromtype(Int)]
-    @test testtill(3) |> first == Any[Quoted(StringToken(StrRange)), fromtype(Int), fromtype(Float64), fromtype(Int)]
-    @test testtill(4) |> first == Any[Quoted(StringToken(StrRange)), fromtype(Float64), fromtype(Float64), NAToken(fromtype(Int))]
-    @test testtill(5) |> first == Any[Quoted(StringToken(StrRange)), fromtype(Float64), NAToken(fromtype(fromtype(Float64))), NAToken(fromtype(Int))]
+    @test testtill(1) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Int), fromtype(Int)]
+    @test testtill(2) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Int), fromtype(Int)]
+    @test testtill(3) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Float64), fromtype(Int)]
+    @test testtill(4) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Float64), fromtype(Float64), NAToken(fromtype(Int))]
+    @test testtill(5) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Float64), NAToken(fromtype(Float64)), NAToken(fromtype(Int))]
 end
 
 
