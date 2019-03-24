@@ -339,52 +339,52 @@ import TextParse: guesstoken, Unknown, Numeric, DateTimeToken, StrRange
 @testset "guesstoken" begin
     opts = LocalOpts(UInt8(','), false, UInt8('"'), UInt8('"'), false, false)
     # Test null values
-    @test guesstoken("", opts, Unknown()) == NAToken(Unknown())
-    @test guesstoken("null", opts, Unknown()) == NAToken(Unknown())
-    @test guesstoken("", opts, NAToken(Unknown())) == NAToken(Unknown())
-    @test guesstoken("null", opts, NAToken(Unknown())) == NAToken(Unknown())
+    @test guesstoken("", opts, false, Unknown()) == NAToken(Unknown())
+    @test guesstoken("null", opts, false, Unknown()) == NAToken(Unknown())
+    @test guesstoken("", opts, false, NAToken(Unknown())) == NAToken(Unknown())
+    @test guesstoken("null", opts, false, NAToken(Unknown())) == NAToken(Unknown())
 
     # Test NA
-    @test guesstoken("1", opts, NAToken(Unknown())) == NAToken(Numeric(Int))
-    @test guesstoken("1", opts, NAToken(Numeric(Int))) == NAToken(Numeric(Int))
-    @test guesstoken("", opts, NAToken(Numeric(Int))) == NAToken(Numeric(Int))
-    @test guesstoken("1%", opts, NAToken(Unknown())) == NAToken(Percentage())
+    @test guesstoken("1", opts, false, NAToken(Unknown())) == NAToken(Numeric(Int))
+    @test guesstoken("1", opts, false, NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+    @test guesstoken("", opts, false, NAToken(Numeric(Int))) == NAToken(Numeric(Int))
+    @test guesstoken("1%", opts, false, NAToken(Unknown())) == NAToken(Percentage())
 
     # Test non-null numeric
-    @test guesstoken("1", opts, Unknown()) == Numeric(Int)
-    @test guesstoken("1", opts, Numeric(Int)) == Numeric(Int)
-    @test guesstoken("", opts, Numeric(Int)) == NAToken(Numeric(Int))
-    @test guesstoken("1.0", opts, Numeric(Int)) == Numeric(Float64)
+    @test guesstoken("1", opts, false, Unknown()) == Numeric(Int)
+    @test guesstoken("1", opts, false, Numeric(Int)) == Numeric(Int)
+    @test guesstoken("", opts, false, Numeric(Int)) == NAToken(Numeric(Int))
+    @test guesstoken("1.0", opts, false, Numeric(Int)) == Numeric(Float64)
 
     # Test strings
-    @test guesstoken("x", opts, Unknown()) == StringToken(StrRange)
+    @test guesstoken("x", opts, false, Unknown()) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
 
     # Test nullable to string
-    @test guesstoken("x", opts, NAToken(Unknown())) == StringToken(StrRange)
+    @test guesstoken("x", opts, false, NAToken(Unknown())) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
 
     # Test string to non-null (short circuit)
-    @test guesstoken("1", opts, StringToken(StrRange)) == StringToken(StrRange)
+    @test guesstoken("1", opts, false, StringToken(StrRange)) == StringToken(StrRange)
 
     # Test quoting
-    @test guesstoken("\"1\"", opts, Unknown()) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"1\"", opts, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"1\"", opts, false, Unknown()) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"1\"", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
 
     # Test quoting with Nullable tokens
-    @test guesstoken("\"\"", opts, Quoted(Unknown(), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, Unknown()) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, Numeric(Int)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
-    @test guesstoken("", opts, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
-    @test guesstoken("", opts, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
-    @test guesstoken("1", opts, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"1\"", opts, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Quoted(Unknown(), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Unknown()) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Numeric(Int)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("", opts, false, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("1", opts, false, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"1\"", opts, false, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
 
     # Test DateTime detection:
-    tok = guesstoken("2016-01-01 10:10:10.10", opts, Unknown())
+    tok = guesstoken("2016-01-01 10:10:10.10", opts, false, Unknown())
     @test tok == DateTimeToken(DateTime, dateformat"yyyy-mm-dd HH:MM:SS.s")
-    @test guesstoken("2016-01-01 10:10:10.10", opts, tok) == tok
-    @test guesstoken("2016-01-01 10:10:10.10", opts, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(tok), opts.quotechar, opts.escapechar)
+    @test guesstoken("2016-01-01 10:10:10.10", opts, false, tok) == tok
+    @test guesstoken("2016-01-01 10:10:10.10", opts, false, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(tok), opts.quotechar, opts.escapechar)
 end
 
 import TextParse: guesscolparsers
@@ -401,14 +401,11 @@ import TextParse: guesscolparsers
     _, pos = readcolnames(str1, opts, 1, String[])
     testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers, StringArray)
     @test testtill(0) |> first == Any[]
-    @test testtill(1) |> first == map(fromtype, [StrRange, Int, Int, Int])
-    @test testtill(2) |> first == map(fromtype, [StrRange, Int, Int, Int])
-    @test testtill(3) |> first == map(fromtype, [StrRange, Int, Float64, Int])
-    @test testtill(4) |> first == vcat(map(fromtype, [StrRange, Float64, Float64]),
-                                       NAToken(fromtype(Int)))
-    @test testtill(5) |> first == vcat(map(fromtype, [StrRange, Float64]),
-                                       NAToken(fromtype(Float64)),
-                                       NAToken(fromtype(Int)))
+    @test testtill(1) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Int), fromtype(Int)]
+    @test testtill(2) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Int), fromtype(Int)]
+    @test testtill(3) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Float64), fromtype(Int)]
+    @test testtill(4) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Float64), fromtype(Float64), NAToken(fromtype(Int))]
+    @test testtill(5) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Float64), NAToken(fromtype(Float64)), NAToken(fromtype(Int))]
 end
 
 

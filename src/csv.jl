@@ -419,7 +419,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 end
 
 function promote_field(failed_str, field, col, err, nastrings, stringtype, stringarraytype, opts)
-    newtoken = guesstoken(failed_str, opts, field.inner, nastrings, stringarraytype)
+    newtoken = guesstoken(failed_str, opts, false, field.inner, nastrings, stringarraytype)
     if newtoken == field.inner
         # no need to change
         return field, col
@@ -518,7 +518,7 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
                 error("previous rows had $(length(guess)) fields but row $i2 has $(length(fields))")
             end
             try
-                guess[j] = guesstoken(fields[j], opts, guess[j], nastrings, stringarraytype)
+                guess[j] = guesstoken(fields[j], opts, false, guess[j], nastrings, stringarraytype)
             catch err
                 println(stderr, "Error while guessing a common type for column $j")
                 println(stderr, "new value: $(fields[j]), prev guess was: $(guess[j])")
