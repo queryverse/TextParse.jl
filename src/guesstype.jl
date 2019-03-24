@@ -52,7 +52,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS, stringarraytype=StringArray)
+function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS, stringarraytype=StringArray)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -65,19 +65,19 @@ function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_S
         else
             prev_inner = prev_guess
         end
-        inner_token = guesstoken(strip(strip(x, q)), opts, prev_inner, nastrings, stringarraytype)
+        inner_token = guesstoken(strip(strip(x, q)), opts, true, prev_inner, nastrings, stringarraytype)
         return Quoted(inner_token, opts.quotechar, opts.escapechar)
     elseif isa(prev_guess, Quoted)
         # but this token is not quoted
-        return Quoted(guesstoken(x, opts, prev_guess.inner, nastrings, stringarraytype), opts.quotechar, opts.escapechar)
+        return Quoted(guesstoken(x, opts, true, prev_guess.inner, nastrings, stringarraytype), opts.quotechar, opts.escapechar)
     elseif isa(prev_guess, NAToken)
         # This column is nullable
         if isna(x, nastrings)
             # x is null too, return previous guess
             return prev_guess
         else
-            tok = guesstoken(x, opts, prev_guess.inner, nastrings, stringarraytype)
-            if isa(tok, StringToken)
+            tok = guesstoken(x, opts, false, prev_guess.inner, nastrings, stringarraytype)
+            if isa(tok, Quoted) && isa(tok.inner, StringToken)
                 return tok # never wrap a string in NAToken
             elseif isa(tok, Quoted)
                 # Always put the quoted wrapper on top
@@ -108,17 +108,20 @@ function guesstoken(x, opts, @nospecialize(prev_guess)=Unknown(), nastrings=NA_S
                 return Numeric(promote_type(T, fieldtype(prev_guess)))
             else
                 # something like a date turned into a single number?
-                return StringToken(stringarraytype<:StringArray ? StrRange : String)
+                y1 = StringToken(stringarraytype<:StringArray ? StrRange : String)
+                return prevent_quote_wrap ? y1 : Quoted(y1, opts.quotechar, opts.escapechar)
             end
         else
             # fast-path
             if length(filter(isnumeric, x)) < 4
-                return StringToken(stringarraytype<:StringArray ? StrRange : String)
+                y2 = StringToken(stringarraytype<:StringArray ? StrRange : String)
+                return prevent_quote_wrap ? y2 : Quoted(y2, opts.quotechar, opts.escapechar)
             end
 
             maybedate = guessdateformat(x)
             if maybedate === nothing
-                return StringToken(stringarraytype<:StringArray ? StrRange : String)
+                y3 = StringToken(stringarraytype<:StringArray ? StrRange : String)
+                return prevent_quote_wrap ? y3 : Quoted(y3, opts.quotechar, opts.escapechar)
             else
                 return maybedate
             end
