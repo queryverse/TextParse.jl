@@ -370,11 +370,11 @@ import TextParse: guesstoken, Unknown, Numeric, DateTimeToken, StrRange
     @test guesstoken("\"1\"", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(Numeric(Int), opts.quotechar, opts.escapechar)
 
     # Test quoting with Nullable tokens
-    @test guesstoken("\"\"", opts, false, Quoted(Unknown(), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, false, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, false, Unknown()) == Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)
-    @test guesstoken("\"\"", opts, false, Numeric(Int)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Quoted(Unknown(), opts.quotechar, opts.escapechar)) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Quoted(NAToken(Unknown()), opts.quotechar, opts.escapechar)) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Unknown()) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
+    @test guesstoken("\"\"", opts, false, Numeric(Int)) == Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)
     @test guesstoken("", opts, false, Quoted(Numeric(Int), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
     @test guesstoken("", opts, false, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)
     @test guesstoken("1", opts, false, Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)) == Quoted(NAToken(Numeric(Int)), opts.quotechar, opts.escapechar)

@@ -52,7 +52,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess)=Unknown(), nastrings=NA_STRINGS, stringarraytype=StringArray)
+function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess=Unknown()), nastrings=NA_STRINGS, stringarraytype=StringArray)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -65,8 +65,14 @@ function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess)=Unkno
         else
             prev_inner = prev_guess
         end
-        inner_token = guesstoken(strip(strip(x, q)), opts, true, prev_inner, nastrings, stringarraytype)
-        return Quoted(inner_token, opts.quotechar, opts.escapechar)
+        inner_string = strip(strip(x, q))
+        if inner_string==""
+            # If we come across a "", we classify it as a string column no matter what
+            return Quoted(StringToken(stringarraytype<:StringArray ? StrRange : String), opts.quotechar, opts.escapechar)
+        else
+            inner_token = guesstoken(inner_string, opts, true, prev_inner, nastrings, stringarraytype)
+            return Quoted(inner_token, opts.quotechar, opts.escapechar)
+        end
     elseif isa(prev_guess, Quoted)
         # but this token is not quoted
         return Quoted(guesstoken(x, opts, true, prev_guess.inner, nastrings, stringarraytype), opts.quotechar, opts.escapechar)
