@@ -15,6 +15,8 @@ Base.pointer(s::VectorBackedUTF8String) = pointer(s.buffer)
 
 Base.pointer(s::VectorBackedUTF8String, i::Integer) = pointer(s.buffer) + i - 1
 
+Base.pointer(s::SubString{VectorBackedUTF8String}, i::Integer) = pointer(s.string) + s.offset + i - 1
+
 @inline Base.ncodeunits(s::VectorBackedUTF8String) = length(s.buffer)
 
 Base.codeunit(s::VectorBackedUTF8String) = UInt8
@@ -35,10 +37,10 @@ Base.@propagate_inbounds function Base.iterate(s::VectorBackedUTF8String, i::Int
     b = codeunit(s, i)
     u = UInt32(b) << 24
     Base.between(b, 0x80, 0xf7) || return reinterpret(Char, u), i+1
-    return Base.next_continued(s, i, u)
+    return our_next_continued(s, i, u)
 end
 
-function Base.next_continued(s::VectorBackedUTF8String, i::Int, u::UInt32)
+function our_next_continued(s::VectorBackedUTF8String, i::Int, u::UInt32)
     u < 0xc0000000 && (i += 1; @goto ret)
     n = ncodeunits(s)
     # first continuation byte
@@ -75,7 +77,7 @@ Base.print(io::IO, s::VectorBackedUTF8String) = error("Not yet implemented.")
 
 Base.textwidth(s::VectorBackedUTF8String) = error("Not yet implemented.")
 
-Base.string(x::VectorBackedUTF8String) = error("Not yet implemented.")
+Base.string(x::VectorBackedUTF8String) = unsafe_string(pointer(x.buffer), length(x.buffer))
 
 Base.convert(::Type{VectorBackedUTF8String}, x::String) = error("Not yet implemented.")
 

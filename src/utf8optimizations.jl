@@ -194,3 +194,282 @@ const pre_comp_exp = Float64[10.0^i for i=0:22]
     @label error
     return R(), i
 end
+
+function tryparsenext(f::Field{T}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{T_ENDCHAR}) where {T, T_ENDCHAR<:UInt8}
+    R = Nullable{T}
+    i > len && @goto error
+    if f.ignore_init_whitespace
+        i = eatwhitespaces(str, i, len)
+    end
+    @chk2 res, i = tryparsenext(f.inner, str, i, len, opts)
+
+    if f.ignore_end_whitespace
+        i0 = i
+
+        while i<=len
+            @inbounds b = codeunit(str, i)
+
+            !opts.spacedelim && opts.endchar == 0x09 && b == 0x09 && (i = i+1; @goto done) # 0x09 is \t
+
+            b!=0x20 && b!=0x09 && break
+            i=i+1
+        end
+
+        opts.spacedelim && i > i0 && @goto done
+    end
+    # todo don't ignore whitespace AND spacedelim
+
+    if i > len
+        if f.eoldelim
+            @goto done
+        else
+            @goto error
+        end
+    end
+
+    i>len && error("Internal error.")
+    @inbounds b = codeunit(str, i)
+    opts.spacedelim && (b!=0x20 || b!=0x09) && (i+=1; @goto done)
+    !opts.spacedelim && opts.endchar == b && (i+=1; @goto done)
+
+    if f.eoldelim
+        if b == 0x0d # '\r'
+            i+=1
+            if i<=len
+                @inbounds b = codeunit(str, i)
+                if b == 0x0a # '\n'
+                    i+=1
+                end
+            end
+            @goto done
+        elseif b == 0x0a # '\n'
+            i+=1
+            if i<=len
+                @inbounds b = codeunit(str, i)
+                if b == 0x0d # '\r'
+                    i+=1
+                end
+            end
+            @goto done
+        end
+    end
+
+    @label error
+    return R(), i
+
+    @label done
+    return R(convert(T, res)), i
+end
+
+function tryparsenext(q::Quoted{T,S,<:UInt8,<:UInt8}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8}) where {T,S}
+    if i>len
+        q.required && @goto error
+        # check to see if inner thing is ok with an empty field
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, opts) error
+        @goto done
+    end
+    @inbounds b = codeunit(str, i)
+    ii = i+1
+    quotestarted = false
+    if q.quotechar == b
+        quotestarted = true
+        if !q.includequotes
+            i = ii
+        end
+
+        if q.stripwhitespaces
+            i = eatwhitespaces(str, i, len)
+        end
+    else
+        q.required && @goto error
+    end
+
+    if quotestarted
+        qopts = LocalOpts(q.quotechar, false, q.quotechar, q.escapechar,
+                         q.includequotes, q.includenewlines)
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
+    else
+        @chk2 x, i = tryparsenext(q.inner, str, i, len, opts)
+    end
+
+    if i > len
+        if quotestarted && !q.includequotes
+            @goto error
+        end
+        @goto done
+    end
+
+    if q.stripwhitespaces
+        i = eatwhitespaces(str, i, len)
+    end
+    i>len && error("Internal error.")
+    @inbounds b = codeunit(str, i)
+    ii = i + 1
+
+    if quotestarted && !q.includequotes
+        b != q.quotechar && @goto error
+        i = ii
+    end
+
+
+    @label done
+    return Nullable{T}(x), i
+
+    @label error
+    return Nullable{T}(), i
+end
+
+@inline function isnewline(b::UInt8)
+    b == UInt8(10) || b == UInt8(13)
+end
+
+function tryparsenext(s::StringToken{T}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8}) where {T}
+    len = ncodeunits(str)
+    inside_quoted_strong = opts.endchar == opts.quotechar
+    escapecount = 0
+    R = Nullable{T}
+    p = UInt8(0)
+    i0 = i
+    if opts.includequotes
+        if i<=len
+            @inbounds b = codeunit(str, i)
+            if b==opts.quotechar
+                # advance counter so that
+                # the while loop doesn't react to opening quote
+                i += 1
+            end
+        end
+    end
+
+    while i<=len
+        @inbounds b = codeunit(str, i)
+        ii = i + 1
+
+        if inside_quoted_strong && p==opts.escapechar
+            escapecount += 1
+        end
+
+        if opts.spacedelim && (b == UInt8(32) || b == UInt8(9)) # 32 = ' ' and 9 = '\t'
+            break
+        elseif !opts.spacedelim && b == opts.endchar
+            if inside_quoted_strong
+                # this means we're inside a quoted string
+                if opts.quotechar == opts.escapechar
+                    # sometimes the quotechar is the escapechar
+                    # in that case we need to see the next char
+                    if ii > len
+                        if opts.includequotes
+                            i=ii
+                        end
+                        break
+                    else
+                        @inbounds next_b = codeunit(str, ii)
+                        if next_b == opts.quotechar
+                            # the current character is escaping the
+                            # next one
+                            i = ii + 1 # skip next char as well
+                            p = next_b
+                            continue
+                        end
+                    end
+                elseif p == opts.escapechar
+                    # previous char escaped this one
+                    i = ii
+                    p = b
+                    continue
+                end
+            end
+            if opts.includequotes
+                i = ii
+            end
+            break
+        elseif (!opts.includenewlines && isnewline(b))
+            break
+        end
+        i = ii
+        p = b
+    end
+
+    return R(_substring(T, str, i0, i-1, escapecount, opts)), i
+end
+
+@inline function _substring(::Type{String}, str::Union{VectorBackedUTF8String, String}, i, j, escapecount, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8})
+    if escapecount > 0
+        buffer = Vector{UInt8}(undef, j-i+1-escapecount)
+        cur_i = i
+        cur_buffer_i = 1
+        @inbounds c = codeunit(str, cur_i)
+        if opts.includequotes && c==opts.quotechar
+            @inbounds buffer[cur_buffer_i] = c
+            cur_i += 1
+            cur_buffer_i += 1
+        end
+        while cur_i <= j
+            @inbounds c = codeunit(str, cur_i)
+            if c == opts.escapechar
+                next_i = cur_i + 1
+                if next_i <= j
+                    @inbounds next_c = codeunit(str, next_i)
+                    if next_c == opts.quotechar
+                        @inbounds buffer[cur_buffer_i] = next_c
+                        cur_buffer_i += 1
+                        cur_i = next_i
+                    end
+                else
+                    @inbounds buffer[cur_buffer_i] = c
+                    cur_buffer_i += 1
+                end
+            else
+                @inbounds buffer[cur_buffer_i] = c
+                cur_buffer_i += 1
+            end
+            cur_i += 1
+        end
+        return String(buffer)
+    else
+        return unsafe_string(pointer(str, i), j-i+1)
+    end
+end
+
+function tryparsenext(na::NAToken{T}, str::Union{VectorBackedUTF8String, String}, i, len, opts::LocalOpts{<:UInt8,<:UInt8,<:UInt8}) where {T}
+    R = Nullable{T}
+    i = eatwhitespaces(str, i, len)
+    if i > len
+        if na.emptyisna
+            @goto null
+        else
+            @goto error
+        end
+    end
+
+    @inbounds b = codeunit(str, i)
+    ii = i + 1
+    if (b == opts.endchar || isnewline(b)) && na.emptyisna
+       @goto null
+    end
+
+    if isa(na.inner, Unknown)
+        @goto maybe_null
+    end
+    @chk2 x,ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
+
+    @label done
+    return R(convert(T, x)), ii
+
+    @label maybe_null
+    naopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar,
+                       opts.escapechar, false, opts.includenewlines)
+    @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString{UInt8}), str, i, len, naopts)
+    if !isempty(searchsorted(na.nastrings, nastr))
+        i=ii
+        i = eatwhitespaces(str, i, len)
+        @goto null
+    end
+    return R(), i
+
+    @label null
+    return R(missing), i
+
+    @label error
+    return R(), i
+end

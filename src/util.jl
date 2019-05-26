@@ -92,18 +92,48 @@ end
     return nothing
 end
 
+Base.@pure maxdigits(::Type{T}) where {T} = ndigits(typemax(T))
+Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, T(10)^(maxdigits(T)-1))
+
 @inline function tryparsenext_base10(T, str,i,len)
+    i0 = i
     R = Nullable{T}
     y = tryparsenext_base10_digit(T,str,i, len)
     y===nothing && return R(), i
     r = y[1]; i = y[2]
+
+    # Eat zeros
+    while r==0
+        y2 = tryparsenext_base10_digit(T,str,i, len)
+        y2 === nothing && return R(convert(T, 0)), i
+        r = y2[1]; i = y2[2]
+    end
+
+    digits = 1
     ten = T(10)
     while true
         y2 = tryparsenext_base10_digit(T,str,i,len)
         y2===nothing && break
+        digits += 1
         d = y2[1]; i = y2[2]
         r = r*ten + d
     end
+
+    max_digits = maxdigits(T)
+
+    # Checking for overflow
+    if digits > max_digits
+        # More digits than the max value we can hold, this is certainly
+        # an overflow
+        return R(), i0
+    elseif digits == max_digits && r < min_with_max_digits(T)
+        # Same digits as the max digits we can hold. If the number we computed
+        # is now smaller than the smallest number with the same number of
+        # digits as the typemax number, we must have overflown, so we
+        # again return a parsing failure
+        return R(), i0
+    end
+
     return R(convert(T, r)), i
 end
 
@@ -184,6 +214,23 @@ function eatnewlines(str, i=1, l=lastindex(str))
     return i, count
 end
 
+# Move past consecutive lines that start with commentchar.
+# Return a tuple of the new pos in str and the amount of comment lines moved past.
+function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, Nothing}=nothing) 
+    commentchar === nothing && return i, 0
+
+    count = 0
+    while i <= l && str[i] == commentchar
+        i = getlineend(str, i)
+        y = iterate(str, i)
+        y === nothing && return i, count
+        i = y[2]
+        i, lines = eatnewlines(str, i)
+        count += lines
+    end
+    return i, count
+end
+
 function stripquotes(x)
     x[1] in ('\'', '"') && x[1] == x[end] ?
         strip(x, x[1]) : x
@@ -198,8 +245,74 @@ function getlineend(str, i=1, l=lastindex(str))
         y = iterate(str, i)
     end
 
-    # TODO Is this correct?
-    return i-1
+    return prevind(str, i)
+end
+
+# This is similar to getlineend, but ignores line ends inside
+# quotes
+function getrowend(str, i, len, opts, delim)
+    i0 = i
+    i = eatwhitespaces(str, i, len)
+    y = iterate(str, i)
+    while y!==nothing
+        c = y[1]; i = y[2]
+        if c==Char(opts.quotechar)
+            # We are now inside a quoted field
+            y2 = iterate(str, i)
+            while y2!==nothing
+                c = y2[1]; i = y2[2]
+                if c==Char(opts.escapechar)
+                    y3 = iterate(str, i)
+                    if y3===nothing
+                        if c==Char(opts.quotechar)
+                            return prevind(str, i)
+                        else
+                            error("Parsing error, quoted string never terminated.")
+                        end
+                    else
+                        c2 = y3[1]; ii = y3[2]
+                        if c2==Char(opts.quotechar)
+                            i = ii
+                        elseif c==Char(opts.quotechar)
+                            break
+                        end
+                    end
+                elseif c==Char(opts.quotechar)
+                    break;
+                end
+                y2 = iterate(str, i)
+                if y2===nothing
+                    error("Parsing error, quoted string never terminated.")
+                end
+            end
+            i = eatwhitespaces(str, i, len)
+            y4 = iterate(str, i)
+            if y4!==nothing
+                c = y4[1]; i4 = y4[2]
+                if isnewline(c)
+                    return prevind(str, i)
+                elseif c!=Char(delim)
+                    error("Invalid line")
+                end
+            else
+                return prevind(str, i)
+            end
+        else
+            # We are now inside a non quoted field
+            while y!==nothing
+                c = y[1]; i = y[2]
+                if c==Char(delim)
+                    i = eatwhitespaces(str, i)
+                    break
+                elseif isnewline(c)
+                    return prevind(str, i, 2)
+                end
+                y = iterate(str, i)
+            end
+        end
+        y = iterate(str, i)
+    end
+    return prevind(str, i)
 end
 
 ### Testing helpers
@@ -220,6 +333,7 @@ failedat(xs) = (@assert isnull(xs[1]); xs[2])
 struct StrRange
     offset::Int
     length::Int
+    escapecount::Int
 end
 
 function getlineat(str, i)

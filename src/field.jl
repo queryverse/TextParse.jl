@@ -12,7 +12,7 @@ fieldtype(::Type{T}) where {T<:AbstractToken} = fieldtype(supertype(T))
 
 Parses the string `str` starting at position `i` and ending at or before position `till`. `localopts` is a [LocalOpts](@ref) object which contains contextual options for quoting and NA parsing. (see [LocalOpts](@ref) documentation)
 
-`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Union{Some{T}, Nothing}`, nothing if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
+`tryparsenext` returns a tuple `(result, nextpos)` where `result` is of type `Nullable{T}`, `Nullable{T}()` if parsing failed, non-null containing the parsed value if it succeeded. If parsing succeeded, `nextpos` is the position the next token, if any, starts at. If parsing failed, `nextpos` is the position at which the parsing failed.
 """
 function tryparsenext end
 
@@ -29,16 +29,16 @@ Options local to the token currently being parsed.
 - `includequotes`: whether to include quotes while parsing
 - `includenewlines`: whether to include newlines while parsing
 """
-struct LocalOpts
-    endchar::Char         # End parsing at this char
+struct LocalOpts{T_ENDCHAR<:Union{Char,UInt8}, T_QUOTECHAR<:Union{Char,UInt8}, T_ESCAPECHAR<:Union{Char,UInt8}}
+    endchar::T_ENDCHAR        # End parsing at this char
     spacedelim::Bool
-    quotechar::Char       # Quote char
-    escapechar::Char      # Escape char
+    quotechar::T_QUOTECHAR       # Quote char
+    escapechar::T_ESCAPECHAR      # Escape char
     includequotes::Bool   # Whether to include quotes in string parsing
     includenewlines::Bool # Whether to include newlines in string parsing
 end
 
-const default_opts = LocalOpts(',', false, '"', '"', false, false)
+const default_opts = LocalOpts(UInt8(','), false, UInt8('"'), UInt8('"'), false, false)
 # helper function for easy testing:
 @inline function tryparsenext(tok::AbstractToken, str, opts::LocalOpts=default_opts)
     tryparsenext(tok, str, firstindex(str), lastindex(str), opts)
@@ -91,7 +91,7 @@ The parser function must take the following arguments:
 
 The parser function must return a tuple of two values:
 
-- `result`: A `Union{Some{T}, Nothing}`. Set to nothing if parsing must fail, containing the value otherwise.
+- `result`: A `Nullable{T}`. Set to `Nothing{T}()` if parsing must fail, containing the value otherwise.
 - `nextpos`: If parsing succeeded this must be the next position after parsing finished, if it failed this must be the position at which parsing failed.
 """
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
@@ -140,22 +140,24 @@ end
 
 @inline _is_positive(str, i) = str[i]=='+'
 
+const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
+
 @inline function convert_to_double(f1::Int64, exp::Int)
     f = Float64(f1)
     r = f1 - Int64(f) # get the remainder
     x = Double64(f) + Double64(r)
-  
+
     maxexp = 308
     minexp = -256
-  
+
     if exp >= 0
-        x *= Double64(10.0)^(exp)
+        x *= pre_comp_exp_double[exp+1]
     else
         if exp < minexp # not sure why this is a good choice, but it seems to be!
-            x /= Double64(10.0)^(-minexp)
-            x /= Double64(10.0)^(-exp + minexp)
+            x /= pre_comp_exp_double[-minexp+1]
+            x /= pre_comp_exp_double[-exp + minexp + 1]
         else
-            x /= Double64(10.0)^(-exp)
+            x /= pre_comp_exp_double[-exp+1]
         end
     end
     return Float64(x)
@@ -209,7 +211,7 @@ end
     y3 = iterate(str, i)
     if y3!==nothing && _is_e(str, i)
         i = y3[2]
-    
+
         y4 = iterate(str, i)
         if y4!==nothing
             enegate = false
@@ -264,7 +266,7 @@ function tryparsenext(::Percentage, str, i, len, opts)
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
         y = iterate(str, ii)
-        if y===nothing 
+        if y===nothing
             return Nullable{Float64}(), ii # failed to parse %
         else
             c = y[1]; k = y[2]
@@ -293,6 +295,8 @@ show(io::IO, c::StringToken) = print(io, "<string>")
 fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
 function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
+    inside_quoted_strong = Char(opts.endchar) == Char(opts.quotechar)
+    escapecount = 0
     R = Nullable{T}
     p = ' '
     i0 = i
@@ -300,7 +304,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y = iterate(str, i)
         if y!==nothing
             c = y[1]; ii = y[2]
-            if c == opts.quotechar
+            if c == Char(opts.quotechar)
                 i = ii # advance counter so that
                        # the while loop doesn't react to opening quote
             end
@@ -310,12 +314,17 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     y2 = iterate(str, i)
     while y2!==nothing
         c = y2[1]; ii = y2[2]
+
+        if inside_quoted_strong && p==Char(opts.escapechar)
+            escapecount += 1
+        end
+
         if opts.spacedelim && (c == ' ' || c == '\t')
             break
-        elseif !opts.spacedelim && c == opts.endchar
-            if opts.endchar == opts.quotechar
+        elseif !opts.spacedelim && c == Char(opts.endchar)
+            if inside_quoted_strong
                 # this means we're inside a quoted string
-                if opts.quotechar == opts.escapechar
+                if Char(opts.quotechar) == Char(opts.escapechar)
                     # sometimes the quotechar is the escapechar
                     # in that case we need to see the next char
                     y3 = iterate(str, ii)
@@ -326,7 +335,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
                         break
                     else
                         nxt = y3[1]; j = y3[2]
-                        if nxt == opts.quotechar
+                        if nxt == Char(opts.quotechar)
                             # the current character is escaping the
                             # next one
                             i = j # skip next char as well
@@ -335,7 +344,7 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
                             continue
                         end
                     end
-                elseif p == opts.escapechar
+                elseif p == Char(opts.escapechar)
                     # previous char escaped this one
                     i = ii
                     p = c
@@ -356,15 +365,42 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
     end
 
-    return R(_substring(T, str, i0, i-1)), i
+    return R(_substring(T, str, i0, i-1, escapecount, opts)), i
 end
 
-@inline function _substring(::Type{String}, str, i, j)
-    String(str[i:j])
+@inline function _substring(::Type{String}, str, i, j, escapecount, opts)
+    if escapecount > 0
+        buf = IOBuffer(sizehint=j-i+1-escapecount)
+        cur_i = i
+        c = str[cur_i]
+        if opts.includequotes && c==Char(opts.quotechar)
+            print(buf, c)
+            cur_i = nextind(str, cur_i)
+        end
+        while cur_i <= j
+            c = str[cur_i]
+            if c == Char(opts.escapechar)
+                next_i = nextind(str, cur_i)
+                if next_i <= j && str[next_i] == Char(opts.quotechar)
+                    print(buf, str[next_i])
+                    cur_i = next_i
+                else
+                    print(buf, c)
+                end
+            else
+                print(buf, c)
+            end
+            cur_i = nextind(str, cur_i)
+        end
+        return String(take!(buf))
+    else
+        return unsafe_string(pointer(str, i), j-i+1)
+    end
 end
 
-@inline function _substring(::Type{T}, str, i, j) where {T<:SubString}
-    T(str, i, j)
+@inline function _substring(::Type{T}, str, i, j, escapecount, opts) where {T<:SubString}
+    escapecount > 0 && error("Not yet handled.")
+    T(str, i, thisind(j))
 end
 
 fromtype(::Type{StrRange}) = StringToken(StrRange)
@@ -373,28 +409,29 @@ fromtype(::Type{StrRange}) = StringToken(StrRange)
     unsafe_string(pointer(str, 1 + r.offset), r.length)
 end
 
-@inline function _substring(::Type{StrRange}, str, i, j)
-    StrRange(i - 1, j - i + 1)
+@inline function _substring(::Type{StrRange}, str, i, j, escapecount, opts)
+    StrRange(i - 1, j - i + 1, escapecount)
 end
 
-@inline function _substring(::Type{<:WeakRefString}, str, i, j)
+@inline function _substring(::Type{<:WeakRefString}, str, i, j, escapecount, opts)
+    escapecount > 0 && error("Not yet handled.")
     WeakRefString(convert(Ptr{UInt8}, pointer(str, i)), j - i + 1)
 end
 
 export Quoted
 
-struct Quoted{T, S<:AbstractToken} <: AbstractToken{T}
+struct Quoted{T, S<:AbstractToken, T_QUOTECHAR<:Union{Char,UInt8}, T_ESCAPECHAR<:Union{Char,UInt8}} <: AbstractToken{T}
     inner::S
     required::Bool
     stripwhitespaces::Bool
     includequotes::Bool
     includenewlines::Bool
-    quotechar::Union{Char, Nothing}
-    escapechar::Union{Char, Nothing}
+    quotechar::T_QUOTECHAR
+    escapechar::T_ESCAPECHAR
 end
 
 function show(io::IO, q::Quoted)
-    c = quotechar(q, default_opts)
+    c = Char(q.quotechar)
     print(io, "$c")
     show(io, q.inner)
     print(io, "$c")
@@ -411,25 +448,21 @@ end
 - `quotechar`: character to use to quote (default decided by `LocalOpts`)
 - `escapechar`: character that escapes the quote char (default set by `LocalOpts`)
 """
-function Quoted(inner::S;
+function Quoted(inner::S,
+    quotechar::T_QUOTECHAR, escapechar::T_ESCAPECHAR;
     required=false,
     stripwhitespaces=fieldtype(S)<:Number,
     includequotes=false,
-    includenewlines=true,
-    quotechar=nothing,   # This is to allow file-wide config
-    escapechar=nothing) where S<:AbstractToken
+    includenewlines=true) where {S<:AbstractToken,T_QUOTECHAR,T_ESCAPECHAR}
 
     T = fieldtype(S)
-    Quoted{T,S}(inner, required, stripwhitespaces, includequotes,
+    Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}(inner, required, stripwhitespaces, includequotes,
                 includenewlines, quotechar, escapechar)
 end
 
-@inline quotechar(q::Quoted, opts) = q.quotechar === nothing ? opts.quotechar : q.quotechar
-@inline escapechar(q::Quoted, opts) = q.escapechar === nothing ? opts.escapechar : q.escapechar
+Quoted(t::Type, quotechar, escapechar; kwargs...) = Quoted(fromtype(t), quotechar, escapechar; kwargs...)
 
-Quoted(t::Type; kwargs...) = Quoted(fromtype(t); kwargs...)
-
-function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
+function tryparsenext(q::Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}, str, i, len, opts) where {T,S,T_QUOTECHAR,T_ESCAPECHAR}
     y1 = iterate(str, i)
     if y1===nothing
         q.required && @goto error
@@ -439,7 +472,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     end
     c = y1[1]; ii = y1[2]
     quotestarted = false
-    if quotechar(q, opts) == c
+    if Char(q.quotechar) == c
         quotestarted = true
         if !q.includequotes
             i = ii
@@ -453,7 +486,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     end
 
     if quotestarted
-        qopts = LocalOpts(quotechar(q, opts), false, quotechar(q, opts), escapechar(q, opts),
+        qopts = LocalOpts(q.quotechar, false, q.quotechar, q.escapechar,
                          q.includequotes, q.includenewlines)
         @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
     else
@@ -475,7 +508,7 @@ function tryparsenext(q::Quoted{T}, str, i, len, opts) where {T}
     c = y2[1]; ii = y2[2]
 
     if quotestarted && !q.includequotes
-        c != quotechar(q, opts) && @goto error
+        c != Char(q.quotechar) && @goto error
         i = ii
     end
 
@@ -525,7 +558,6 @@ const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)
 struct NAToken{T, S<:AbstractToken} <: AbstractToken{T}
     inner::S
     emptyisna::Bool
-    endchar::Union{Char, Nothing}
     nastrings::Vector{String}
 end
 
@@ -540,21 +572,18 @@ Parses a Nullable item.
 - `nastrings`: strings that are to be considered NA. Defaults to `$NA_STRINGS`
 """
 function NAToken(
-    inner::S,
+    inner::S
   ; emptyisna=true
-  , endchar=nothing
   , nastrings=NA_STRINGS) where S
 
     T = fieldtype(inner)
-    NAToken{UnionMissing{T}, S}(inner, emptyisna, endchar, nastrings)
+    NAToken{UnionMissing{T}, S}(inner, emptyisna, nastrings)
 end
 
 function show(io::IO, na::NAToken)
     show(io, na.inner)
     print(io, "?")
 end
-
-endchar(na::NAToken, opts) = na.endchar === nothing ? opts.endchar : na.endchar
 
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
@@ -569,7 +598,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     end
 
     c = y1[1]; ii=y1[2]
-    if (c == endchar(na, opts) || isnewline(c)) && na.emptyisna
+    if (c == Char(opts.endchar) || isnewline(c)) && na.emptyisna
        @goto null
     end
 
@@ -582,7 +611,7 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     return R(convert(T, x)), ii
 
     @label maybe_null
-    naopts = LocalOpts(endchar(na,opts), opts.spacedelim, opts.quotechar,
+    naopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar,
                        opts.escapechar, false, opts.includenewlines)
     @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString{UInt8}), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
@@ -727,7 +756,7 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
         while y2!==nothing
             c = y2[1]; ii = y2[2]
-            !opts.spacedelim && opts.endchar == '\t' && c == '\t' && (i =ii; @goto done)
+            !opts.spacedelim && Char(opts.endchar) == '\t' && c == '\t' && (i =ii; @goto done)
             !isspace(c) && c != '\t' && break
             i = ii
             y2 = iterate(str, i)
@@ -749,7 +778,7 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     y3===nothing && error("Internal error.")
     c = y3[1]; ii = y3[2]
     opts.spacedelim && (isspace(c) || c == '\t') && (i=ii; @goto done)
-    !opts.spacedelim && opts.endchar == c && (i=ii; @goto done)
+    !opts.spacedelim && Char(opts.endchar) == c && (i=ii; @goto done)
 
     if f.eoldelim
         if c == '\r'

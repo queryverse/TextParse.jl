@@ -15,7 +15,7 @@ Returns a 2-element tuple `(values, pos)`:
 * `pos::Int`: The character index at which parsing stopped.
 """
 @generated function tryparsenext_internal(
-                                          ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar='\0', raise::Bool=false,
+                                          ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar=UInt('\0'), raise::Bool=false,
 ) where {T<:TimeType}
     letters = character_codes(df)
 
@@ -51,7 +51,7 @@ Returns a 2-element tuple `(values, pos)`:
         unsafe_val = unsafe_get(values)
         $(assign_value_till...)
         if isnull(values)
-            if (pos <= len && str[pos] == endchar) ||
+            if (pos <= len && str[pos] == Char(endchar)) ||
                 num_parsed == $(length(value_names))
                 # finished parsing and found an extra char,
                 # or parsing was terminated by a delimiter
