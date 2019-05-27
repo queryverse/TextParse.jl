@@ -654,6 +654,15 @@ end
     @test _csvread(s, spacedelim=true) == ((["a,b", "e"],[1,3]), ["x,y","z"])
 end
 
+@testset "skipfield" begin
+    str1 = """
+    x,y,z
+    1,2,3
+    """
+
+    @test _csvread(str1, colparsers=Dict(2=>nothing)) == (([1], [3]), String["x","z"])
+end
+
 import TextParse: eatwhitespaces
 @testset "custom parser" begin
     floatparser = Numeric(Float64)
