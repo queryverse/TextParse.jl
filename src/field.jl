@@ -630,74 +630,18 @@ end
 
 fromtype(::Type{Union{Missing,T}}) where T = NAToken(fromtype(T))
 
-struct SkipToken <: AbstractToken{Nothing}
+struct SkipToken{S} <: AbstractToken{Nothing}
+    inner::S
 end
 
-function tryparsenext(::SkipToken, str, i, len, opts)
-    R = Nullable{Nothing}
-    p = ' '
-    i0 = i
-    if opts.includequotes
-        y = iterate(str, i)
-        if y!==nothing
-            c = y[1]; ii = y[2]
-            if c == opts.quotechar
-                i = ii # advance counter so that
-                       # the while loop doesn't react to opening quote
-            end
-        end
+function tryparsenext(f::SkipToken, str, i, len, opts)
+    x, ii = tryparsenext(f.inner, str, i, len, opts)
+
+    if isnull(x)
+        return Nullable{Nothing}(), ii
+    else
+        return Nullable{Nothing}(nothing), ii
     end
-
-    y2 = iterate(str, i)
-    while y2!==nothing
-        c = y2[1]; ii = y2[2]
-        if opts.spacedelim && (c == ' ' || c == '\t')
-            break
-        elseif !opts.spacedelim && c == opts.endchar
-            if opts.endchar == opts.quotechar
-                # this means we're inside a quoted string
-                if opts.quotechar == opts.escapechar
-                    # sometimes the quotechar is the escapechar
-                    # in that case we need to see the next char
-                    y3 = iterate(str, ii)
-                    if y3===nothing
-                        if opts.includequotes
-                            i=ii
-                        end
-                        break
-                    else
-                        nxt = y3[1]; j = y3[2]
-                        if nxt == opts.quotechar
-                            # the current character is escaping the
-                            # next one
-                            i = j # skip next char as well
-                            p = nxt
-                            y2 = iterate(str, i)
-                            continue
-                        end
-                    end
-                elseif p == opts.escapechar
-                    # previous char escaped this one
-                    i = ii
-                    p = c
-                    y2 = iterate(str, i)
-                    continue
-                end
-            end
-            if opts.includequotes
-                i = ii
-            end
-            break
-        elseif (!opts.includenewlines && isnewline(c))
-            break
-        end
-        i = ii
-        p = c
-
-        y2 = iterate(str, i)
-    end
-
-    return R(nothing), i
 end
 
 ### Field parsing

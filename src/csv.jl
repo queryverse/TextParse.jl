@@ -51,7 +51,7 @@ tofield(f::Type, opts, stringarraytype) = tofield(fromtype(f), opts, stringarray
 tofield(f::Type{String}, opts, stringarraytype::Type{StringArray}) = tofield(fromtype(StrRange), opts, stringarraytype)
 tofield(f::Type{String}, opts, stringarraytype::Type{Array}) = tofield(fromtype(String), opts, stringarraytype)
 tofield(f::DateFormat, opts, stringarraytype) = tofield(DateTimeToken(DateTime, f), opts, stringarraytype)
-tofield(f::Nothing, opts, stringarraytype) = Field(SkipToken())
+tofield(f::Nothing, opts, stringarraytype) = Field(SkipToken(Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)))
 
 """
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
