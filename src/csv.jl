@@ -141,7 +141,7 @@ function csvread(files::AbstractVector{T},
     count = Int[nrows]
     prev = nrows
     for f in files[2:end]
-        if !isempty(cols) && length(cols[1]) == nrows
+        if !isempty(cols) && length(cols[findfirst(i->i!==nothing, cols)]) == nrows
             n = ceil(Int, nrows * sqrt(2))
             resizecols(colspool, n)
         end
@@ -180,7 +180,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  #ignore_empty_rows=true,
                  colspool = ColsPool(),
                  nrows = !isempty(colspool) ?
-                     length(first(colspool)[2]) : 0,
+                     length(first(i for i in colspool if i[2]!==nothing)[2]) : 0,
                  prev_parsers = nothing,
                  colparsers=[],
                  filename=nothing,
@@ -298,7 +298,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             c = get(canonnames, i, i)
             f = rec.fields[i]
             if haskey(colspool, c)
-                if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString)
+                if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString) || colspool[c]===nothing
                     return colspool[c]
                 else
                     try
