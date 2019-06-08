@@ -157,7 +157,7 @@ function csvread(files::AbstractVector{T},
     end
 
     resizecols(colspool, nrows)
-    (values(colspool)...,), collect(keys(colspool)), count
+    ((i[2] for i in colspool if i[2]!==nothing)...,), [i[1] for i in colspool if i[2]!==nothing], count
 end
 
 # read CSV in a string
