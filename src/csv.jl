@@ -108,21 +108,13 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
     if ext == "gz" # Gzipped
         return open(GzipDecompressorStream, file, "r") do io
             data = read(io)
-            cols, canonnames, parsers, finalrows = _csvread_internal(String(data), delim; filename=file, kwargs...)
-            ((col for col in cols if col!==nothing)...,),
-                [colname for (col, colname) in zip(cols, canonnames) if col!==nothing],
-                parsers,
-                finalrows
+            _csvread_internal(String(data), delim; filename=file, kwargs...)
         end
     else # Otherwise just try to read the file
         return open(file, "r") do io
             data = Mmap.mmap(io)
             try
-                cols, canonnames, parsers, finalrows = _csvread_internal(VectorBackedUTF8String(data), delim; filename=file, kwargs...)
-                ((col for col in cols if col!==nothing)...,),
-                    [colname for (col, colname) in zip(cols, canonnames) if col!==nothing],
-                    parsers,
-                    finalrows
+                _csvread_internal(VectorBackedUTF8String(data), delim; filename=file, kwargs...)
             finally
                 finalize(data)
             end
