@@ -6,3 +6,5 @@ docs/site/
 benchmark/tune.json
 docs/Manifest.toml
 .vscode
+*.cov
+lcov.info
