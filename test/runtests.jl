@@ -657,10 +657,19 @@ end
 @testset "skipfield" begin
     str1 = """
     x,y,z
-    1,2,3
+    1,2.1,"John"
+    4,5.2,"Sally"
     """
 
-    @test _csvread(str1, colparsers=Dict(2=>nothing)) == (([1], [3]), String["x","z"])
+    @test _csvread(str1, colparsers=Dict(1=>nothing)) == (([2.1,5.2], ["John", "Sally"]), String["y","z"])
+    @test _csvread(str1, colparsers=Dict(2=>nothing)) == (([1,4], ["John", "Sally"]), String["x","z"])
+    @test _csvread(str1, colparsers=Dict(3=>nothing)) == (([1,4], [2.1,5.2]), String["x","y"])
+
+    @test _csvread(str1, colparsers=Dict(1=>nothing,2=>nothing)) == ((["John", "Sally"],), String["z"])
+    @test _csvread(str1, colparsers=Dict(1=>nothing,3=>nothing)) == (([2.1,5.2],), String["y"])
+    @test _csvread(str1, colparsers=Dict(2=>nothing,3=>nothing)) == (([1,4],), String["x"])
+
+    @test _csvread(str1, colparsers=Dict(1=>nothing,2=>nothing,3=>nothing)) == ((), String[])
 end
 
 import TextParse: eatwhitespaces
