@@ -51,6 +51,7 @@ tofield(f::Type, opts, stringarraytype) = tofield(fromtype(f), opts, stringarray
 tofield(f::Type{String}, opts, stringarraytype::Type{StringArray}) = tofield(fromtype(StrRange), opts, stringarraytype)
 tofield(f::Type{String}, opts, stringarraytype::Type{Array}) = tofield(fromtype(String), opts, stringarraytype)
 tofield(f::DateFormat, opts, stringarraytype) = tofield(DateTimeToken(DateTime, f), opts, stringarraytype)
+tofield(f::Nothing, opts, stringarraytype) = Field(SkipToken(Quoted(StringToken(StrRange), opts.quotechar, opts.escapechar)))
 
 """
     csvread(file::Union{String,IO}, delim=','; <arguments>...)
@@ -72,10 +73,14 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `header_exists`: boolean specifying whether CSV file contains a header
 - `nastrings`: strings that are to be considered NA. Defaults to `TextParse.NA_STRINGS`
 - `colnames`: manually specified column names. Could be a vector or a dictionary from Int index (the column) to String column name.
-- `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior
+- `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior. If you pass `nothing` as the parser for a given column, that column will be skipped
 - `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
 """
-csvread(file::String, delim=','; kwargs...) = _csvread_f(file, delim; kwargs...)[1:2]
+function csvread(file::String, delim=','; kwargs...)
+    cols, canonnames, parsers, finalrows = _csvread_f(file, delim; kwargs...)
+
+    return ((col for col in cols if col!==nothing)...,), [colname for (col, colname) in zip(cols, canonnames) if col!==nothing]
+end
 
 function csvread(file::IOStream, delim=','; kwargs...)
     mmap_data = Mmap.mmap(file)
@@ -91,7 +96,9 @@ function csvread(buffer::IO, delim=','; kwargs...)
 end
 
 function _csvread(str::AbstractString, delim=','; kwargs...)
-    _csvread_internal(str, delim; kwargs...)[1:2]
+    cols, canonnames, parsers, finalrows = _csvread_internal(str, delim; kwargs...)
+
+    return ((col for col in cols if col!==nothing)...,), [colname for (col, colname) in zip(cols, canonnames) if col!==nothing]
 end
 
 function _csvread_f(file::AbstractString, delim=','; kwargs...)
@@ -115,7 +122,7 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
     end
 end
 
-const ColsPool = OrderedDict{Union{Int, String}, AbstractVector}
+const ColsPool = OrderedDict{Union{Int, String}, Union{AbstractVector, Nothing}}
 
 function csvread(files::AbstractVector{T},
                  delim=','; kwargs...) where {T<:AbstractString}
@@ -134,7 +141,7 @@ function csvread(files::AbstractVector{T},
     count = Int[nrows]
     prev = nrows
     for f in files[2:end]
-        if !isempty(cols) && length(cols[1]) == nrows
+        if !isempty(cols) && length(cols[findfirst(i->i!==nothing, cols)]) == nrows
             n = ceil(Int, nrows * sqrt(2))
             resizecols(colspool, n)
         end
@@ -150,7 +157,7 @@ function csvread(files::AbstractVector{T},
     end
 
     resizecols(colspool, nrows)
-    (values(colspool)...,), collect(keys(colspool)), count
+    ((i[2] for i in colspool if i[2]!==nothing)...,), [i[1] for i in colspool if i[2]!==nothing], count
 end
 
 # read CSV in a string
@@ -173,7 +180,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  #ignore_empty_rows=true,
                  colspool = ColsPool(),
                  nrows = !isempty(colspool) ?
-                     length(first(colspool)[2]) : 0,
+                     length(first(i for i in colspool if i[2]!==nothing)[2]) : 0,
                  prev_parsers = nothing,
                  colparsers=[],
                  filename=nothing,
@@ -242,7 +249,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     # seed guesses using those from previous file
     guess, pos1 = guesscolparsers(str, canonnames, opts,
-                                  pos, type_detect_rows, colparsers, stringarraytype, 
+                                  pos, type_detect_rows, colparsers, stringarraytype,
                                   commentchar, nastrings, prev_parsers)
     if isempty(canonnames)
         canonnames = Any[1:length(guess);]
@@ -291,7 +298,7 @@ function _csvread_internal(str::AbstractString, delim=',';
             c = get(canonnames, i, i)
             f = rec.fields[i]
             if haskey(colspool, c)
-                if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString)
+                if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString) || colspool[c]===nothing
                     return colspool[c]
                 else
                     try
@@ -318,7 +325,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         cols = (_cols...,)
     end
 
-    if any(c->length(c) != nrows, cols)
+    if any(c->c!==nothing && length(c) != nrows, cols)
         resizecols(colspool, nrows)
     end
 
@@ -419,6 +426,10 @@ function _csvread_internal(str::AbstractString, delim=',';
 end
 
 function promote_field(failed_str, field, col, err, nastrings, stringtype, stringarraytype, opts)
+    if field.inner isa SkipToken
+        # No need to change
+        return field, col
+    end
     newtoken = guesstoken(failed_str, opts, false, field.inner, nastrings, stringarraytype)
     if newtoken == field.inner
         # no need to change
@@ -583,13 +594,15 @@ end
 
 function resizecols(colspool, nrecs)
     for (h, c) in colspool
-        l = length(c)
-        resize!(c, nrecs)
-        if eltype(c) <: AbstractString
-            # fill with blanks
-            c[l+1:nrecs] .= ""
-        elseif eltype(c) <: StrRange
-            c[l+1:nrecs] .= StrRange(1,0)
+        if c!==nothing
+            l = length(c)
+            resize!(c, nrecs)
+            if eltype(c) <: AbstractString
+                # fill with blanks
+                c[l+1:nrecs] .= ""
+            elseif eltype(c) <: StrRange
+                c[l+1:nrecs] .= StrRange(1,0)
+            end
         end
     end
 end
@@ -599,7 +612,9 @@ function makeoutputvecs(rec, N, stringtype, stringarraytype)
 end
 
 function makeoutputvec(eltyp, N, stringtype, stringarraytype)
-    if fieldtype(eltyp) == Missing # we weren't able to detect the type,
+    if fieldtype(eltyp)===Nothing
+        return nothing
+    elseif fieldtype(eltyp) == Missing # we weren't able to detect the type,
                                    # all cells were blank
         Array{Missing}(undef, N)
     elseif fieldtype(eltyp) == StrRange

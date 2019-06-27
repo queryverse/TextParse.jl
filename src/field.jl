@@ -630,6 +630,20 @@ end
 
 fromtype(::Type{Union{Missing,T}}) where T = NAToken(fromtype(T))
 
+struct SkipToken{S} <: AbstractToken{Nothing}
+    inner::S
+end
+
+function tryparsenext(f::SkipToken, str, i, len, opts)
+    x, ii = tryparsenext(f.inner, str, i, len, opts)
+
+    if isnull(x)
+        return Nullable{Nothing}(), ii
+    else
+        return Nullable{Nothing}(nothing), ii
+    end
+end
+
 ### Field parsing
 
 abstract type AbstractField{T} <: AbstractToken{T} end # A rocord is a collection of abstract fields

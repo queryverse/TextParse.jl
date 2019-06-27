@@ -95,6 +95,10 @@ end
     PARSE_SUCCESS
 end
 
+@inline function setcell!(col::Nothing, i, val, str)
+    PARSE_SUCCESS
+end
+
 @inline Base.@propagate_inbounds function setcell!(col::StringVector, i, val::StrRange, str)
     # TODO Properly handle the val.escapecount>0 case
     col[i] = WeakRefString(pointer(str, val.offset + 1), val.length)
