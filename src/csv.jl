@@ -382,14 +382,22 @@ function _csvread_internal(str::AbstractString, delim=',';
                 lineno = err.lineno+1
                 @goto retry
             end
+            @info failed_strs
+            reparse_needed = fill(false, length(cols))
             promoted = map(failed_strs, err.colno:length(cols)) do s, colidx
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
                 c = promote_field(s, f, col, err, nastrings, stringtype, stringarraytype, opts)
-                colspool[name] = c[2]
+                if c[2]==:reparserequired
+                    reparse_needed[colidx] = true
+                else
+                    colspool[name] = c[2]
+                end
                 c
             end
+
+            @info reparse_needed
 
             newfields = map(first, promoted)
             newcols = map(last, promoted)
@@ -434,6 +442,11 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, strin
     if newtoken == field.inner
         # no need to change
         return field, col
+    end
+    @info newtoken
+    @info typeof(newtoken)
+    if newtoken isa StringToken || (newtoken isa Quoted && newtoken.inner isa StringToken)
+        return swapinner(field, newtoken), :reparserequired
     end
     newcol = try
         promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype, stringarraytype)
