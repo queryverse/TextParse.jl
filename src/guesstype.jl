@@ -19,21 +19,21 @@ const common_datetime_formats = Any[
 
 const DEFAULT_QUOTES = ('"', '\'')
 
-function guessdateformat(str)
+function guessdateformat(str, len=lastindex(str))
 
     dts = Any[Date => d for d in common_date_formats]
     dts = vcat(dts, Any[DateTime => d for d in common_datetime_formats])
 
     for (typ, df) in dts
-        x, len = try
-            tryparsenext_internal(typ, str, 1, lastindex(str), df)
+        x, l = try
+            tryparsenext_internal(typ, str, 1, len, df)
         catch err
             continue
         end
         if !isnull(x)
             try
                 typ(get(x)...)
-                if len > lastindex(str)
+                if l > len
                     return DateTimeToken(typ, df)
                 end
             catch err; end
@@ -43,7 +43,7 @@ function guessdateformat(str)
 end
 
 # force precompilation
-guessdateformat("xyz")
+guessdateformat("xyz", 3)
 
 function getquotechar(x)
     if (length(x) > 0 && x[1] in DEFAULT_QUOTES) && last(x) == x[1]

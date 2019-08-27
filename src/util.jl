@@ -225,7 +225,7 @@ function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, No
         y = iterate(str, i)
         y === nothing && return i, count
         i = y[2]
-        i, lines = eatnewlines(str, i)
+        i, lines = eatnewlines(str, i, l)
         count += lines
     end
     return i, count
@@ -302,7 +302,7 @@ function getrowend(str, i, len, opts, delim)
             while y!==nothing
                 c = y[1]; i = y[2]
                 if c==Char(delim)
-                    i = eatwhitespaces(str, i)
+                    i = eatwhitespaces(str, i, len)
                     break
                 elseif isnewline(c)
                     return prevind(str, i, 2)
@@ -336,8 +336,8 @@ struct StrRange
     escapecount::Int
 end
 
-function getlineat(str, i)
-    l = lastindex(str)
+function getlineat(str, i, len=lastindex(str))
+    l = len
     if i <= l
         ii = prevind(str, i)
     else
