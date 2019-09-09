@@ -205,14 +205,14 @@ function _csvread_internal(str::AbstractString, delim=',';
         end
     end
 
-    pos, lines = eatnewlines(str, pos)
+    pos, lines = eatnewlines(str, pos, len)
     lineno += lines
     while lineno < skiplines_begin
         pos = getlineend(str, pos)
         y2 = iterate(str, pos)
         y2===nothing && error("Internal error.")
         pos = y2[2]
-        pos, lines = eatnewlines(str, pos)
+        pos, lines = eatnewlines(str, pos, len)
         lineno += lines
     end
 
@@ -221,7 +221,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     lineno += lines
 
     if header_exists
-        merged_colnames, pos = readcolnames(str, opts, pos, colnames)
+        merged_colnames, pos = readcolnames(str, opts, pos, colnames, len)
         lineno += 1
     else
         merged_colnames = colnames
@@ -248,7 +248,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     end
 
     # seed guesses using those from previous file
-    guess, pos1 = guesscolparsers(str, canonnames, opts,
+    guess, pos1 = guesscolparsers(str, len, canonnames, opts,
                                   pos, type_detect_rows, colparsers, stringarraytype,
                                   commentchar, nastrings, prev_parsers)
     if isempty(canonnames)
@@ -333,7 +333,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     @label retry
     try
         finalrows = parsefill!(str, opts, rec, nrows, cols, colspool,
-                               pos, lineno, rowno, lastindex(str), commentchar)
+                               pos, lineno, rowno, len, commentchar)
         if !noresize
             resizecols(colspool, finalrows)
         end
@@ -347,11 +347,11 @@ function _csvread_internal(str::AbstractString, delim=',';
 
         if err.err_code == PARSE_ERROR
 
-            rng = getlineat(str, err.fieldpos)
+            rng = getlineat(str, err.fieldpos, len)
             f, l = first(rng), last(rng)
             field = rec.fields[err.colno]
 
-            if l !== lastindex(str) && err.pos >= l && !field.eoldelim
+            if l !== len && err.pos >= l && !field.eoldelim
                 if fieldtype(field) <: AbstractString || fieldtype(field) <: StrRange
                     # retry assuming newlines can be part of the field
                     wopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar, opts.escapechar, opts.includequotes, true)
@@ -473,10 +473,9 @@ function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
     end
 end
 
-function readcolnames(str, opts, pos, colnames)
+function readcolnames(str, opts, pos, colnames, len=lastindex(str))
     colnames_inferred = String[]
 
-    len = lastindex(str)
     lineend = getlineend(str, pos, len)
     head = str[pos:lineend]
 
@@ -490,7 +489,7 @@ function readcolnames(str, opts, pos, colnames)
     colnames_inferred, lineend+1
 end
 
-function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
+function guesscolparsers(str::AbstractString, len, header, opts::LocalOpts, pos::Int,
                        nrows::Int, colparsers, stringarraytype, commentchar=nothing, nastrings=NA_STRINGS, prevs=nothing)
     # Field type guesses
     guess = []
@@ -498,13 +497,13 @@ function guesscolparsers(str::AbstractString, header, opts::LocalOpts, pos::Int,
 
     givenkeys = !isempty(colparsers) ? first.(collect(optionsiter(colparsers, header))) : []
     for i2=1:nrows
-        pos, _ = eatnewlines(str, pos)
+        pos, _ = eatnewlines(str, pos, len)
 
         # Move past commented lines before guessing.
-        pos, _ = eatcommentlines(str, pos, lastindex(str), commentchar)
-        pos > lastindex(str) && break
+        pos, _ = eatcommentlines(str, pos, len, commentchar)
+        pos > len && break
 
-        lineend = getrowend(str, pos, lastindex(str), opts, opts.endchar)
+        lineend = getrowend(str, pos, len, opts, opts.endchar)
 
         fields = quotedsplit(str, opts, true, pos, lineend)
 

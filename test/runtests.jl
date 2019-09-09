@@ -399,7 +399,7 @@ import TextParse: guesscolparsers
     """
     opts = LocalOpts(',', false, '"', '\\', false, false)
     _, pos = readcolnames(str1, opts, 1, String[])
-    testtill(i, colparsers=[]) = guesscolparsers(str1, String[], opts, pos, i, colparsers, StringArray)
+    testtill(i, colparsers=[]) = guesscolparsers(str1, lastindex(str1), String[], opts, pos, i, colparsers, StringArray)
     @test testtill(0) |> first == Any[]
     @test testtill(1) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Int), fromtype(Int)]
     @test testtill(2) |> first == Any[Quoted(StringToken(StrRange), '"', '"'), fromtype(Int), fromtype(Int), fromtype(Int)]
