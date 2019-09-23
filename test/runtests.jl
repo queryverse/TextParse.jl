@@ -108,6 +108,16 @@ end
     @test tryparsenext(fromtype(Int64), "0001", 1, 4) |> unwrap == (1, 5)
     @test tryparsenext(fromtype(Int64), "123", 1, 3) |> unwrap == (123, 4)
     @test tryparsenext(fromtype(Int64), "00123", 1, 5) |> unwrap == (123, 6)
+    @test tryparsenext(fromtype(Int64), "-1", 1, 2) |> unwrap == (-1, 3)
+    @test tryparsenext(fromtype(Int64), "-01", 1, 3) |> unwrap == (-1, 4)
+    @test tryparsenext(fromtype(Int64), "-0001", 1, 5) |> unwrap == (-1, 6)
+    @test tryparsenext(fromtype(Int64), "-123", 1, 4) |> unwrap == (-123, 5)
+    @test tryparsenext(fromtype(Int64), "-00123", 1, 6) |> unwrap == (-123, 7)
+    @test tryparsenext(fromtype(Int64), "+1", 1, 2) |> unwrap == (1, 3)
+    @test tryparsenext(fromtype(Int64), "+01", 1, 3) |> unwrap == (1, 4)
+    @test tryparsenext(fromtype(Int64), "+0001", 1, 5) |> unwrap == (1, 6)
+    @test tryparsenext(fromtype(Int64), "+123", 1, 4) |> unwrap == (123, 5)
+    @test tryparsenext(fromtype(Int64), "+00123", 1, 6) |> unwrap == (123, 7)
     @test tryparsenext(fromtype(Int64), "9223372036854775807", 1, 19) |> unwrap == (9223372036854775807, 20)
     @test tryparsenext(fromtype(Int64), "9223372036854775808", 1, 19) |> failedat == 1
     @test tryparsenext(fromtype(Int64), "19223372036854775808", 1, 20) |> failedat == 1
