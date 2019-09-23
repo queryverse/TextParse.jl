@@ -41,6 +41,20 @@ end
     return i, count
 end
 
+@inline function tryparsenext_sign(str::Union{VectorBackedUTF8String, String}, i, len)
+    i > len && return Nullable{Int}(), i
+
+    @inbounds b = codeunit(str, i)
+
+    if b==0x2d
+        return Nullable{Int}(-1), i+1
+    elseif b==0x2b
+        return Nullable{Int}(1), i+1
+    else
+        return Nullable{Int}(1), i
+    end
+end
+
 @inline function tryparsenext_base10_digit(T,str::Union{VectorBackedUTF8String, String},i, len)
     i > len && @goto error
     @inbounds b = codeunit(str,i)
