@@ -7,7 +7,7 @@
 TextParse uses Julia's generated functions to generate efficient specialized parsers for text files. Right now, there is a good set of features for reading CSV files (see [the documentation](https://JuliaComputing.github.io/TextParse.jl/stable)). Parsing packages can use TextParse as a framework for implementing parsers for other formats.
 
 ## Related packages
-- [CSV.jl](https://github.com/JuliaData/CSV.jl) - Package for reading CSV files into [DataStreams](https://github.com/JuliaData/DataStreams.jl) API. It loads the data into a `DataFrame`. TextParse tries to be minimal and returns a tuple of vectors as the output of `csvread` and adds useful features such as parsing string columns as PooledArrays.
+- [CSV.jl](https://github.com/JuliaData/CSV.jl) - Package for reading CSV files into [Tables](https://github.com/JuliaData/Tables.jl) API. It loads the data into a `DataFrame`. TextParse tries to be minimal and returns a tuple of vectors as the output of `csvread` and adds useful features such as parsing string columns as PooledArrays.
 - [CSVFiles.jl](https://github.com/davidanthoff/CSVFiles.jl) - Package for reading CSV via the [FileIO.jl](https://github.com/JuliaIO/FileIO.jl) API into any [IterableTables.jl](https://github.com/davidanthoff/IterableTables.jl) sink. The package uses [TextParse.jl](https://github.com/JuliaComputing/TextParse.jl) for parsing.
 
 
