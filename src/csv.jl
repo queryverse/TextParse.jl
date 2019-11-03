@@ -329,6 +329,9 @@ function _csvread_internal(str::AbstractString, delim=',';
         resizecols(colspool, nrows)
     end
 
+    lineno_start_of_data = lineno
+    pos_start_of_data = pos
+
     finalrows = rowno
     @label retry
     try
@@ -382,7 +385,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 lineno = err.lineno+1
                 @goto retry
             end
-            @info failed_strs
+
             reparse_needed = fill(false, length(cols))
             promoted = map(failed_strs, err.colno:length(cols)) do s, colidx
                 col = cols[colidx]
@@ -391,13 +394,33 @@ function _csvread_internal(str::AbstractString, delim=',';
                 c = promote_field(s, f, col, err, nastrings, stringtype, stringarraytype, opts)
                 if c[2]==:reparserequired
                     reparse_needed[colidx] = true
-                else
-                    colspool[name] = c[2]
+                    c = c[1], stringarraytype{stringtype,1}(undef, nrows)
                 end
+                colspool[name] = c[2]
                 c
             end
 
-            @info reparse_needed
+            if any(reparse_needed)
+                new_fields = [reparse_needed[i] ? tofield(String, opts, stringarraytype) : tofield(nothing, opts, stringarraytype) for i in 1:length(reparse_needed)]
+                new_fields[end] = swapinner(new_fields[end], new_fields[end], eoldelim=true)
+                rec2 = Record((new_fields...,))
+
+                cols2 = makeoutputvecs(rec2, nrows, stringtype, stringarraytype)
+                for (iii, val) in enumerate(cols2)
+                    if val!==nothing
+                        colspool[iii] = val
+                    end
+                end
+
+                finalrows2 = parsefill!(str, opts, rec2, nrows, cols2, colspool,
+                    pos_start_of_data, lineno_start_of_data, 1, l, commentchar)
+
+                for iii=err.colno:length(cols)
+                    if reparse_needed[iii]
+                        promoted[iii] = (promoted[iii][1], cols2[iii])
+                    end
+                end
+            end
 
             newfields = map(first, promoted)
             newcols = map(last, promoted)
@@ -443,8 +466,6 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, strin
         # no need to change
         return field, col
     end
-    @info newtoken
-    @info typeof(newtoken)
     if newtoken isa StringToken || (newtoken isa Quoted && newtoken.inner isa StringToken)
         return swapinner(field, newtoken), :reparserequired
     end
