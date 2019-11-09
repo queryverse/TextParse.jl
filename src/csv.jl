@@ -417,7 +417,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
                 for iii=err.colno:length(cols)
                     if reparse_needed[iii]
-                        promoted[iii] = (promoted[iii][1], cols2[iii])
+                        promoted[iii-err.colno+1] = (promoted[iii-err.colno+1][1], cols2[iii])
                     end
                 end
             end
