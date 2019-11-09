@@ -22,7 +22,6 @@ matrix:
   allow_failures:
   - julia: nightly
 codecov: true
-coveralls: true
 
 jobs:
   include:
