@@ -252,7 +252,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                                   pos, type_detect_rows, colparsers, stringarraytype,
                                   commentchar, nastrings, prev_parsers)
     if isempty(canonnames)
-        canonnames = Any["Col$i" for i in 1:length(guess)]
+        canonnames = Any["Column$i" for i in 1:length(guess)]
     end
 
     for (i, v) in enumerate(guess)
@@ -277,7 +277,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     end
 
     if isempty(canonnames)
-        canonnames = Any["Col$i" for i in 1:length(rec.fields)]
+        canonnames = Any["Column$i" for i in 1:length(rec.fields)]
     end
 
     current_record[] = rec
