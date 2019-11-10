@@ -3,4 +3,4 @@ Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 TextParse = "e0df1984-e451-5cb5-8b61-797a481e67e3"
 
 [compat]
-Documenter = "~0.21"
+Documenter = "~0.23"
