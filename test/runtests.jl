@@ -493,13 +493,33 @@ import TextParse: _csvread
     @test isequal(data, _csvread(str1, type_detect_rows=2))
     @test isequal(data, _csvread(str1, type_detect_rows=3))
     @test isequal(data, _csvread(str1, type_detect_rows=4))
-    # But we can't go from a non-string column to a string column
+
+    # Test reparsing as a string column
     str3 = """
      a, b,c d, e
     1,1,1,1
     x,1,1,1
     """
-    @test_throws TextParse.CSVParseError _csvread(str3, type_detect_rows=1)
+    coltype_test4 = _csvread(str3, type_detect_rows=1)
+    @test isequal(((["1","x"], [1,1], [1,1], [1,1]),["a","b","c d","e"]), coltype_test4)
+
+    str4 = """
+     a, b,c d, e
+    1,1,01,1
+    2,1,x,1
+    y,2,3,8
+    """
+    coltype_test4 = _csvread(str4, type_detect_rows=1)
+    @test isequal(((["1","2", "y"], [1,1,2], ["01","x", "3"], [1,1,8]),["a","b","c d","e"]), coltype_test4)
+
+    str5 = """
+     a, b,c d, e
+    1,1,4,01.1
+    02,1,3,x
+    y,2,3,8
+    """
+    coltype_test4 = _csvread(str5, type_detect_rows=1)
+    @test isequal(((["1","02", "y"], [1,1,2], [4,3,3], ["01.1","x","8"]),["a","b","c d","e"]), coltype_test4)
 
     # test growing of columns if prediction is too low
     @test _csvread("x,y\nabcd, defg\n,\n,\n", type_detect_rows=1) ==
@@ -638,7 +658,7 @@ import TextParse: _csvread
     #2,2,2
     """
 
-    # Since we are not skipping commented lines the '#' character is considered 
+    # Since we are not skipping commented lines the '#' character is considered
     # data. This will force parsing to treat columns with '#'s as String columns.
     # Here, we verify this behavior.
     result = _csvread(str7)
