@@ -68,7 +68,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `quotechar`: character used to quote strings, defaults to `"`
 - `escapechar`: character used to escape quotechar in strings. (could be the same as quotechar)
 - `commentchar`: ignore lines that begin with commentchar
-- `nrows`: number of rows in the file. Defaults to `0` in which case we try to estimate this.
+- `row_estimate`: estimated number of rows in the file. Defaults to `0` in which case we try to estimate this.
 - `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
 - `nastrings`: strings that are to be considered NA. Defaults to `TextParse.NA_STRINGS`
@@ -179,7 +179,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  colnames=String[],
                  #ignore_empty_rows=true,
                  colspool = ColsPool(),
-                 nrows = !isempty(colspool) ?
+                 row_estimate = !isempty(colspool) ?
                      length(first(i for i in colspool if i[2]!==nothing)[2]) : 0,
                  prev_parsers = nothing,
                  colparsers=[],
@@ -194,7 +194,7 @@ function _csvread_internal(str::AbstractString, delim=',';
         isascii(escapechar) ? UInt8(escapechar) : escapechar, false, false)
     len = lastindex(str)
     pos = firstindex(str)
-    rowlength_sum = 0   # sum of lengths of rows, for estimating nrows
+    rowlength_sum = 0   # sum of lengths of rows, for estimating row_estimate
     lineno = 0
 
     y = iterate(str, pos)
@@ -282,14 +282,14 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     current_record[] = rec
 
-    if nrows == 0
+    if row_estimate == 0
         # just an estimate, with some margin
-        nrows = ceil(Int, (len-pos) / ((pos1-pos)/max(1, type_detect_rows)) * sqrt(2))
+        row_estimate = ceil(Int, (len-pos) / ((pos1-pos)/max(1, type_detect_rows)) * sqrt(2))
     end
 
     if isempty(colspool)
-        # this is the first file, use nrows
-        cols = makeoutputvecs(rec, nrows, stringtype, stringarraytype)
+        # this is the first file, use row_estimate
+        cols = makeoutputvecs(rec, row_estimate, stringtype, stringarraytype)
         for (c2, h) in zip(cols, canonnames)
             colspool[h] = c2
         end
@@ -310,7 +310,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                     end
                 end
             else
-                return colspool[c] = makeoutputvec(f, nrows, stringtype, stringarraytype)
+                return colspool[c] = makeoutputvec(f, row_estimate, stringtype, stringarraytype)
             end
         end
         # promote missing columns to nullable
@@ -325,8 +325,8 @@ function _csvread_internal(str::AbstractString, delim=',';
         cols = (_cols...,)
     end
 
-    if any(c->c!==nothing && length(c) != nrows, cols)
-        resizecols(colspool, nrows)
+    if any(c->c!==nothing && length(c) != row_estimate, cols)
+        resizecols(colspool, row_estimate)
     end
 
     lineno_start_of_data = lineno
@@ -335,7 +335,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     finalrows = rowno
     @label retry
     try
-        finalrows = parsefill!(str, opts, rec, nrows, cols, colspool,
+        finalrows = parsefill!(str, opts, rec, row_estimate, cols, colspool,
                                pos, lineno, rowno, len, commentchar)
         if !noresize
             resizecols(colspool, finalrows)
@@ -394,7 +394,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 c = promote_field(s, f, col, err, nastrings, stringtype, stringarraytype, opts)
                 if c[2]==:reparserequired
                     reparse_needed[colidx] = true
-                    c = c[1], stringarraytype{stringtype,1}(undef, nrows)
+                    c = c[1], stringarraytype{stringtype,1}(undef, row_estimate)
                 end
                 colspool[name] = c[2]
                 c
@@ -405,14 +405,14 @@ function _csvread_internal(str::AbstractString, delim=',';
                 new_fields[end] = swapinner(new_fields[end], new_fields[end], eoldelim=true)
                 rec2 = Record((new_fields...,))
 
-                cols2 = makeoutputvecs(rec2, nrows, stringtype, stringarraytype)
+                cols2 = makeoutputvecs(rec2, row_estimate, stringtype, stringarraytype)
                 for (iii, val) in enumerate(cols2)
                     if val!==nothing
                         colspool[iii] = val
                     end
                 end
 
-                finalrows2 = parsefill!(str, opts, rec2, nrows, cols2, colspool,
+                finalrows2 = parsefill!(str, opts, rec2, row_estimate, cols2, colspool,
                     pos_start_of_data, lineno_start_of_data, 1, l, commentchar)
 
                 for iii=err.colno:length(cols)
