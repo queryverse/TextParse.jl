@@ -1,4 +1,4 @@
-using ../src/TextParse
+using TextParse
 
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
