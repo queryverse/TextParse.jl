@@ -12,7 +12,7 @@ Nullables = "4d1e1d77-625e-5b40-9113-a560ec7a8ecd"
 WeakRefStrings = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
 
 [compat]
-CodecZlib = "0.6"
+CodecZlib = "0.6, 0.7"
 DataStructures = "0.17"
 DoubleFloats = "0.9, 1"
 Nullables = "0.0.7, 0.0.8, 1"
