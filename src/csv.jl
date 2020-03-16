@@ -110,6 +110,11 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
             data = read(io)
             _csvread_internal(String(data), delim; filename=file, kwargs...)
         end
+    elseif ext == "bz2" # bzip2ed
+        return open(Bzip2DecompressorStream, file, "r") do io
+            data = read(io)
+            _csvread_internal(String(data), delim; filename=file, kwargs...)
+        end
     else # Otherwise just try to read the file
         return open(file, "r") do io
             data = Mmap.mmap(io)

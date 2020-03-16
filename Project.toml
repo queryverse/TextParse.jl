@@ -3,6 +3,7 @@ uuid = "e0df1984-e451-5cb5-8b61-797a481e67e3"
 version = "1.0.1-DEV"
 
 [deps]
+CodecBzip2 = "523fee87-0ab8-5b00-afb7-3ecf72e48cfd"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"

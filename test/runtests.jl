@@ -2,6 +2,7 @@ using TextParse
 
 import TextParse: tryparsenext, unwrap, failedat, AbstractToken, LocalOpts
 import CodecZlib: GzipCompressorStream
+import CodecBzip2: Bzip2CompressorStream
 using Test
 using Dates, Random
 using Nullables
@@ -738,6 +739,21 @@ end
     @test csvread([fn]) == csvread([fngz])
     if isfile(fngz)
         rm(fngz)
+    end
+end
+
+@testset "read bzip2ed files" begin
+    fn   = joinpath(@__DIR__, "data", "a.csv")
+    fnbz2 = fn*".bz2"
+    open(fn, "r") do ior
+        open(Bzip2CompressorStream, fnbz2, "w") do iow
+            write(iow, ior)
+        end
+    end
+    @test csvread(fn)   == csvread(fnbz2)
+    @test csvread([fn]) == csvread([fnbz2])
+    if isfile(fnbz2)
+        rm(fnbz2)
     end
 end
 
