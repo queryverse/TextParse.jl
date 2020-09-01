@@ -1,6 +1,6 @@
 name = "TextParse"
 uuid = "e0df1984-e451-5cb5-8b61-797a481e67e3"
-version = "1.0.1"
+version = "1.0.2-DEV"
 
 [deps]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
