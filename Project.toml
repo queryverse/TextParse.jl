@@ -1,27 +1,27 @@
 name = "TextParse"
 uuid = "e0df1984-e451-5cb5-8b61-797a481e67e3"
-version = "1.0.1-DEV"
+version = "1.0.1"
 
 [deps]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
-DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
-Mmap = "a63ad114-7e13-5084-954f-fe012c677804"
-Nullables = "4d1e1d77-625e-5b40-9113-a560ec7a8ecd"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 WeakRefStrings = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
+Mmap = "a63ad114-7e13-5084-954f-fe012c677804"
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
+Nullables = "4d1e1d77-625e-5b40-9113-a560ec7a8ecd"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 CodecZlib = "0.6, 0.7"
+julia = "1"
 DataStructures = "0.17, 0.18"
+WeakRefStrings = "0.5, 0.6"
 DoubleFloats = "0.9, 1"
 Nullables = "0.0.7, 0.0.8, 1"
-WeakRefStrings = "0.5, 0.6"
-julia = "1"
-
-[extras]
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test", "Random"]
