@@ -140,6 +140,23 @@ end
 
 @inline _is_positive(str, i) = str[i]=='+'
 
+@inline function _is_inf(str, i)
+    y = iterate(str, i)
+    if !isnothing(y) && lowercase(y[1]) == 'i'
+        i = y[2]
+        y = iterate(str, i)
+        if !isnothing(y) && lowercase(y[1]) == 'n'
+            i = y[2]
+            y = iterate(str, i)
+            return !isnothing(y) && lowercase(y[1]) == 'f'
+        else
+            return false
+        end
+    else
+        return false
+    end
+end
+
 const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
 
 @inline function convert_to_double(f1::Int64, exp::Int)
@@ -178,69 +195,76 @@ end
         i = y1[2]
     end
 
-    f1::Int64 = 0
-
-    # read an integer up to the decimal point
-    f1, rval1, idecpt = parse_uint_and_stop(str, i, len, f1)
-    idecpt = read_digits(str, idecpt, len) # get any trailing digits
-    i = idecpt
-
-    ie = i
-    frac_digits = 0
-
-    # next thing must be dec pt.
+    # check if inf
     y2 = iterate(str, i)
-    if y2!==nothing && y2[1]=='.'
-        i =y2[2]
-        f1, rval2, ie = parse_uint_and_stop(str, i, len, f1)
-        # TODO This is incorrect for string types where a digit takes up
-        # more than one codeunit, we need to return the number of digits
-        # from parse_uint_and_stop instead. Ok for now because we are
-        # not handling any such string types.
-        frac_digits = ie - i
+    if y2!==nothing && _is_inf(str, i)
+        f = F(Inf)
+        i = y2[2] + 2
+    else
+        f1::Int64 = 0
 
-        ie = read_digits(str, ie, len) # get any trailing digits
-    elseif !rval1 # no first number, and now no deciaml point => invalid
-        @goto error
-    end
+        # read an integer up to the decimal point
+        f1, rval1, idecpt = parse_uint_and_stop(str, i, len, f1)
+        idecpt = read_digits(str, idecpt, len) # get any trailing digits
+        i = idecpt
 
-    # Next thing must be exponent
-    i = ie
-    eval::Int32 = 0
+        ie = i
+        frac_digits = 0
 
-    y3 = iterate(str, i)
-    if y3!==nothing && _is_e(str, i)
-        i = y3[2]
+        # next thing must be dec pt.
+        y2 = iterate(str, i)
+        if y2!==nothing && y2[1]=='.'
+            i =y2[2]
+            f1, rval2, ie = parse_uint_and_stop(str, i, len, f1)
+            # TODO This is incorrect for string types where a digit takes up
+            # more than one codeunit, we need to return the number of digits
+            # from parse_uint_and_stop instead. Ok for now because we are
+            # not handling any such string types.
+            frac_digits = ie - i
 
-        y4 = iterate(str, i)
-        if y4!==nothing
-            enegate = false
-            if _is_negative(str, i)
-                enegate = true
-                i = y4[2]
-            elseif _is_positive(str, i)
-                i = y4[2]
+            ie = read_digits(str, ie, len) # get any trailing digits
+        elseif !rval1 # no first number, and now no deciaml point => invalid
+            @goto error
+        end
+
+        # Next thing must be exponent
+        i = ie
+        eval::Int32 = 0
+
+        y3 = iterate(str, i)
+        if y3!==nothing && _is_e(str, i)
+            i = y3[2]
+
+            y4 = iterate(str, i)
+            if y4!==nothing
+                enegate = false
+                if _is_negative(str, i)
+                    enegate = true
+                    i = y4[2]
+                elseif _is_positive(str, i)
+                    i = y4[2]
+                end
+            end
+            eval, rval3, i = parse_uint_and_stop(str, i, len, eval)
+            if enegate
+                eval *= Int32(-1)
             end
         end
-        eval, rval3, i = parse_uint_and_stop(str, i, len, eval)
-        if enegate
-            eval *= Int32(-1)
-        end
-    end
 
-    exp = eval - frac_digits
+        exp = eval - frac_digits
 
-    maxexp = 308
-    minexp = -307
+        maxexp = 308
+        minexp = -307
 
-    if frac_digits <= 15 && -22 <= exp <= 22
-        if exp >= 0
-            f = F(f1)*10.0^exp
+        if frac_digits <= 15 && -22 <= exp <= 22
+            if exp >= 0
+                f = F(f1)*10.0^exp
+            else
+                f = F(f1)/10.0^(-exp)
+            end
         else
-            f = F(f1)/10.0^(-exp)
+            f = convert_to_double(f1, exp)
         end
-    else
-          f = convert_to_double(f1, exp)
     end
 
     if negate
@@ -754,4 +778,3 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     @label done
     return R(convert(T, res)), i
 end
-
