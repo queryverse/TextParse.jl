@@ -53,7 +53,7 @@ percentagestring = "35.35%"
 percentagestringlen = our_lastindex(percentagestring)
 somestring = "foo something,"
 somestringlen = our_lastindex(somestring)
-somequotedstring =  "\"Owner 2 ”Vicepresident\"\"\""
+somequotedstring = "\"Owner 2 ”Vicepresident\"\"\""
 somequotedstringlen = our_lastindex(somequotedstring)
 
 longfloat64str = "2344345.1232353459389238738435"
@@ -65,14 +65,14 @@ datetimestr = "1970-02-02 02:20:20"
 datetimestrlen = our_lastindex(datetimestr)
 
 SUITE["util"]["tryparsenext"] = BenchmarkGroup()
-SUITE["util"]["tryparsenext"]["NumericFloat64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(Float64)), $float64str,1,$float64strlen)
-SUITE["util"]["tryparsenext"]["LongNumericFloat64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(Float64)), $longfloat64str,1,$longfloat64strlen)
-SUITE["util"]["tryparsenext"]["UInt64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(UInt64)), $intstr,1,$intstrlen)
-SUITE["util"]["tryparsenext"]["NegInt64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(Int64)), $negintstr,1,$negintstrlen)
-SUITE["util"]["tryparsenext"]["Percentage"] = @benchmarkable TextParse.tryparsenext($(TextParse.Percentage()), $percentagestring,1,$percentagestringlen, TextParse.default_opts)
-SUITE["util"]["tryparsenext"]["StringToken"] = @benchmarkable TextParse.tryparsenext($(TextParse.StringToken(String)), $somestring,1,$somestringlen, TextParse.default_opts)
-SUITE["util"]["tryparsenext"]["DateTimeToken"] = @benchmarkable TextParse.tryparsenext($tok, $datetimestr,1,$datetimestrlen, $opts)
-SUITE["util"]["tryparsenext"]["QuotedStringToken"] = @benchmarkable TextParse.tryparsenext($(Quoted(String,quotechar='"', escapechar='"')), $somequotedstring)
+SUITE["util"]["tryparsenext"]["NumericFloat64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(Float64)), $float64str, 1, $float64strlen)
+SUITE["util"]["tryparsenext"]["LongNumericFloat64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(Float64)), $longfloat64str, 1, $longfloat64strlen)
+SUITE["util"]["tryparsenext"]["UInt64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(UInt64)), $intstr, 1, $intstrlen)
+SUITE["util"]["tryparsenext"]["NegInt64"] = @benchmarkable TextParse.tryparsenext($(TextParse.Numeric(Int64)), $negintstr, 1, $negintstrlen)
+SUITE["util"]["tryparsenext"]["Percentage"] = @benchmarkable TextParse.tryparsenext($(TextParse.Percentage()), $percentagestring, 1, $percentagestringlen, TextParse.default_opts)
+SUITE["util"]["tryparsenext"]["StringToken"] = @benchmarkable TextParse.tryparsenext($(TextParse.StringToken(String)), $somestring, 1, $somestringlen, TextParse.default_opts)
+SUITE["util"]["tryparsenext"]["DateTimeToken"] = @benchmarkable TextParse.tryparsenext($tok, $datetimestr, 1, $datetimestrlen, $opts)
+SUITE["util"]["tryparsenext"]["QuotedStringToken"] = @benchmarkable TextParse.tryparsenext($(Quoted(String, quotechar='"', escapechar='"')), $somequotedstring)
 
 somefieldstring = " 12,3"
 f = TextParse.fromtype(Int)

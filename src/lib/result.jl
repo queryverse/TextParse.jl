@@ -18,8 +18,8 @@ struct Result{T,S}
     error::IRef{S}
     function Result{T,S}(issuccess, val) where {T,S}
         issuccess ?
-            new{T,S}(issuccess, IRef{T}(val), IRef{S}()) :
-            new{T,S}(issuccess, IRef{T}(), IRef{S}(val))
+        new{T,S}(issuccess, IRef{T}(val), IRef{S}()) :
+        new{T,S}(issuccess, IRef{T}(), IRef{S}(val))
     end
 end
 
