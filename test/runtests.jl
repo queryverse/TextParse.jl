@@ -75,6 +75,10 @@ import TextParse: fromtype, Percentage
     @test tryparsenext(fromtype(Float64), "-1e-12") |> unwrap == (-1.0e-12,7)
     @test tryparsenext(fromtype(Float64), "-1.0E-12", 1, 8) |> unwrap == (-1.0e-12,9)
     @test tryparsenext(fromtype(Float64), "5.e-3", 1, 5) |> unwrap == (5.0e-3,6) # 32
+    @test tryparsenext(fromtype(Float64), "Inf", 1, 3) |> unwrap == (Inf,4)
+    @test tryparsenext(fromtype(Float64), "inf", 1, 3) |> unwrap == (Inf,4)
+    @test tryparsenext(fromtype(Float64), "INF", 1, 3) |> unwrap == (Inf,4)
+    @test tryparsenext(fromtype(Float64), "-Inf", 1, 4) |> unwrap == (-Inf,5)
     @test tryparsenext(Percentage(), "33%") |> unwrap == (.33,4)
     @test tryparsenext(Percentage(), "3.3%") |> unwrap == (.033,5)
 
@@ -89,6 +93,10 @@ import TextParse: fromtype, Percentage
     @test tryparsenext(fromtype(Float64), SubString("-1e-12", 1)) |> unwrap == (-1.0e-12,7)
     @test tryparsenext(fromtype(Float64), SubString("-1.0E-12", 1), 1, 8) |> unwrap == (-1.0e-12,9)
     @test tryparsenext(fromtype(Float64), SubString("5.e-3", 1), 1, 5) |> unwrap == (5.0e-3,6) # 32
+    @test tryparsenext(fromtype(Float64), SubString("Inf", 1), 1, 3) |> unwrap == (Inf,4)
+    @test tryparsenext(fromtype(Float64), SubString("inf", 1), 1, 3) |> unwrap == (Inf,4)
+    @test tryparsenext(fromtype(Float64), SubString("INF", 1), 1, 3) |> unwrap == (Inf,4)
+    @test tryparsenext(fromtype(Float64), SubString("-Inf", 1), 1, 4) |> unwrap == (-Inf,5)
     @test tryparsenext(Percentage(), SubString("33%", 1)) |> unwrap == (.33,4)
     @test tryparsenext(Percentage(), SubString("3.3%", 1)) |> unwrap == (.033,5)
 
