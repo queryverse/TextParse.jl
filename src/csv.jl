@@ -87,7 +87,11 @@ function csvread(file::IOStream, delim=','; kwargs...)
     try
         _csvread(VectorBackedUTF8String(mmap_data), delim; kwargs...)
     finally
-        finalize(mmap_data)
+        @static if VERSION ≥ v"1.11"
+            finalize(mmap_data.ref.mem)
+        else
+            finalize(mmap_data)
+        end
     end
 end
 
@@ -116,7 +120,11 @@ function _csvread_f(file::AbstractString, delim=','; kwargs...)
             try
                 _csvread_internal(VectorBackedUTF8String(data), delim; filename=file, kwargs...)
             finally
-                finalize(data)
+                @static if VERSION ≥ v"1.11"
+                    finalize(data.ref.mem)
+                else
+                    finalize(data)
+                end
             end
         end
     end
