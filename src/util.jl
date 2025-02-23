@@ -17,7 +17,7 @@ macro chk1(expr,label=:error)
 end
 =#
 
-macro chk2(expr,label=:error)
+macro chk2(expr, label=:error)
     @assert expr.head == :(=)
     lhs, rhs = expr.args
 
@@ -36,27 +36,27 @@ end
 
 @inline _isdigit(c::Char) = isdigit(c)
 
-@inline function parse_uint_and_stop(str, i, len, n::T) where {T <: Integer}
+@inline function parse_uint_and_stop(str, i, len, n::T) where {T<:Integer}
     ten = T(10)
     # specialize handling of the first digit so we can return an error
-    max_without_overflow = div(typemax(T)-9,10) # the larg
+    max_without_overflow = div(typemax(T) - 9, 10) # the larg
     y1 = iterate(str, i)
-    y1===nothing && return n, false, i
+    y1 === nothing && return n, false, i
     c = y1[1]
     if _isdigit(c) && n <= max_without_overflow
         n *= ten
-        n += T(c-'0')
+        n += T(c - '0')
     else
         return n, false, i
     end
     i = y1[2]
 
     y2 = iterate(str, i)
-    while y2!==nothing && n <= max_without_overflow
+    while y2 !== nothing && n <= max_without_overflow
         c = y2[1]
         if _isdigit(c)
             n *= ten
-            n += T(c-'0')
+            n += T(c - '0')
         else
             return n, true, i
         end
@@ -70,7 +70,7 @@ end
 # slurp up extra digits
 @inline function read_digits(str, i, len)
     y = iterate(str, i)
-    while y!==nothing
+    while y !== nothing
         c = y[1]
         if !_isdigit(c) # do nothing
             return i
@@ -81,42 +81,46 @@ end
     return i
 end
 
-@inline function tryparsenext_base10_digit(T,str,i, len)
-    y = iterate(str,i)
-    y===nothing && @goto error
-    c = y[1]; ii = y[2]
+@inline function tryparsenext_base10_digit(T, str, i, len)
+    y = iterate(str, i)
+    y === nothing && @goto error
+    c = y[1]
+    ii = y[2]
     '0' <= c <= '9' || @goto error
-    return convert(T, c-'0'), ii
+    return convert(T, c - '0'), ii
 
     @label error
     return nothing
 end
 
 Base.@pure maxdigits(::Type{T}) where {T} = ndigits(typemax(T))
-Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, T(10)^(maxdigits(T)-1))
+Base.@pure min_with_max_digits(::Type{T}) where {T} = convert(T, T(10)^(maxdigits(T) - 1))
 
-@inline function tryparsenext_base10(T, str,i,len)
+@inline function tryparsenext_base10(T, str, i, len)
     i0 = i
     R = Nullable{T}
-    y = tryparsenext_base10_digit(T,str,i, len)
-    y===nothing && return R(), i
-    r = y[1]; i = y[2]
+    y = tryparsenext_base10_digit(T, str, i, len)
+    y === nothing && return R(), i
+    r = y[1]
+    i = y[2]
 
     # Eat zeros
-    while r==0
-        y2 = tryparsenext_base10_digit(T,str,i, len)
+    while r == 0
+        y2 = tryparsenext_base10_digit(T, str, i, len)
         y2 === nothing && return R(convert(T, 0)), i
-        r = y2[1]; i = y2[2]
+        r = y2[1]
+        i = y2[2]
     end
 
     digits = 1
     ten = T(10)
     while true
-        y2 = tryparsenext_base10_digit(T,str,i,len)
-        y2===nothing && break
+        y2 = tryparsenext_base10_digit(T, str, i, len)
+        y2 === nothing && break
         digits += 1
-        d = y2[1]; i = y2[2]
-        r = r*ten + d
+        d = y2[1]
+        i = y2[2]
+        r = r * ten + d
     end
 
     max_digits = maxdigits(T)
@@ -141,10 +145,11 @@ end
     R = Nullable{Int}
 
     y = iterate(str, i)
-    if y===nothing
+    if y === nothing
         return return R(), i
     else
-        c = y[1]; ii = y[2]
+        c = y[1]
+        ii = y[2]
         if c == '-'
             return R(-1), ii
         elseif c == '+'
@@ -165,10 +170,11 @@ end
 
 @inline function eatwhitespaces(str, i=1, l=lastindex(str))
     y = iterate(str, i)
-    while y!==nothing
-        c = y[1]; ii = y[2]
+    while y !== nothing
+        c = y[1]
+        ii = y[2]
         if isspace(c)
-            i=ii
+            i = ii
         else
             break
         end
@@ -181,27 +187,28 @@ end
 function eatnewlines(str, i=1, l=lastindex(str))
     count = 0
     y = iterate(str, i)
-    while y!==nothing
-        c = y[1]; ii = y[2]
+    while y !== nothing
+        c = y[1]
+        ii = y[2]
         if c == '\r'
-            i=ii
+            i = ii
             y2 = iterate(str, i)
-            if y2!==nothing
+            if y2 !== nothing
                 c = y2[1]
                 ii = y2[2]
                 if c == '\n'
-                    i=ii
+                    i = ii
                 end
             end
             count += 1
         elseif c == '\n'
-            i=ii
+            i = ii
             y3 = iterate(str, i)
-            if y3!==nothing
+            if y3 !== nothing
                 c = y3[1]
                 ii = y3[2]
                 if c == '\r'
-                    i=ii
+                    i = ii
                 end
             end
             count += 1
@@ -216,7 +223,7 @@ end
 
 # Move past consecutive lines that start with commentchar.
 # Return a tuple of the new pos in str and the amount of comment lines moved past.
-function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char, Nothing}=nothing) 
+function eatcommentlines(str, i=1, l=lastindex(str), commentchar::Union{Char,Nothing}=nothing)
     commentchar === nothing && return i, 0
 
     count = 0
@@ -233,13 +240,14 @@ end
 
 function stripquotes(x)
     x[1] in ('\'', '"') && x[1] == x[end] ?
-        strip(x, x[1]) : x
+    strip(x, x[1]) : x
 end
 
 function getlineend(str, i=1, l=lastindex(str))
     y = iterate(str, i)
-    while y!==nothing
-        c = y[1]; ii = y[2]
+    while y !== nothing
+        c = y[1]
+        ii = y[2]
         isnewline(c) && break
         i = ii
         y = iterate(str, i)
@@ -254,44 +262,48 @@ function getrowend(str, i, len, opts, delim)
     i0 = i
     i = eatwhitespaces(str, i, len)
     y = iterate(str, i)
-    while y!==nothing
-        c = y[1]; i = y[2]
-        if c==Char(opts.quotechar)
+    while y !== nothing
+        c = y[1]
+        i = y[2]
+        if c == Char(opts.quotechar)
             # We are now inside a quoted field
             y2 = iterate(str, i)
-            while y2!==nothing
-                c = y2[1]; i = y2[2]
-                if c==Char(opts.escapechar)
+            while y2 !== nothing
+                c = y2[1]
+                i = y2[2]
+                if c == Char(opts.escapechar)
                     y3 = iterate(str, i)
-                    if y3===nothing
-                        if c==Char(opts.quotechar)
+                    if y3 === nothing
+                        if c == Char(opts.quotechar)
                             return prevind(str, i)
                         else
                             error("Parsing error, quoted string never terminated.")
                         end
                     else
-                        c2 = y3[1]; ii = y3[2]
-                        if c2==Char(opts.quotechar)
+                        c2 = y3[1]
+                        ii = y3[2]
+                        if c2 == Char(opts.quotechar)
                             i = ii
-                        elseif c==Char(opts.quotechar)
+                        elseif c == Char(opts.quotechar)
                             break
                         end
                     end
-                elseif c==Char(opts.quotechar)
-                    break;
+                elseif c == Char(opts.quotechar)
+                    break
                 end
                 y2 = iterate(str, i)
-                if y2===nothing
+                if y2 === nothing
                     error("Parsing error, quoted string never terminated.")
                 end
             end
             i = eatwhitespaces(str, i, len)
             y4 = iterate(str, i)
-            if y4!==nothing
-                c = y4[1]; i4 = y4[2]
+            if y4 !== nothing
+                c = y4[1]
+                i4 = y4[2]
                 if isnewline(c)
                     return prevind(str, i)
-                elseif c!=Char(delim)
+                elseif c != Char(delim)
                     error("Invalid line")
                 end
             else
@@ -299,9 +311,10 @@ function getrowend(str, i, len, opts, delim)
             end
         else
             # We are now inside a non quoted field
-            while y!==nothing
-                c = y[1]; i = y[2]
-                if c==Char(delim)
+            while y !== nothing
+                c = y[1]
+                i = y[2]
+                if c == Char(delim)
                     i = eatwhitespaces(str, i, len)
                     break
                 elseif isnewline(c)

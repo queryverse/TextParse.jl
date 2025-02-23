@@ -36,7 +36,7 @@ Base.@propagate_inbounds function Base.iterate(s::VectorBackedUTF8String, i::Int
     i > ncodeunits(s) && return nothing
     b = codeunit(s, i)
     u = UInt32(b) << 24
-    Base.between(b, 0x80, 0xf7) || return reinterpret(Char, u), i+1
+    Base.between(b, 0x80, 0xf7) || return reinterpret(Char, u), i + 1
     return our_next_continued(s, i, u)
 end
 
@@ -57,8 +57,9 @@ function our_next_continued(s::VectorBackedUTF8String, i::Int, u::UInt32)
     ((i += 1) > n) | (u < 0xf0000000) && @goto ret
     @inbounds b = codeunit(s, i)
     b & 0xc0 == 0x80 || @goto ret
-    u |= UInt32(b); i += 1
-@label ret
+    u |= UInt32(b)
+    i += 1
+    @label ret
     return reinterpret(Char, u), i
 end
 

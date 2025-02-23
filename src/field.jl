@@ -29,7 +29,7 @@ Options local to the token currently being parsed.
 - `includequotes`: whether to include quotes while parsing
 - `includenewlines`: whether to include newlines while parsing
 """
-struct LocalOpts{T_ENDCHAR<:Union{Char,UInt8}, T_QUOTECHAR<:Union{Char,UInt8}, T_ESCAPECHAR<:Union{Char,UInt8}}
+struct LocalOpts{T_ENDCHAR<:Union{Char,UInt8},T_QUOTECHAR<:Union{Char,UInt8},T_ESCAPECHAR<:Union{Char,UInt8}}
     endchar::T_ENDCHAR        # End parsing at this char
     spacedelim::Bool
     quotechar::T_QUOTECHAR       # Quote char
@@ -49,12 +49,12 @@ end
     tryparsenext(tok, str, i, len)
 end
 
-struct WrapLocalOpts{T, X<:AbstractToken} <: AbstractToken{T}
+struct WrapLocalOpts{T,X<:AbstractToken} <: AbstractToken{T}
     opts::LocalOpts
     inner::X
 end
 
-WrapLocalOpts(opts, inner) = WrapLocalOpts{fieldtype(inner), typeof(inner)}(opts, inner)
+WrapLocalOpts(opts, inner) = WrapLocalOpts{fieldtype(inner),typeof(inner)}(opts, inner)
 
 @inline function tryparsenext(tok::WrapLocalOpts, str, i, len, opts::LocalOpts=default_opts)
     tryparsenext(tok.inner, str, i, len, tok.opts)
@@ -69,7 +69,7 @@ function tryparsenext(::Unknown, str, i, len, opts)
     nullableNA, i
 end
 show(io::IO, ::Unknown) = print(io, "<unknown>")
-struct CustomParser{T, F} <: AbstractToken{T}
+struct CustomParser{T,F} <: AbstractToken{T}
     f::Function
 end
 
@@ -124,23 +124,23 @@ function tryparsenext(::Numeric{T}, str, i, len) where {T<:Signed}
     @chk2 x, i = tryparsenext_base10(T, str, i, len)
 
     @label done
-    return R(convert(T, sign*x)), i
+    return R(convert(T, sign * x)), i
 
     @label error
     return R(), i
 end
 
 @inline function tryparsenext(::Numeric{T}, str, i, len) where {T<:Unsigned}
-    tryparsenext_base10(T,str, i, len)
+    tryparsenext_base10(T, str, i, len)
 end
 
-@inline _is_e(str, i) = str[i]=='e' || str[i]=='E'
+@inline _is_e(str, i) = str[i] == 'e' || str[i] == 'E'
 
-@inline _is_negative(str, i) = str[i]=='-'
+@inline _is_negative(str, i) = str[i] == '-'
 
-@inline _is_positive(str, i) = str[i]=='+'
+@inline _is_positive(str, i) = str[i] == '+'
 
-const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
+const pre_comp_exp_double = Double64[Double64(10.0)^i for i = 0:308]
 
 @inline function convert_to_double(f1::Int64, exp::Int)
     f = Float64(f1)
@@ -155,7 +155,7 @@ const pre_comp_exp_double = Double64[Double64(10.0)^i for i=0:308]
     else
         if exp < minexp # not sure why this is a good choice, but it seems to be!
             x /= pre_comp_exp_double[-minexp+1]
-            x /= pre_comp_exp_double[-exp + minexp + 1]
+            x /= pre_comp_exp_double[-exp+minexp+1]
         else
             x /= pre_comp_exp_double[-exp+1]
         end
@@ -167,14 +167,14 @@ end
     R = Nullable{F}
 
     y1 = iterate(str, i)
-    y1===nothing && @goto error
+    y1 === nothing && @goto error
 
     negate = false
     c = y1[1]
-    if c=='-'
+    if c == '-'
         negate = true
         i = y1[2]
-    elseif c=='+'
+    elseif c == '+'
         i = y1[2]
     end
 
@@ -190,8 +190,8 @@ end
 
     # next thing must be dec pt.
     y2 = iterate(str, i)
-    if y2!==nothing && y2[1]=='.'
-        i =y2[2]
+    if y2 !== nothing && y2[1] == '.'
+        i = y2[2]
         f1, rval2, ie = parse_uint_and_stop(str, i, len, f1)
         # TODO This is incorrect for string types where a digit takes up
         # more than one codeunit, we need to return the number of digits
@@ -209,11 +209,11 @@ end
     eval::Int32 = 0
 
     y3 = iterate(str, i)
-    if y3!==nothing && _is_e(str, i)
+    if y3 !== nothing && _is_e(str, i)
         i = y3[2]
 
         y4 = iterate(str, i)
-        if y4!==nothing
+        if y4 !== nothing
             enegate = false
             if _is_negative(str, i)
                 enegate = true
@@ -235,12 +235,12 @@ end
 
     if frac_digits <= 15 && -22 <= exp <= 22
         if exp >= 0
-            f = F(f1)*10.0^exp
+            f = F(f1) * 10.0^exp
         else
-            f = F(f1)/10.0^(-exp)
+            f = F(f1) / 10.0^(-exp)
         end
     else
-          f = convert_to_double(f1, exp)
+        f = convert_to_double(f1, exp)
     end
 
     if negate
@@ -266,10 +266,11 @@ function tryparsenext(::Percentage, str, i, len, opts)
         # parse away the % char
         ii = eatwhitespaces(str, ii, len)
         y = iterate(str, ii)
-        if y===nothing
+        if y === nothing
             return Nullable{Float64}(), ii # failed to parse %
         else
-            c = y[1]; k = y[2]
+            c = y[1]
+            k = y[2]
             if c != '%'
                 return Nullable{Float64}(), ii # failed to parse %
             else
@@ -302,20 +303,22 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
     i0 = i
     if opts.includequotes
         y = iterate(str, i)
-        if y!==nothing
-            c = y[1]; ii = y[2]
+        if y !== nothing
+            c = y[1]
+            ii = y[2]
             if c == Char(opts.quotechar)
                 i = ii # advance counter so that
-                       # the while loop doesn't react to opening quote
+                # the while loop doesn't react to opening quote
             end
         end
     end
 
     y2 = iterate(str, i)
-    while y2!==nothing
-        c = y2[1]; ii = y2[2]
+    while y2 !== nothing
+        c = y2[1]
+        ii = y2[2]
 
-        if inside_quoted_strong && p==Char(opts.escapechar)
+        if inside_quoted_strong && p == Char(opts.escapechar)
             escapecount += 1
         end
 
@@ -328,13 +331,14 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
                     # sometimes the quotechar is the escapechar
                     # in that case we need to see the next char
                     y3 = iterate(str, ii)
-                    if y3===nothing
+                    if y3 === nothing
                         if opts.includequotes
-                            i=ii
+                            i = ii
                         end
                         break
                     else
-                        nxt = y3[1]; j = y3[2]
+                        nxt = y3[1]
+                        j = y3[2]
                         if nxt == Char(opts.quotechar)
                             # the current character is escaping the
                             # next one
@@ -365,15 +369,15 @@ function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
         y2 = iterate(str, i)
     end
 
-    return R(_substring(T, str, i0, i-1, escapecount, opts)), i
+    return R(_substring(T, str, i0, i - 1, escapecount, opts)), i
 end
 
 @inline function _substring(::Type{String}, str, i, j, escapecount, opts)
     if escapecount > 0
-        buf = IOBuffer(sizehint=j-i+1-escapecount)
+        buf = IOBuffer(sizehint=j - i + 1 - escapecount)
         cur_i = i
         c = str[cur_i]
-        if opts.includequotes && c==Char(opts.quotechar)
+        if opts.includequotes && c == Char(opts.quotechar)
             print(buf, c)
             cur_i = nextind(str, cur_i)
         end
@@ -394,7 +398,7 @@ end
         end
         return String(take!(buf))
     else
-        return unsafe_string(pointer(str, i), j-i+1)
+        return unsafe_string(pointer(str, i), j - i + 1)
     end
 end
 
@@ -420,7 +424,7 @@ end
 
 export Quoted
 
-struct Quoted{T, S<:AbstractToken, T_QUOTECHAR<:Union{Char,UInt8}, T_ESCAPECHAR<:Union{Char,UInt8}} <: AbstractToken{T}
+struct Quoted{T,S<:AbstractToken,T_QUOTECHAR<:Union{Char,UInt8},T_ESCAPECHAR<:Union{Char,UInt8}} <: AbstractToken{T}
     inner::S
     required::Bool
     stripwhitespaces::Bool
@@ -451,26 +455,27 @@ end
 function Quoted(inner::S,
     quotechar::T_QUOTECHAR, escapechar::T_ESCAPECHAR;
     required=false,
-    stripwhitespaces=fieldtype(S)<:Number,
+    stripwhitespaces=fieldtype(S) <: Number,
     includequotes=false,
     includenewlines=true) where {S<:AbstractToken,T_QUOTECHAR,T_ESCAPECHAR}
 
     T = fieldtype(S)
     Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}(inner, required, stripwhitespaces, includequotes,
-                includenewlines, quotechar, escapechar)
+        includenewlines, quotechar, escapechar)
 end
 
 Quoted(t::Type, quotechar, escapechar; kwargs...) = Quoted(fromtype(t), quotechar, escapechar; kwargs...)
 
 function tryparsenext(q::Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}, str, i, len, opts) where {T,S,T_QUOTECHAR,T_ESCAPECHAR}
     y1 = iterate(str, i)
-    if y1===nothing
+    if y1 === nothing
         q.required && @goto error
         # check to see if inner thing is ok with an empty field
         @chk2 x, i = tryparsenext(q.inner, str, i, len, opts) error
         @goto done
     end
-    c = y1[1]; ii = y1[2]
+    c = y1[1]
+    ii = y1[2]
     quotestarted = false
     if Char(q.quotechar) == c
         quotestarted = true
@@ -487,7 +492,7 @@ function tryparsenext(q::Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}, str, i, len, opts
 
     if quotestarted
         qopts = LocalOpts(q.quotechar, false, q.quotechar, q.escapechar,
-                         q.includequotes, q.includenewlines)
+            q.includequotes, q.includenewlines)
         @chk2 x, i = tryparsenext(q.inner, str, i, len, qopts)
     else
         @chk2 x, i = tryparsenext(q.inner, str, i, len, opts)
@@ -504,8 +509,9 @@ function tryparsenext(q::Quoted{T,S,T_QUOTECHAR,T_ESCAPECHAR}, str, i, len, opts
         i = eatwhitespaces(str, i, len)
     end
     y2 = iterate(str, i)
-    y2===nothing && error("Internal error.")
-    c = y2[1]; ii = y2[2]
+    y2 === nothing && error("Internal error.")
+    c = y2[1]
+    ii = y2[2]
 
     if quotestarted && !q.includequotes
         c != Char(q.quotechar) && @goto error
@@ -531,8 +537,8 @@ end
 Parse a date time string of format `fmt` into type `T` which is
 either `Date`, `Time` or `DateTime`.
 """
-DateTimeToken(T::Type, df::S) where {S<:DateFormat} = DateTimeToken{T, S}(df)
-DateTimeToken(df::S) where {S<:DateFormat} = DateTimeToken{DateTime, S}(df)
+DateTimeToken(T::Type, df::S) where {S<:DateFormat} = DateTimeToken{T,S}(df)
+DateTimeToken(df::S) where {S<:DateFormat} = DateTimeToken{DateTime,S}(df)
 fromtype(df::DateFormat) = DateTimeToken(DateTime, df)
 fromtype(::Type{DateTime}) = DateTimeToken(DateTime, ISODateTimeFormat)
 fromtype(::Type{Date}) = DateTimeToken(Date, ISODateFormat)
@@ -549,13 +555,13 @@ end
 
 ### Missing
 
-const nastrings_upcase = ["NA", "NULL", "N/A","#N/A", "#N/A N/A", "#NA",
-                          "-1.#IND", "-1.#QNAN", "-NaN", "-nan",
-                          "1.#IND", "1.#QNAN", "N/A", "NA", "NaN", "nan"]
+const nastrings_upcase = ["NA", "NULL", "N/A", "#N/A", "#N/A N/A", "#NA",
+    "-1.#IND", "-1.#QNAN", "-NaN", "-nan",
+    "1.#IND", "1.#QNAN", "N/A", "NA", "NaN", "nan"]
 
 const NA_STRINGS = sort!(vcat(nastrings_upcase, map(lowercase, nastrings_upcase)))
 
-struct NAToken{T, S<:AbstractToken} <: AbstractToken{T}
+struct NAToken{T,S<:AbstractToken} <: AbstractToken{T}
     inner::S
     emptyisna::Bool
     nastrings::Vector{String}
@@ -573,11 +579,10 @@ Parses a Nullable item.
 """
 function NAToken(
     inner::S
-  ; emptyisna=true
-  , nastrings=NA_STRINGS) where S
+    ; emptyisna=true, nastrings=NA_STRINGS) where S
 
     T = fieldtype(inner)
-    NAToken{UnionMissing{T}, S}(inner, emptyisna, nastrings)
+    NAToken{UnionMissing{T},S}(inner, emptyisna, nastrings)
 end
 
 function show(io::IO, na::NAToken)
@@ -588,8 +593,8 @@ end
 function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
     R = Nullable{T}
     i = eatwhitespaces(str, i, len)
-    y1 = iterate(str,i)
-    if y1===nothing
+    y1 = iterate(str, i)
+    if y1 === nothing
         if na.emptyisna
             @goto null
         else
@@ -597,25 +602,26 @@ function tryparsenext(na::NAToken{T}, str, i, len, opts) where {T}
         end
     end
 
-    c = y1[1]; ii=y1[2]
+    c = y1[1]
+    ii = y1[2]
     if (c == Char(opts.endchar) || isnewline(c)) && na.emptyisna
-       @goto null
+        @goto null
     end
 
     if isa(na.inner, Unknown)
         @goto maybe_null
     end
-    @chk2 x,ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
+    @chk2 x, ii = tryparsenext(na.inner, str, i, len, opts) maybe_null
 
     @label done
     return R(convert(T, x)), ii
 
     @label maybe_null
     naopts = LocalOpts(opts.endchar, opts.spacedelim, opts.quotechar,
-                       opts.escapechar, false, opts.includenewlines)
+        opts.escapechar, false, opts.includenewlines)
     @chk2 nastr, ii = tryparsenext(StringToken(WeakRefString{UInt8}), str, i, len, naopts)
     if !isempty(searchsorted(na.nastrings, nastr))
-        i=ii
+        i = ii
         i = eatwhitespaces(str, i, len)
         @goto null
     end
@@ -661,23 +667,19 @@ function Field(inner::S; ignore_init_whitespace=true, ignore_end_whitespace=true
 end
 
 function Field(f::Field; inner=f.inner, ignore_init_whitespace=f.ignore_init_whitespace,
-                  ignore_end_whitespace=f.ignore_end_whitespace,
-                  eoldelim=f.eoldelim)
+    ignore_end_whitespace=f.ignore_end_whitespace,
+    eoldelim=f.eoldelim)
     T = fieldtype(inner)
     Field{T,typeof(inner)}(inner, ignore_init_whitespace,
-                           ignore_end_whitespace, eoldelim)
+        ignore_end_whitespace, eoldelim)
 end
 
 function swapinner(f::Field, inner::AbstractToken;
-        ignore_init_whitespace= f.ignore_end_whitespace
-      , ignore_end_whitespace=f.ignore_end_whitespace
-      , eoldelim=f.eoldelim
-  )
+    ignore_init_whitespace=f.ignore_end_whitespace, ignore_end_whitespace=f.ignore_end_whitespace, eoldelim=f.eoldelim
+)
     Field(inner;
-        ignore_init_whitespace=ignore_end_whitespace
-      , ignore_end_whitespace=ignore_end_whitespace
-      , eoldelim=eoldelim
-     )
+        ignore_init_whitespace=ignore_end_whitespace, ignore_end_whitespace=ignore_end_whitespace, eoldelim=eoldelim
+    )
 
 end
 
@@ -686,8 +688,9 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     i > len && @goto error
     if f.ignore_init_whitespace
         y1 = iterate(str, i)
-        while y1!==nothing
-            c = y1[1]; ii = y1[2]
+        while y1 !== nothing
+            c = y1[1]
+            ii = y1[2]
             !isspace(c) && break
             i = ii
             y1 = iterate(str, i)
@@ -698,9 +701,10 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     if f.ignore_end_whitespace
         i0 = i
         y2 = iterate(str, i)
-        while y2!==nothing
-            c = y2[1]; ii = y2[2]
-            !opts.spacedelim && Char(opts.endchar) == '\t' && c == '\t' && (i =ii; @goto done)
+        while y2 !== nothing
+            c = y2[1]
+            ii = y2[2]
+            !opts.spacedelim && Char(opts.endchar) == '\t' && c == '\t' && (i = ii; @goto done)
             !isspace(c) && c != '\t' && break
             i = ii
             y2 = iterate(str, i)
@@ -719,29 +723,32 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     end
 
     y3 = iterate(str, i)
-    y3===nothing && error("Internal error.")
-    c = y3[1]; ii = y3[2]
-    opts.spacedelim && (isspace(c) || c == '\t') && (i=ii; @goto done)
-    !opts.spacedelim && Char(opts.endchar) == c && (i=ii; @goto done)
+    y3 === nothing && error("Internal error.")
+    c = y3[1]
+    ii = y3[2]
+    opts.spacedelim && (isspace(c) || c == '\t') && (i = ii; @goto done)
+    !opts.spacedelim && Char(opts.endchar) == c && (i = ii; @goto done)
 
     if f.eoldelim
         if c == '\r'
-            i=ii
+            i = ii
             y4 = iterate(str, i)
-            if y4!==nothing
-                c = y4[1]; ii = y4[2]
+            if y4 !== nothing
+                c = y4[1]
+                ii = y4[2]
                 if c == '\n'
-                    i=ii
+                    i = ii
                 end
             end
             @goto done
         elseif c == '\n'
-            i=ii
+            i = ii
             y5 = iterate(str, i)
-            if y5!==nothing
-                c = y5[1]; ii = y5[2]
+            if y5 !== nothing
+                c = y5[1]
+                ii = y5[2]
                 if c == '\r'
-                    i=ii
+                    i = ii
                 end
             end
             @goto done
@@ -754,4 +761,3 @@ function tryparsenext(f::Field{T}, str, i, len, opts) where {T}
     @label done
     return R(convert(T, res)), i
 end
-

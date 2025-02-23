@@ -4,7 +4,7 @@ const common_date_formats = Any[
     dateformat"yyyy-mm-dd", dateformat"yyyy/mm/dd",
     dateformat"mm-dd-yyyy", dateformat"mm/dd/yyyy",
     dateformat"dd-mm-yyyy", dateformat"dd/mm/yyyy",
-    dateformat"dd u yyyy",  dateformat"e, dd u yyyy"
+    dateformat"dd u yyyy", dateformat"e, dd u yyyy"
 ]
 
 const common_datetime_formats = Any[
@@ -36,7 +36,8 @@ function guessdateformat(str, len=lastindex(str))
                 if l > len
                     return DateTimeToken(typ, df)
                 end
-            catch err; end
+            catch err
+            end
         end
     end
     return nothing
@@ -52,7 +53,7 @@ function getquotechar(x)
     return '\0'
 end
 
-function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess=Unknown()), nastrings=NA_STRINGS, stringarraytype=StringArray)
+function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess = Unknown()), nastrings=NA_STRINGS, stringarraytype=StringArray)
     q = getquotechar(x)
 
     if isa(prev_guess, StringToken)
@@ -66,9 +67,9 @@ function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess=Unknow
             prev_inner = prev_guess
         end
         inner_string = strip(strip(x, q))
-        if inner_string==""
+        if inner_string == ""
             # If we come across a "", we classify it as a string column no matter what
-            return Quoted(StringToken(stringarraytype<:StringArray ? StrRange : String), opts.quotechar, opts.escapechar)
+            return Quoted(StringToken(stringarraytype <: StringArray ? StrRange : String), opts.quotechar, opts.escapechar)
         else
             inner_token = guesstoken(inner_string, opts, true, prev_inner, nastrings, stringarraytype)
             return Quoted(inner_token, opts.quotechar, opts.escapechar)
@@ -114,19 +115,19 @@ function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess=Unknow
                 return Numeric(promote_type(T, fieldtype(prev_guess)))
             else
                 # something like a date turned into a single number?
-                y1 = StringToken(stringarraytype<:StringArray ? StrRange : String)
+                y1 = StringToken(stringarraytype <: StringArray ? StrRange : String)
                 return prevent_quote_wrap ? y1 : Quoted(y1, opts.quotechar, opts.escapechar)
             end
         else
             # fast-path
             if length(filter(isnumeric, x)) < 4
-                y2 = StringToken(stringarraytype<:StringArray ? StrRange : String)
+                y2 = StringToken(stringarraytype <: StringArray ? StrRange : String)
                 return prevent_quote_wrap ? y2 : Quoted(y2, opts.quotechar, opts.escapechar)
             end
 
             maybedate = guessdateformat(x)
             if maybedate === nothing
-                y3 = StringToken(stringarraytype<:StringArray ? StrRange : String)
+                y3 = StringToken(stringarraytype <: StringArray ? StrRange : String)
                 return prevent_quote_wrap ? y3 : Quoted(y3, opts.quotechar, opts.escapechar)
             else
                 return maybedate
@@ -134,5 +135,3 @@ function guesstoken(x, opts, prevent_quote_wrap, @nospecialize(prev_guess=Unknow
         end
     end
 end
-
-
