@@ -15,7 +15,7 @@ Returns a 2-element tuple `(values, pos)`:
 * `pos::Int`: The character index at which parsing stopped.
 """
 @generated function tryparsenext_internal(
-                                          ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar=UInt('\0'), raise::Bool=false,
+    ::Type{T}, str::AbstractString, pos::Int, len::Int, df::DateFormat, endchar=UInt('\0'), raise::Bool=false,
 ) where {T<:TimeType}
     letters = character_codes(df)
 
@@ -41,9 +41,9 @@ Returns a 2-element tuple `(values, pos)`:
     value_tuple = Expr(:tuple, value_names...)
 
     assign_value_till = Expr[
-    quote
-        ($i <= num_parsed) && ($name = unsafe_val[$i])
-    end for (i,name) in enumerate(value_names)]
+        quote
+            ($i <= num_parsed) && ($name = unsafe_val[$i])
+        end for (i, name) in enumerate(value_names)]
 
     quote
         values, pos, num_parsed = tryparsenext_core(str, pos, len, df, raise)
@@ -52,7 +52,7 @@ Returns a 2-element tuple `(values, pos)`:
         $(assign_value_till...)
         if isnull(values)
             if (pos <= len && str[pos] == Char(endchar)) ||
-                num_parsed == $(length(value_names))
+               num_parsed == $(length(value_names))
                 # finished parsing and found an extra char,
                 # or parsing was terminated by a delimiter
                 return Nullable{$R}($(Expr(:tuple, output_names...))), pos
@@ -108,7 +108,7 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
             quote
                 pos > len && @goto done
                 nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
-                nothingable_tuple===nothing && @goto error
+                nothingable_tuple === nothing && @goto error
                 $name = nothingable_tuple[1]
                 next_pos = nothingable_tuple[2]
                 pos = next_pos
@@ -119,7 +119,7 @@ Returns a 3-element tuple `(values, pos, num_parsed)`:
             quote
                 pos > len && @goto done
                 nothingable_tuple = tryparsenext(directives[$i], str, pos, len, locale)
-                nothingable_tuple===nothing && @goto error
+                nothingable_tuple === nothing && @goto error
                 nullable_delim = nothingable_tuple[1]
                 next_pos = nothingable_tuple[2]
                 pos = next_pos
