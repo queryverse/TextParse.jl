@@ -140,62 +140,69 @@ const pre_comp_exp = Float64[10.0^i for i=0:22]
         i +=1
     end
 
-    f1::Int64 = 0
+    # check if inf
+    y2 = iterate(str, i)
+    if y2!==nothing && _is_inf(str, i)
+        f = F(Inf)
+        i = y2[2] + 2
+    else
+        f1::Int64 = 0
 
-    # read an integer up to the decimal point
-    f1, rval1, idecpt = parse_uint_and_stop(str, i, len, f1)
-    idecpt = read_digits(str, idecpt, len) # get any trailing digits
-    i = idecpt
+        # read an integer up to the decimal point
+        f1, rval1, idecpt = parse_uint_and_stop(str, i, len, f1)
+        idecpt = read_digits(str, idecpt, len) # get any trailing digits
+        i = idecpt
 
-    ie = i
-    frac_digits = 0
+        ie = i
+        frac_digits = 0
 
-    # next thing must be dec pt.
-    if i <= len && @inbounds(codeunit(str, i)) == 0x2e # Check for '.'
-        i += 1
-        f1, rval2, ie = parse_uint_and_stop(str, i, len, f1)
-        frac_digits = ie - i
+        # next thing must be dec pt.
+        if i <= len && @inbounds(codeunit(str, i)) == 0x2e # Check for '.'
+            i += 1
+            f1, rval2, ie = parse_uint_and_stop(str, i, len, f1)
+            frac_digits = ie - i
 
-        ie = read_digits(str, ie, len) # get any trailing digits
-    elseif !rval1 # no first number, and now no deciaml point => invalid
-        @goto error
-    end
+            ie = read_digits(str, ie, len) # get any trailing digits
+        elseif !rval1 # no first number, and now no deciaml point => invalid
+            @goto error
+        end
 
-    # Next thing must be exponent
-    i = ie
-    eval::Int32 = 0
+        # Next thing must be exponent
+        i = ie
+        eval::Int32 = 0
 
-    if i <= len && _is_e(str, i)
-        i += 1
+        if i <= len && _is_e(str, i)
+            i += 1
 
-        enegate = false
-        if i<=len
-            if _is_negative(str, i)
-                enegate = true
-                i += 1
-            elseif _is_positive(str, i)
-                i += 1
+            enegate = false
+            if i<=len
+                if _is_negative(str, i)
+                    enegate = true
+                    i += 1
+                elseif _is_positive(str, i)
+                    i += 1
+                end
+            end
+            eval, rval3, i = parse_uint_and_stop(str, i, len, eval)
+            if enegate
+                eval *= Int32(-1)
             end
         end
-        eval, rval3, i = parse_uint_and_stop(str, i, len, eval)
-        if enegate
-            eval *= Int32(-1)
-        end
-    end
 
-    exp = eval - frac_digits
+        exp = eval - frac_digits
 
-    maxexp = 308
-    minexp = -307
+        maxexp = 308
+        minexp = -307
 
-    if frac_digits <= 15 && -22 <= exp <= 22
-        if exp >= 0
-            f = F(f1)*pre_comp_exp[exp+1]
+        if frac_digits <= 15 && -22 <= exp <= 22
+            if exp >= 0
+                f = F(f1)*pre_comp_exp[exp+1]
+            else
+                f = F(f1)/pre_comp_exp[-exp+1]
+            end
         else
-            f = F(f1)/pre_comp_exp[-exp+1]
+            f = convert_to_double(f1, exp)
         end
-    else
-          f = convert_to_double(f1, exp)
     end
 
     if negate
