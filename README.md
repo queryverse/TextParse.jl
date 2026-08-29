@@ -1,6 +1,6 @@
 # TextParse
 
-![](https://github.com/queryverse/TextParse.jl/workflows/Run%20CI%20on%20master/badge.svg)
+[![Build Status](https://github.com/queryverse/TextParse.jl/actions/workflows/juliaci.yml/badge.svg?branch=main)](https://github.com/queryverse/TextParse.jl/actions/workflows/juliaci.yml)
 [![codecov](https://codecov.io/gh/queryverse/TextParse.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/queryverse/TextParse.jl)
 
 TextParse uses Julia's generated functions to generate efficient specialized parsers for text files. Right now, there is a good set of features for reading CSV files (see [the documentation](https://www.queryverse.org/TextParse.jl/stable/)). Parsing packages can use TextParse as a framework for implementing parsers for other formats.
