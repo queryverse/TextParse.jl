@@ -19,7 +19,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 [compat]
 CodecZlib = "0.6, 0.7"
 julia = "1"
-DataStructures = "0.17, 0.18"
+DataStructures = "0.17, 0.18, 0.19"
 WeakRefStrings = "0.5, 0.6, 1"
 DoubleFloats = "0.9, 1"
 Nullables = "0.0.7, 0.0.8, 1"
