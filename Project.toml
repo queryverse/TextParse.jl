@@ -12,6 +12,7 @@ DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 Nullables = "4d1e1d77-625e-5b40-9113-a560ec7a8ecd"
 
 [extras]
+TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
@@ -24,4 +25,4 @@ DoubleFloats = "0.9, 1"
 Nullables = "0.0.7, 0.0.8, 1"
 
 [targets]
-test = ["Test", "Random"]
+test = ["Test", "Random", "TestItemRunner"]

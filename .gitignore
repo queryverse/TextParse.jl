@@ -8,3 +8,8 @@ docs/Manifest.toml
 .vscode
 *.cov
 lcov.info
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+test-output*.*
+Manifest.toml
