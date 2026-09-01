@@ -90,10 +90,26 @@ end
     end
 end
 
+"""
+    setmissing!(col, i)
+
+Record a missing value at index `i` of output column `col`. The default
+writes `missing`; a `missingarraytype` sink (see csv.jl) overloads this to
+store its own missing representation.
+"""
+@inline setmissing!(col, i) = (col[i] = missing; nothing)
+
 @inline function setcell!(col, i, val, str)
     col[i] = val
     PARSE_SUCCESS
 end
+
+@inline function setcell!(col, i, val::Missing, str)
+    setmissing!(col, i)
+    PARSE_SUCCESS
+end
+
+@inline setcell!(col::Nothing, i, val::Missing, str) = PARSE_SUCCESS
 
 @inline function setcell!(col::Nothing, i, val, str)
     PARSE_SUCCESS

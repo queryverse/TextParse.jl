@@ -72,6 +72,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `skiplines_begin`: skips specified number of lines at the beginning of the file
 - `header_exists`: boolean specifying whether CSV file contains a header
 - `nastrings`: strings that are to be considered NA. Defaults to `TextParse.NA_STRINGS`
+- `missingarraytype`: the output vector type for columns that contain missing values. Defaults to `Array` (columns come back as `Array{Union{Missing,T}}`). A package can plug in its own column type by implementing `allocmissing`, `setmissing!`, `promotemissing`, `ismissingcolumn` and `colmatchestype` for its type; requires `stringarraytype=Array`.
 - `colnames`: manually specified column names. Could be a vector or a dictionary from Int index (the column) to String column name.
 - `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior. If you pass `nothing` as the parser for a given column, that column will be skipped
 - `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
@@ -176,6 +177,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                  commentchar=nothing,
                  stringtype=String,
                  stringarraytype=StringArray,
+                 missingarraytype=Array,
                  noresize=false,
                  rowno::Int=1,
                  prevheaders=nothing,
@@ -196,6 +198,9 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     if pooledstrings === true
         @warn("pooledstrings argument has been removed")
+    end
+    if missingarraytype !== Array && stringarraytype !== Array
+        throw(ArgumentError("missingarraytype sinks require stringarraytype=Array"))
     end
     opts = LocalOpts(isascii(delim) ? UInt8(delim) : delim, spacedelim,
         isascii(quotechar) ? UInt8(quotechar) : quotechar,
@@ -297,7 +302,7 @@ function _csvread_internal(str::AbstractString, delim=',';
 
     if isempty(colspool)
         # this is the first file, use row_estimate
-        cols = makeoutputvecs(rec, row_estimate, stringtype, stringarraytype)
+        cols = makeoutputvecs(rec, row_estimate, stringtype, stringarraytype, missingarraytype)
         for (c2, h) in zip(cols, canonnames)
             colspool[h] = c2
         end
@@ -306,28 +311,30 @@ function _csvread_internal(str::AbstractString, delim=',';
             c = get(canonnames, i, i)
             f = rec.fields[i]
             if haskey(colspool, c)
-                if eltype(colspool[c]) == fieldtype(f) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString) || colspool[c]===nothing
+                if colmatchestype(colspool[c], fieldtype(f)) || (fieldtype(f) <: StrRange && eltype(colspool[c]) <: AbstractString) || colspool[c]===nothing
                     return colspool[c]
                 else
                     try
                         return colspool[c] = promote_column(colspool[c],
                                                             rowno-1,
-                                                            fieldtype(f), stringtype, stringarraytype)
+                                                            fieldtype(f), stringtype, stringarraytype,
+                                                            missingarraytype)
                     catch err
                         error("Could not convert column $c of eltype $(eltype(colspool[c])) to eltype $(fieldtype(f))")
                     end
                 end
             else
-                return colspool[c] = makeoutputvec(f, row_estimate, stringtype, stringarraytype)
+                return colspool[c] = makeoutputvec(f, row_estimate, stringtype, stringarraytype, missingarraytype)
             end
         end
         # promote missing columns to nullable
         missingcols = setdiff(collect(keys(colspool)), canonnames)
         for k in missingcols
-            if !ismissingtype(eltype(colspool[k])) && !(eltype(colspool[k]) <: StringLike)
+            if !ismissingcolumn(colspool[k]) && !(eltype(colspool[k]) <: StringLike)
                 colspool[k] = promote_column(colspool[k],
                                              rowno-1,
-                                             UnionMissing{eltype(colspool[k])}, stringtype, stringarraytype)
+                                             UnionMissing{eltype(colspool[k])}, stringtype, stringarraytype,
+                                             missingarraytype)
             end
         end
         cols = (_cols...,)
@@ -399,7 +406,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 col = cols[colidx]
                 f = rec.fields[colidx]
                 name = get(canonnames, colidx, colidx)
-                c = promote_field(s, f, col, err, nastrings, stringtype, stringarraytype, opts)
+                c = promote_field(s, f, col, err, nastrings, stringtype, stringarraytype, missingarraytype, opts)
                 if c[2]==:reparserequired
                     reparse_needed[colidx] = true
                     c = c[1], stringarraytype{stringtype,1}(undef, row_estimate)
@@ -413,7 +420,7 @@ function _csvread_internal(str::AbstractString, delim=',';
                 new_fields[end] = swapinner(new_fields[end], new_fields[end], eoldelim=true)
                 rec2 = Record((new_fields...,))
 
-                cols2 = makeoutputvecs(rec2, row_estimate, stringtype, stringarraytype)
+                cols2 = makeoutputvecs(rec2, row_estimate, stringtype, stringarraytype, missingarraytype)
                 for (iii, val) in enumerate(cols2)
                     if val!==nothing
                         colspool[iii] = val
@@ -464,7 +471,7 @@ function _csvread_internal(str::AbstractString, delim=',';
     cols, canonnames, parsers, finalrows
 end
 
-function promote_field(failed_str, field, col, err, nastrings, stringtype, stringarraytype, opts)
+function promote_field(failed_str, field, col, err, nastrings, stringtype, stringarraytype, missingarraytype, opts)
     if field.inner isa SkipToken
         # No need to change
         return field, col
@@ -478,7 +485,7 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, strin
         return swapinner(field, newtoken), :reparserequired
     end
     newcol = try
-        promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype, stringarraytype)
+        promote_column(col,  err.rowno-1, fieldtype(newtoken), stringtype, stringarraytype, missingarraytype)
     catch err2
         # TODO Should this really be shown?
         Base.showerror(stderr, err2)
@@ -488,7 +495,7 @@ function promote_field(failed_str, field, col, err, nastrings, stringtype, strin
     swapinner(field, newtoken), newcol
 end
 
-function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
+function promote_column(col, rowno, T, stringtype, stringarraytype, missingarraytype=Array, inner=false)
     if typeof(col) <: Array{Missing}
         if T <: StringLike
             arr = stringarraytype{stringtype,1}(undef, length(col))
@@ -497,17 +504,12 @@ function promote_column(col, rowno, T, stringtype, stringarraytype, inner=false)
             end
             return arr
         elseif ismissingtype(T)
-            fill!(Array{UnionMissing{eltype(T)}}(undef, length(col)), missing) # defaults to fill missing
+            return promotemissing(missingarraytype, col, rowno, T)
         else
             error("empty to non-nullable")
         end
     elseif ismissingtype(T)
-        arr = convert(Array{UnionMissing{T}}, col)
-        for i=rowno+1:length(arr)
-            # if we convert an Array{Int} to be missing-friendly, we will not have missing in here by default
-            arr[i] = missing
-        end
-        return arr
+        return promotemissing(missingarraytype, col, rowno, T)
     else
         newcol = Array{T, 1}(undef, length(col))
         copyto!(newcol, 1, col, 1, rowno)
@@ -648,11 +650,11 @@ function resizecols(colspool, nrecs)
     end
 end
 
-function makeoutputvecs(rec, N, stringtype, stringarraytype)
-    map(f->makeoutputvec(f, N, stringtype, stringarraytype), rec.fields)
+function makeoutputvecs(rec, N, stringtype, stringarraytype, missingarraytype=Array)
+    map(f->makeoutputvec(f, N, stringtype, stringarraytype, missingarraytype), rec.fields)
 end
 
-function makeoutputvec(eltyp, N, stringtype, stringarraytype)
+function makeoutputvec(eltyp, N, stringtype, stringarraytype, missingarraytype=Array)
     if fieldtype(eltyp)===Nothing
         return nothing
     elseif fieldtype(eltyp) == Missing # we weren't able to detect the type,
@@ -662,10 +664,68 @@ function makeoutputvec(eltyp, N, stringtype, stringarraytype)
         stringarraytype{stringtype,1}(undef, N)
     elseif ismissingtype(fieldtype(eltyp)) && fieldtype(eltyp) <: StrRange
         stringarraytype{Union{Missing, String},1}(undef, N)
+    elseif ismissingtype(fieldtype(eltyp)) && missingarraytype !== Array
+        allocmissing(missingarraytype, Base.nonmissingtype(fieldtype(eltyp)), N)
     else
         Array{fieldtype(eltyp)}(undef, N)
     end
 end
+
+# ---------------------------------------------------------------------------
+# The pluggable missing-value sink API.
+#
+# `csvread(...; missingarraytype=MA)` makes the parser store missing-capable
+# columns in the caller's own column type instead of Array{Union{Missing,T}},
+# without TextParse depending on that type's package. A sink `MA` implements
+# the functions below plus `setmissing!` (record.jl); its columns must also
+# support `setindex!` with plain values, `resize!`, and `length`.
+# Requires `stringarraytype=Array`.
+# ---------------------------------------------------------------------------
+
+"""
+    allocmissing(::Type{MA}, ::Type{T}, N)
+
+Allocate the length-`N` output vector for a column with value type `T` in
+which missing values may occur, under `missingarraytype=MA`. The default
+`Array` sink allocates `Array{Union{Missing,T}}`.
+"""
+allocmissing(::Type{Array}, ::Type{T}, N) where {T} = Array{UnionMissing{T}}(undef, N)
+
+"""
+    promotemissing(::Type{MA}, col, rowno, ::Type{T})
+
+Convert output column `col`, whose first `rowno` entries hold parsed values,
+into the missing-capable column for target type `T` (`T` includes `Missing`),
+under `missingarraytype=MA`. `col` is an `Array{Missing}` when every cell so
+far was blank, a plain `Vector` when the first missing value was just
+encountered, or an already-allocated sink column that needs widening.
+"""
+function promotemissing(::Type{Array}, col::Array{Missing}, rowno, ::Type{T}) where {T}
+    return fill!(Array{UnionMissing{eltype(T)}}(undef, length(col)), missing) # defaults to fill missing
+end
+function promotemissing(::Type{Array}, col::AbstractVector, rowno, ::Type{T}) where {T}
+    arr = convert(Array{UnionMissing{T}}, col)
+    for i=rowno+1:length(arr)
+        # if we convert an Array{Int} to be missing-friendly, we will not have missing in here by default
+        arr[i] = missing
+    end
+    return arr
+end
+
+"""
+    ismissingcolumn(col)
+
+Whether output column `col` can already hold missing values.
+"""
+ismissingcolumn(col) = ismissingtype(eltype(col))
+
+"""
+    colmatchestype(col, ::Type{T})
+
+Whether output column `col` can be reused as-is for a field whose parsed
+value type is `T`.
+"""
+colmatchestype(col, ::Type{T}) where {T} = eltype(col) == T
 
 
 mutable struct CSVParseError <: Exception
