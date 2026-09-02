@@ -74,7 +74,7 @@ Read CSV from `file`. Returns a tuple of 2 elements:
 - `nastrings`: strings that are to be considered NA. Defaults to `TextParse.NA_STRINGS`
 - `missingarraytype`: the output vector type for columns that contain missing values. Defaults to `Array` (columns come back as `Array{Union{Missing,T}}`). A package can plug in its own column type by implementing `allocmissing`, `setmissing!`, `promotemissing`, `ismissingcolumn` and `colmatchestype` for its type; requires `stringarraytype=Array`.
 - `colnames`: manually specified column names. Could be a vector or a dictionary from Int index (the column) to String column name.
-- `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [CustomParser](@ref) if you want to plug in custom parsing behavior. If you pass `nothing` as the parser for a given column, that column will be skipped
+- `colparsers`: Parsers to use for specified columns. This can be a vector or a dictionary from column name / column index (Int) to a "parser". The simplest parser is a type such as Int, Float64. It can also be a `dateformat"..."`, see [`CustomParser`](@ref) if you want to plug in custom parsing behavior. If you pass `nothing` as the parser for a given column, that column will be skipped
 - `type_detect_rows`: number of rows to use to infer the initial `colparsers` defaults to 20.
 """
 function csvread(file::String, delim=','; kwargs...)
