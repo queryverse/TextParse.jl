@@ -96,7 +96,7 @@ The parser function must return a tuple of two values:
 """
 CustomParser(f, T) = CustomParser{T,typeof(f)}(f)
 
-show(io::IO, c::CustomParser{T}) where {T} = print(io, "{{custom:$T}}")
+show(io::IO, ::CustomParser{T}) where {T} = print(io, "{{custom:$T}}")
 
 @inline function tryparsenext(c::CustomParser, str, i, len, opts)
     c.f(str, i, len, opts)
@@ -111,7 +111,7 @@ struct Numeric{T} <: AbstractToken{T}
     decimal::Char
     thousands::Char
 end
-show(io::IO, c::Numeric{T}) where {T} = print(io, "<$T>")
+show(io::IO, ::Numeric{T}) where {T} = print(io, "<$T>")
 
 Numeric(::Type{T}, decimal='.', thousands=',') where {T} = Numeric{T}(decimal, thousands)
 fromtype(::Type{N}) where {N<:Number} = Numeric(N)
@@ -222,16 +222,13 @@ end
                 i = y4[2]
             end
         end
-        eval, rval3, i = parse_uint_and_stop(str, i, len, eval)
+        eval, _, i = parse_uint_and_stop(str, i, len, eval)
         if enegate
             eval *= Int32(-1)
         end
     end
 
     exp = eval - frac_digits
-
-    maxexp = 308
-    minexp = -307
 
     if frac_digits <= 15 && -22 <= exp <= 22
         if exp >= 0
@@ -240,7 +237,7 @@ end
             f = F(f1)/10.0^(-exp)
         end
     else
-          f = convert_to_double(f1, exp)
+            f = convert_to_double(f1, exp)
     end
 
     if negate
@@ -287,14 +284,14 @@ It is used internally by `csvparse` for avoiding allocating strings.
 struct StringToken{T} <: AbstractToken{T}
 end
 
-function StringToken(t::Type{T}) where T
+function StringToken(::Type{T}) where T
     StringToken{T}()
 end
-show(io::IO, c::StringToken) = print(io, "<string>")
+show(io::IO, ::StringToken) = print(io, "<string>")
 
 fromtype(::Type{S}) where {S<:AbstractString} = StringToken(S)
 
-function tryparsenext(s::StringToken{T}, str, i, len, opts) where {T}
+function tryparsenext(::StringToken{T}, str, i, len, opts) where {T}
     inside_quoted_strong = Char(opts.endchar) == Char(opts.quotechar)
     escapecount = 0
     R = Nullable{T}
