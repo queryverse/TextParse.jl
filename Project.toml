@@ -21,6 +21,7 @@ test = ["Test", "Random", "TestItemRunner"]
 
 [compat]
 DataStructures = "0.17, 0.18, 0.19"
+Mmap = "< 0.0.1, 1"
 Dates = "< 0.0.1, 1"
 julia = "1"
 CodecZlib = "0.6, 0.7"
